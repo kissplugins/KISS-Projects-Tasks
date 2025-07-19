@@ -1,6 +1,6 @@
 <canvas>
 
-# 🚀 Project & Task Time Tracker
+# 🚀 KISS Project & Task Time Tracker
 
 A robust WordPress plugin for tracking time spent on client projects and individual tasks. It integrates seamlessly with the WordPress admin area and provides a flexible front-end interface for users.
 
