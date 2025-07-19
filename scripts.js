@@ -99,15 +99,53 @@ jQuery(document).ready(function ($) {
         const $projectSelect = $('#ptt_project');
         const $taskSelect = $('#ptt_task');
         const $createNewFields = $('#ptt-create-new-fields');
-        const $taskBudgetDisplay = $('#ptt-task-budget-display');
         const $projectBudgetDisplay = $('#ptt-project-budget-display');
+        const $taskBudgetDisplay = $('#ptt-task-budget-display');
+        let suggestedTimeInterval = null;
+
+        /**
+         * Calculates and updates the suggested end time text.
+         */
+        function updateSuggestedTime() {
+            if (!$taskBudgetDisplay.is(':visible') || !$taskBudgetDisplay.data('budget-hours')) {
+                if (suggestedTimeInterval) clearInterval(suggestedTimeInterval);
+                return;
+            }
+            const taskBudgetHours = parseFloat($taskBudgetDisplay.data('budget-hours'));
+            let budgetString = `This Task's Budget: ${taskBudgetHours.toFixed(2)} hour(s)`;
+
+            if (taskBudgetHours > 0) {
+                const now = new Date();
+                const suggestedEndTime = new Date(now.getTime() + taskBudgetHours * 60 * 60 * 1000);
+                
+                let hours = suggestedEndTime.getHours();
+                const minutes = suggestedEndTime.getMinutes();
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                
+                hours = hours % 12;
+                hours = hours ? hours : 12; // The hour '0' should be '12'
+                
+                let formattedTime = String(hours);
+                
+                if (minutes > 0) {
+                    const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
+                    formattedTime += `:${formattedMinutes}`;
+                }
+                
+                formattedTime += ` ${ampm}`;
+                budgetString += ` (Suggested end time at approx. ${formattedTime})`;
+            }
+            $taskBudgetDisplay.text(budgetString);
+        }
 
         // When project changes, fetch its tasks
         $projectSelect.on('change', function() {
+            if (suggestedTimeInterval) clearInterval(suggestedTimeInterval);
             const projectId = $(this).val();
+
             $taskSelect.html('<option value="">Loading tasks...</option>').prop('disabled', true);
             $createNewFields.hide();
-            $taskBudgetDisplay.hide();
+            $taskBudgetDisplay.hide().data('budget-hours', '');
             $projectBudgetDisplay.hide();
 
             if (!projectId) {
@@ -120,35 +158,36 @@ jQuery(document).ready(function ($) {
                 nonce: ptt_ajax_object.nonce,
                 project_id: projectId
             }).done(function(response) {
-                // BUG FIX: The logic here was updated to be more robust.
+                if (response.success && response.data.budget && parseFloat(response.data.budget) > 0) {
+                    let budget = parseFloat(response.data.budget);
+                    let unit = (budget === 1) ? 'hr' : 'hrs';
+                    $projectBudgetDisplay.text(`- Initial Budget: ${budget} ${unit}`).show();
+                }
+
                 let options;
-                if (response.success && response.data.length > 0) {
+                if (response.success && response.data.tasks.length > 0) {
                     options = '<option value="">-- Select a Task --</option>';
-                    response.data.forEach(function(task) {
+                    response.data.tasks.forEach(function(task) {
                         options += `<option value="${task.id}">${task.title}</option>`;
                     });
                 } else {
-                    // Handle case where no tasks are found
                     options = '<option value="">No un-started tasks found</option>';
                 }
                 
-                // Always add the "Create New Task" option so the user is never stuck.
                 options += '<option value="new">-- Create New Task --</option>';
-                
-                // Always update the HTML and re-enable the dropdown.
                 $taskSelect.html(options).prop('disabled', false);
 
             }).fail(function() {
-                // Also handle AJAX errors gracefully
                 $taskSelect.html('<option value="new">Error loading tasks. Create new?</option>').prop('disabled', false);
             });
         });
 
         // When task changes, show/hide relevant fields
         $taskSelect.on('change', function() {
+            if (suggestedTimeInterval) clearInterval(suggestedTimeInterval);
             const taskId = $(this).val();
-            $taskBudgetDisplay.hide();
-            $projectBudgetDisplay.hide();
+
+            $taskBudgetDisplay.hide().data('budget-hours', '');
 
             if (taskId === 'new') {
                 $createNewFields.show();
@@ -161,40 +200,10 @@ jQuery(document).ready(function ($) {
                         nonce: ptt_ajax_object.nonce,
                         task_id: taskId
                     }).done(function(response) {
-                        if (response.success) {
-                            if (response.data.project_budget) {
-                                $projectBudgetDisplay.text(`Project Budget: ${response.data.project_budget} hour(s)`).show();
-                            }
-                            
-                            if (response.data.task_budget) {
-                                const taskBudgetHours = parseFloat(response.data.task_budget);
-                                let budgetString = `This Task's Budget: ${taskBudgetHours} hour(s)`;
-
-                                if (taskBudgetHours > 0) {
-                                    const now = new Date();
-                                    const suggestedEndTime = new Date(now.getTime() + taskBudgetHours * 60 * 60 * 1000);
-                                    
-                                    let hours = suggestedEndTime.getHours();
-                                    const minutes = suggestedEndTime.getMinutes();
-                                    const ampm = hours >= 12 ? 'PM' : 'AM';
-                                    
-                                    hours = hours % 12;
-                                    hours = hours ? hours : 12; // The hour '0' should be '12'
-                                    
-                                    let formattedTime = String(hours);
-                                    
-                                    if (minutes > 0) {
-                                        const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
-                                        formattedTime += `:${formattedMinutes}`;
-                                    }
-                                    
-                                    formattedTime += ` ${ampm}`;
-
-                                    budgetString += ` (Suggested end time at approx. ${formattedTime})`;
-                                }
-
-                                $taskBudgetDisplay.text(budgetString).show();
-                            }
+                        if (response.success && response.data.task_budget && parseFloat(response.data.task_budget) > 0) {
+                            $taskBudgetDisplay.data('budget-hours', response.data.task_budget).show();
+                            updateSuggestedTime(); // Initial call
+                            suggestedTimeInterval = setInterval(updateSuggestedTime, 300000); // 5 minutes
                         }
                     });
                 }
@@ -205,7 +214,6 @@ jQuery(document).ready(function ($) {
         $newTaskForm.on('submit', function (e) {
             e.preventDefault();
 
-            // Manual validation before proceeding
             const client = $('#ptt_client').val();
             const project = $projectSelect.val();
             const task = $taskSelect.val();
@@ -231,7 +239,6 @@ jQuery(document).ready(function ($) {
             let formData;
 
             if (selectedTaskId === 'new') {
-                // Creating a new task
                 ajaxAction = 'ptt_frontend_start_task';
                 formData = {
                     action: ajaxAction,
@@ -242,7 +249,6 @@ jQuery(document).ready(function ($) {
                     notes: $('#ptt_notes').val(),
                 };
             } else {
-                // Starting an existing task
                 ajaxAction = 'ptt_start_timer';
                 formData = {
                     action: ajaxAction,
@@ -256,7 +262,7 @@ jQuery(document).ready(function ($) {
                     if (response.success) {
                         const currentTaskName = (selectedTaskId === 'new') ? formData.task_name : $taskSelect.find('option:selected').text();
                         $('#ptt-active-task-name').text(currentTaskName);
-                        $('#ptt-frontend-stop-btn').data('postid', response.data.post_id || selectedTaskId);
+                        $('#ptt-frontend-stop-btn').data('postid', response.data.post_id);
                         $newTaskForm.hide();
                         $activeTaskDisplay.show();
                         $('#ptt-frontend-message').hide();
@@ -268,7 +274,6 @@ jQuery(document).ready(function ($) {
                     showMessage($('#ptt-frontend-message').parent(), 'An unexpected error occurred.', true);
                 })
                 .always(function () {
-                    // Re-enable button on failure
                     if (!$activeTaskDisplay.is(':visible')) {
                         $button.prop('disabled', false);
                     }
@@ -278,6 +283,7 @@ jQuery(document).ready(function ($) {
 
         // Stop the active task from the frontend
         $('#ptt-frontend-stop-btn').on('click', function () {
+            if (suggestedTimeInterval) clearInterval(suggestedTimeInterval);
             const $button = $(this);
             const postId = $button.data('postid');
             showSpinner($activeTaskDisplay);
@@ -291,14 +297,13 @@ jQuery(document).ready(function ($) {
                 if (response.success) {
                     $activeTaskDisplay.hide();
                     $newTaskForm.trigger('reset');
-                    // Manually reset dropdowns to initial state
+                    // Manually reset dropdowns and displays
                     $projectSelect.val('');
                     $taskSelect.html('<option value="">-- Select Project First --</option>').prop('disabled', true);
                     $createNewFields.hide();
-                    $taskBudgetDisplay.hide();
+                    $taskBudgetDisplay.hide().data('budget-hours', '');
                     $projectBudgetDisplay.hide();
                     $newTaskForm.show();
-                    // Ensure start button is enabled
                     $('#ptt-frontend-start-btn').prop('disabled', false);
                     showMessage($('#ptt-frontend-message').parent(), response.data.message, false);
                 } else {
