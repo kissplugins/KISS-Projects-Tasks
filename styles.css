@@ -1,0 +1,150 @@
+/* --- Admin & General Styles --- */
+.ptt-start-button {
+    background-color: #4CAF50 !important; /* Green */
+    border-color: #4CAF50 !important;
+    color: white !important;
+}
+
+.ptt-stop-button {
+    background-color: #f44336 !important; /* Red */
+    border-color: #f44336 !important;
+    color: white !important;
+}
+
+#ptt-timer-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 8px;
+}
+
+#ptt-timer-controls button {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+}
+
+/* Spinner for AJAX actions */
+.ptt-ajax-spinner {
+    display: none;
+    background: url('/wp-admin/images/spinner.gif') no-repeat;
+    width: 20px;
+    height: 20px;
+    vertical-align: middle;
+    margin-left: 10px;
+}
+
+.ptt-ajax-message {
+    font-size: 13px;
+    padding: 5px 0;
+    color: #444;
+}
+
+.ptt-ajax-message.success {
+    color: #2b8a3e;
+}
+.ptt-ajax-message.error {
+    color: #d94848;
+}
+
+/* --- Frontend Shortcode Styles --- */
+.ptt-frontend-container {
+    max-width: 600px;
+    border: 1px solid #ddd;
+    padding: 20px;
+    border-radius: 4px;
+    background: #f9f9f9;
+}
+
+.ptt-frontend-container .ptt-form-field {
+    margin-bottom: 15px;
+}
+
+.ptt-frontend-container label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.ptt-frontend-container input[type="text"],
+.ptt-frontend-container textarea,
+.ptt-frontend-container select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+#ptt-active-task-display {
+    border: 2px dashed #4CAF50;
+    padding: 15px;
+    margin-bottom: 20px;
+    background: #e8f5e9;
+}
+#ptt-active-task-display h3 {
+    margin-top: 0;
+}
+
+.ptt-task-budget {
+    color: #f44336; /* Red */
+    font-weight: bold;
+    padding: 10px;
+    background-color: #ffebee;
+    border: 1px solid #f44336;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+/* --- Report Styles --- */
+.ptt-report-results .client-group {
+    margin-bottom: 30px;
+    padding: 15px;
+    border: 1px solid #e5e5e5;
+    background: #fff;
+}
+.ptt-report-results .project-group {
+    margin-bottom: 20px;
+    padding-left: 20px;
+}
+
+.ptt-report-results h4 {
+    border-bottom: 2px solid #ccc;
+    padding-bottom: 5px;
+}
+
+.ptt-report-results h5 {
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+}
+
+.subtotal {
+    font-weight: normal;
+    font-size: 0.9em;
+    color: #666;
+}
+
+.grand-total {
+    margin-top: 20px;
+    padding: 15px;
+    background: #333;
+    color: #fff;
+    font-size: 1.2em;
+    text-align: right;
+}
+
+/* --- Self Test Styles --- */
+#ptt-test-results-container table {
+    width: 100%;
+    margin-top: 1em;
+}
+
+#ptt-test-results-container .status-pass {
+    color: green;
+    font-weight: bold;
+}
+
+#ptt-test-results-container .status-fail {
+    color: red;
+    font-weight: bold;
+}
