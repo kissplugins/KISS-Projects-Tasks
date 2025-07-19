@@ -324,6 +324,13 @@ jQuery(document).ready(function ($) {
      * ADMIN REPORTS PAGE
      * ---------------------------------------------------------------
      */
+    const formatDate = (date) => {
+        const y = date.getFullYear();
+        const m = ('0' + (date.getMonth() + 1)).slice(-2);
+        const d = ('0' + date.getDate()).slice(-2);
+        return `${y}-${m}-${d}`;
+    };
+
     $('#set-this-week').on('click', function(e) {
         e.preventDefault();
         const today = new Date();
@@ -334,17 +341,26 @@ jQuery(document).ready(function ($) {
         
         const saturday = new Date(today);
         saturday.setDate(today.getDate() - day + 6);
-        
-        const formatDate = (date) => {
-            const y = date.getFullYear();
-            const m = ('0' + (date.getMonth() + 1)).slice(-2);
-            const d = ('0' + date.getDate()).slice(-2);
-            return `${y}-${m}-${d}`;
-        };
 
         $('#start_date').val(formatDate(sunday));
         $('#end_date').val(formatDate(saturday));
     });
+
+    $('#set-last-week').on('click', function(e) {
+        e.preventDefault();
+        const today = new Date();
+        const day = today.getDay();
+        
+        const lastSunday = new Date(today);
+        lastSunday.setDate(today.getDate() - day - 7);
+        
+        const lastSaturday = new Date(today);
+        lastSaturday.setDate(today.getDate() - day - 1);
+
+        $('#start_date').val(formatDate(lastSunday));
+        $('#end_date').val(formatDate(lastSaturday));
+    });
+
 
     /**
      * ---------------------------------------------------------------
