@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.4.0
+ * Version:           1.4.1
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.4.0' );
+define( 'PTT_VERSION', '1.4.1' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -547,17 +547,16 @@ add_action( 'wp_ajax_ptt_stop_timer', 'ptt_stop_timer_callback' );
 // =================================================================
 
 /**
- * Adds the top-level "Reports" menu page.
+ * Adds the "Reports" page under the "Tasks" menu.
  */
 function ptt_add_reports_page() {
-    add_menu_page(
-        'Time Reports',
-        'Reports',
-        'manage_options',
-        'ptt-reports',
-        'ptt_reports_page_html',
-        'dashicons-chart-bar',
-        30
+    add_submenu_page(
+        'edit.php?post_type=project_task', // Parent slug
+        'Time Reports',                    // Page title
+        'Reports',                         // Menu title
+        'manage_options',                  // Capability
+        'ptt-reports',                     // Menu slug
+        'ptt_reports_page_html'            // Function
     );
 }
 add_action( 'admin_menu', 'ptt_add_reports_page' );
@@ -597,13 +596,39 @@ function ptt_reports_page_html() {
                             ] ); ?>
                         </td>
                     </tr>
+                     <tr>
+                        <th scope="row"><label for="client_id">Select Client</label></th>
+                        <td>
+                            <?php wp_dropdown_categories( [
+                                'taxonomy'        => 'client',
+                                'name'            => 'client_id',
+                                'show_option_all' => 'All Clients',
+                                'hide_empty'      => false,
+                                'selected'        => isset($_POST['client_id']) ? intval($_POST['client_id']) : 0,
+                                'hierarchical'    => true,
+                            ] ); ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="project_id">Select Project</label></th>
+                        <td>
+                             <?php wp_dropdown_categories( [
+                                'taxonomy'        => 'project',
+                                'name'            => 'project_id',
+                                'show_option_all' => 'All Projects',
+                                'hide_empty'      => false,
+                                'selected'        => isset($_POST['project_id']) ? intval($_POST['project_id']) : 0,
+                                'hierarchical'    => true,
+                            ] ); ?>
+                        </td>
+                    </tr>
                     <tr>
                         <th scope="row"><label for="start_date">Date Range</label></th>
                         <td>
                             <input type="date" id="start_date" name="start_date" value="<?php echo isset($_POST['start_date']) ? esc_attr($_POST['start_date']) : ''; ?>">
                             to
                             <input type="date" id="end_date" name="end_date" value="<?php echo isset($_POST['end_date']) ? esc_attr($_POST['end_date']) : ''; ?>">
-                             <button type="button" id="set-this-week" class="button">This Week</button>
+                             <button type="button" id="set-this-week" class="button">This Week (Sun-Sat)</button>
                         </td>
                     </tr>
                 </tbody>
@@ -627,25 +652,27 @@ function ptt_reports_page_html() {
  * Queries and displays the report results.
  */
 function ptt_display_report_results() {
-    $user_id = isset( $_POST['user_id'] ) ? intval( $_POST['user_id'] ) : 0;
+    $user_id    = isset( $_POST['user_id'] ) ? intval( $_POST['user_id'] ) : 0;
+    $client_id  = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
+    $project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
     $start_date = isset( $_POST['start_date'] ) && $_POST['start_date'] ? sanitize_text_field( $_POST['start_date'] ) : null;
-    $end_date = isset( $_POST['end_date'] ) && $_POST['end_date'] ? sanitize_text_field( $_POST['end_date'] ) : null;
+    $end_date   = isset( $_POST['end_date'] ) && $_POST['end_date'] ? sanitize_text_field( $_POST['end_date'] ) : null;
 
     $args = [
-        'post_type' => 'project_task',
+        'post_type'      => 'project_task',
         'posts_per_page' => -1,
-        'post_status' => 'publish',
-        'orderby' => 'author',
-        'order' => 'ASC',
-        'meta_query' => [
+        'post_status'    => 'publish',
+        'orderby'        => 'author',
+        'order'          => 'ASC',
+        'meta_query'     => [
             'relation' => 'AND',
             [ // Only include tasks that have been completed
-                'key' => 'stop_time',
+                'key'     => 'stop_time',
                 'compare' => 'EXISTS'
             ],
             [
-                'key' => 'stop_time',
-                'value' => '',
+                'key'     => 'stop_time',
+                'value'   => '',
                 'compare' => '!='
             ]
         ]
@@ -655,12 +682,33 @@ function ptt_display_report_results() {
         $args['author'] = $user_id;
     }
 
+    // Add taxonomy query
+    $tax_query = ['relation' => 'AND'];
+    if ( $client_id ) {
+        $tax_query[] = [
+            'taxonomy' => 'client',
+            'field'    => 'term_id',
+            'terms'    => $client_id,
+        ];
+    }
+    if ( $project_id ) {
+        $tax_query[] = [
+            'taxonomy' => 'project',
+            'field'    => 'term_id',
+            'terms'    => $project_id,
+        ];
+    }
+    if ( count( $tax_query ) > 1 ) {
+        $args['tax_query'] = $tax_query;
+    }
+
+
     if ( $start_date && $end_date ) {
         $args['meta_query'][] = [
-            'key' => 'start_time',
-            'value' => [ $start_date . ' 00:00:00', $end_date . ' 23:59:59' ],
+            'key'     => 'start_time',
+            'value'   => [ $start_date . ' 00:00:00', $end_date . ' 23:59:59' ],
             'compare' => 'BETWEEN',
-            'type' => 'DATETIME'
+            'type'    => 'DATETIME'
         ];
     }
 
@@ -677,17 +725,17 @@ function ptt_display_report_results() {
 
     while ( $query->have_posts() ) {
         $query->the_post();
-        $post_id = get_the_ID();
-        $author_id = get_the_author_meta('ID');
-        $author_name = get_the_author_meta('display_name');
+        $post_id      = get_the_ID();
+        $author_id    = get_the_author_meta('ID');
+        $author_name  = get_the_author_meta('display_name');
 
-        $clients = get_the_terms($post_id, 'client');
-        $client_name = !is_wp_error($clients) && !empty($clients) ? $clients[0]->name : 'Uncategorized';
-        $client_id = !is_wp_error($clients) && !empty($clients) ? $clients[0]->term_id : 0;
+        $clients      = get_the_terms($post_id, 'client');
+        $client_name  = !is_wp_error($clients) && !empty($clients) ? $clients[0]->name : 'Uncategorized';
+        $client_id_term = !is_wp_error($clients) && !empty($clients) ? $clients[0]->term_id : 0;
         
-        $projects = get_the_terms($post_id, 'project');
+        $projects     = get_the_terms($post_id, 'project');
         $project_name = !is_wp_error($projects) && !empty($projects) ? $projects[0]->name : 'Uncategorized';
-        $project_id = !is_wp_error($projects) && !empty($projects) ? $projects[0]->term_id : 0;
+        $project_id_term = !is_wp_error($projects) && !empty($projects) ? $projects[0]->term_id : 0;
         
         $duration = (float) get_field('calculated_duration', $post_id);
         $grand_total += $duration;
@@ -696,21 +744,21 @@ function ptt_display_report_results() {
             $report_data[$author_id] = ['name' => $author_name, 'clients' => [], 'total' => 0];
         }
 
-        if (!isset($report_data[$author_id]['clients'][$client_id])) {
-            $report_data[$author_id]['clients'][$client_id] = ['name' => $client_name, 'projects' => [], 'total' => 0];
+        if (!isset($report_data[$author_id]['clients'][$client_id_term])) {
+            $report_data[$author_id]['clients'][$client_id_term] = ['name' => $client_name, 'projects' => [], 'total' => 0];
         }
 
-        if (!isset($report_data[$author_id]['clients'][$client_id]['projects'][$project_id])) {
-            $report_data[$author_id]['clients'][$client_id]['projects'][$project_id] = ['name' => $project_name, 'tasks' => [], 'total' => 0];
+        if (!isset($report_data[$author_id]['clients'][$client_id_term]['projects'][$project_id_term])) {
+            $report_data[$author_id]['clients'][$client_id_term]['projects'][$project_id_term] = ['name' => $project_name, 'tasks' => [], 'total' => 0];
         }
 
         $report_data[$author_id]['total'] += $duration;
-        $report_data[$author_id]['clients'][$client_id]['total'] += $duration;
-        $report_data[$author_id]['clients'][$client_id]['projects'][$project_id]['total'] += $duration;
-        $report_data[$author_id]['clients'][$client_id]['projects'][$project_id]['tasks'][] = [
-            'id' => $post_id,
-            'title' => get_the_title(),
-            'date' => get_field('start_time', $post_id),
+        $report_data[$author_id]['clients'][$client_id_term]['total'] += $duration;
+        $report_data[$author_id]['clients'][$client_id_term]['projects'][$project_id_term]['total'] += $duration;
+        $report_data[$author_id]['clients'][$client_id_term]['projects'][$project_id_term]['tasks'][] = [
+            'id'       => $post_id,
+            'title'    => get_the_title(),
+            'date'     => get_field('start_time', $post_id),
             'duration' => $duration
         ];
     }
@@ -721,9 +769,7 @@ function ptt_display_report_results() {
     echo '<div class="ptt-report-results">';
     
     foreach ($report_data as $author) {
-        if (!$user_id) { // Only show user header if report is for all users
-             echo '<h3>User: ' . esc_html($author['name']) . '</h3>';
-        }
+        echo '<h3>User: ' . esc_html($author['name']) . ' <span class="subtotal">(User Total: ' . number_format($author['total'], 2) . ' hrs)</span></h3>';
        
         foreach ($author['clients'] as $client) {
             echo '<div class="client-group">';
