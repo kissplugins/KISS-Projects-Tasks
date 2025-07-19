@@ -23,7 +23,7 @@ A robust WordPress plugin for tracking time spent on client projects and individ
     * `styles.css`
     * `scripts.js`
 4.  Activate the plugin through the 'Plugins' menu in your WordPress admin dashboard.
-5.  Ensure ACF Pro is also activated. The necessary custom fields will be created automatically.
+5.  ACF Pro (Premium/paid) plugin is required and needs to be activated. The necessary custom fields will be created automatically.
 
 ***
 
