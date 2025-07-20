@@ -24,6 +24,16 @@
     justify-content: center;
 }
 
+#ptt-active-task-timer .colon {
+    animation: ptt-blink 1s step-end infinite;
+}
+
+@keyframes ptt-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
 /* Spinner for AJAX actions */
 .ptt-ajax-spinner {
     display: none;

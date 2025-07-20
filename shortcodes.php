@@ -28,6 +28,7 @@ function ptt_task_enter_shortcode() {
         <div id="ptt-active-task-display" style="display: none;">
             <h3>Active Task</h3>
             <p><strong>Task:</strong> <span id="ptt-active-task-name"></span></p>
+            <p><strong>Time Elapsed:</strong> <span id="ptt-active-task-timer"><span class="hours">00</span><span class="colon">:</span><span class="minutes">00</span></span></p>
             <button id="ptt-frontend-stop-btn" class="button ptt-stop-button" data-postid="">Stop Timer</button>
             <div class="ptt-ajax-spinner"></div>
         </div>
@@ -101,8 +102,12 @@ function ptt_frontend_start_task_callback() {
     $user_id = get_current_user_id();
 
     // Check for concurrent tasks
-    if ( ptt_has_active_task( $user_id ) ) {
-        wp_send_json_error( [ 'message' => 'You have another task running. Please stop it before starting a new one.' ] );
+    $active_task_id = ptt_has_active_task( $user_id );
+    if ( $active_task_id > 0 ) {
+        wp_send_json_error( [ 
+            'message' => 'You have another task running. Please stop it before starting a new one.',
+            'active_task_id' => $active_task_id
+        ] );
     }
 
     // Sanitize inputs

@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.4.5
+ * Version:           1.4.7
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.4.5' );
+define( 'PTT_VERSION', '1.4.7' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -336,7 +336,8 @@ function ptt_enqueue_assets() {
         'ajax_url' => admin_url( 'admin-ajax.php' ),
         'nonce'    => wp_create_nonce( 'ptt_ajax_nonce' ),
         'confirm_stop' => __('Are you sure you want to stop the timer?', 'ptt'),
-        'concurrent_error' => __('You have another task running. Please stop it before starting a new one.', 'ptt')
+        'concurrent_error' => __('You have another task running. Please stop it before starting a new one.', 'ptt'),
+        'edit_post_link' => admin_url('post.php?action=edit&post='), // Add this line
     ]);
 }
 // Enqueue for admin screens
@@ -447,13 +448,14 @@ add_action( 'post_submitbox_misc_actions', 'ptt_add_start_stop_buttons' );
  *
  * @param int $user_id The user ID to check.
  * @param int $exclude_post_id A post ID to exclude from the check (optional).
- * @return bool True if an active task exists, false otherwise.
+ * @return int The ID of the active post, or 0 if none.
  */
 function ptt_has_active_task( $user_id, $exclude_post_id = 0 ) {
     $args = [
         'post_type'      => 'project_task',
         'author'         => $user_id,
         'posts_per_page' => 1,
+        'fields'         => 'ids', // Only get post IDs
         'meta_query'     => [
             'relation' => 'AND',
             [
@@ -469,6 +471,11 @@ function ptt_has_active_task( $user_id, $exclude_post_id = 0 ) {
                 'key'     => 'stop_time',
                 'compare' => 'NOT EXISTS',
             ],
+             [
+                'key'     => 'stop_time',
+                'value'   => '',
+                'compare' => '=',
+            ]
         ],
     ];
 
@@ -477,8 +484,14 @@ function ptt_has_active_task( $user_id, $exclude_post_id = 0 ) {
     }
 
     $query = new WP_Query( $args );
-    return $query->have_posts();
+    
+    if ( $query->have_posts() ) {
+        return $query->posts[0];
+    }
+    
+    return 0;
 }
+
 
 /**
  * AJAX handler to start the timer. This is used by both Admin and Frontend.
@@ -497,8 +510,12 @@ function ptt_start_timer_callback() {
 
     // Check for concurrent tasks
     $user_id = get_current_user_id();
-    if ( ptt_has_active_task( $user_id, $post_id ) ) {
-        wp_send_json_error( [ 'message' => 'You have another task running. Please stop it before starting a new one.' ] );
+    $active_task_id = ptt_has_active_task( $user_id, $post_id );
+    if ( $active_task_id > 0 ) {
+        wp_send_json_error( [ 
+            'message' => 'You have another task running. Please stop it before starting a new one.',
+            'active_task_id' => $active_task_id
+        ] );
     }
 
     $current_time = current_time( 'Y-m-d H:i:s' );
@@ -513,6 +530,34 @@ function ptt_start_timer_callback() {
     wp_send_json_success( [ 'message' => 'Timer started!', 'start_time' => $current_time, 'post_id' => $post_id ] );
 }
 add_action( 'wp_ajax_ptt_start_timer', 'ptt_start_timer_callback' );
+
+/**
+ * AJAX handler to get info about the currently active task.
+ */
+function ptt_get_active_task_info_callback() {
+    check_ajax_referer('ptt_ajax_nonce', 'nonce');
+
+    if ( !is_user_logged_in() || !current_user_can('edit_posts') ) {
+        wp_send_json_error(['message' => 'Permission denied.']);
+    }
+
+    $user_id = get_current_user_id();
+    $active_task_id = ptt_has_active_task($user_id);
+
+    if ( !$active_task_id ) {
+        wp_send_json_error(['message' => 'No active task found.']);
+    }
+
+    $start_time = get_field('start_time', $active_task_id);
+
+    wp_send_json_success([
+        'post_id'    => $active_task_id,
+        'task_name'  => get_the_title($active_task_id),
+        'start_time' => $start_time,
+    ]);
+}
+add_action('wp_ajax_ptt_get_active_task_info', 'ptt_get_active_task_info_callback');
+
 
 /**
  * AJAX handler to stop the timer.

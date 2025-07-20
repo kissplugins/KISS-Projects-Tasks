@@ -22,6 +22,15 @@ jQuery(document).ready(function ($) {
             .fadeOut('slow');
     }
 
+    function showMessageWithHTML($container, html, isError) {
+        $container.find('.ptt-ajax-message')
+            .html(html)
+            .removeClass('success error')
+            .addClass(isError ? 'error' : 'success')
+            .show();
+    }
+
+
     /**
      * ---------------------------------------------------------------
      * ADMIN UI (CPT EDITOR)
@@ -101,7 +110,58 @@ jQuery(document).ready(function ($) {
         const $createNewFields = $('#ptt-create-new-fields');
         const $projectBudgetDisplay = $('#ptt-project-budget-display');
         const $taskBudgetDisplay = $('#ptt-task-budget-display');
+        const $messageContainer = $('#ptt-frontend-message').parent();
         let suggestedTimeInterval = null;
+        let activeTimerInterval = null;
+
+
+        /**
+         * Fetches active task info and updates the UI.
+         */
+        function checkActiveTask() {
+            $.post(ptt_ajax_object.ajax_url, {
+                action: 'ptt_get_active_task_info',
+                nonce: ptt_ajax_object.nonce
+            }).done(function(response) {
+                if (response.success) {
+                    $('#ptt-active-task-name').text(response.data.task_name);
+                    $('#ptt-frontend-stop-btn').data('postid', response.data.post_id);
+                    $newTaskForm.hide();
+                    $activeTaskDisplay.show();
+                    startActiveTimer(response.data.start_time);
+                }
+            });
+        }
+        
+        // Check for active task on page load
+        checkActiveTask();
+
+        /**
+         * Starts the on-screen timer.
+         */
+        function startActiveTimer(startTimeStr) {
+            if (activeTimerInterval) clearInterval(activeTimerInterval);
+
+            const startTime = new Date(startTimeStr.replace(/-/g, '/')); // Fix for cross-browser parsing
+
+            const updateTimer = () => {
+                const now = new Date();
+                const diff = now - startTime;
+                
+                const hours = Math.floor(diff / 3600000);
+                const minutes = Math.floor((diff % 3600000) / 60000);
+
+                const formattedHours = ('0' + hours).slice(-2);
+                const formattedMinutes = ('0' + minutes).slice(-2);
+
+                $('#ptt-active-task-timer .hours').text(formattedHours);
+                $('#ptt-active-task-timer .minutes').text(formattedMinutes);
+            };
+
+            updateTimer(); // Initial call
+            activeTimerInterval = setInterval(updateTimer, 60000); // Update every minute
+        }
+
 
         /**
          * Calculates and updates the suggested end time text.
@@ -220,12 +280,12 @@ jQuery(document).ready(function ($) {
             const taskName = $('#ptt_task_name').val();
 
             if (!client || !project || !task) {
-                showMessage($('#ptt-frontend-message').parent(), 'Please select a Client, Project, and Task.', true);
+                showMessage($messageContainer, 'Please select a Client, Project, and Task.', true);
                 return;
             }
     
             if (task === 'new' && !taskName.trim()) {
-                showMessage($('#ptt-frontend-message').parent(), 'Please enter a name for the new task.', true);
+                showMessage($messageContainer, 'Please enter a name for the new task.', true);
                 return;
             }
 
@@ -266,12 +326,20 @@ jQuery(document).ready(function ($) {
                         $newTaskForm.hide();
                         $activeTaskDisplay.show();
                         $('#ptt-frontend-message').hide();
+                        startActiveTimer(response.data.start_time);
                     } else {
-                        showMessage($('#ptt-frontend-message').parent(), response.data.message, true);
+                         if (response.data.active_task_id) {
+                            const stopLink = `<a href="#" class="ptt-stop-and-start-new" data-postid="${response.data.active_task_id}">stop</a>`;
+                            const viewLink = `<a href="${ptt_ajax_object.edit_post_link}${response.data.active_task_id}" target="_blank">view the task</a>`;
+                            const message = `You have another task running. Would you like to ${stopLink} the task and create a new one? Or would you like to ${viewLink} and current time for it?`;
+                            showMessageWithHTML($messageContainer, message, true);
+                        } else {
+                            showMessage($messageContainer, response.data.message, true);
+                        }
                     }
                 })
                 .fail(function () {
-                    showMessage($('#ptt-frontend-message').parent(), 'An unexpected error occurred.', true);
+                    showMessage($messageContainer, 'An unexpected error occurred.', true);
                 })
                 .always(function () {
                     if (!$activeTaskDisplay.is(':visible')) {
@@ -281,9 +349,38 @@ jQuery(document).ready(function ($) {
                 });
         });
 
+        // Click handler for the "stop and start new" link
+        $messageContainer.on('click', '.ptt-stop-and-start-new', function(e) {
+            e.preventDefault();
+            const $link = $(this);
+            const postId = $link.data('postid');
+
+            $link.text('Stopping...');
+            
+            $.post(ptt_ajax_object.ajax_url, {
+                action: 'ptt_stop_timer',
+                nonce: ptt_ajax_object.nonce,
+                post_id: postId,
+            }).done(function(response) {
+                if (response.success) {
+                    $('#ptt-frontend-message').fadeOut('slow', function() {
+                        $(this).html('').show();
+                    });
+                     // Resubmit the form
+                    $newTaskForm.trigger('submit');
+                } else {
+                     showMessage($messageContainer, 'Could not stop the active task. Please try again.', true);
+                }
+            }).fail(function() {
+                showMessage($messageContainer, 'An unexpected error occurred while stopping the task.', true);
+            });
+        });
+
+
         // Stop the active task from the frontend
         $('#ptt-frontend-stop-btn').on('click', function () {
             if (suggestedTimeInterval) clearInterval(suggestedTimeInterval);
+            if (activeTimerInterval) clearInterval(activeTimerInterval);
             const $button = $(this);
             const postId = $button.data('postid');
             showSpinner($activeTaskDisplay);
@@ -305,13 +402,13 @@ jQuery(document).ready(function ($) {
                     $projectBudgetDisplay.hide();
                     $newTaskForm.show();
                     $('#ptt-frontend-start-btn').prop('disabled', false);
-                    showMessage($('#ptt-frontend-message').parent(), response.data.message, false);
+                    showMessage($messageContainer, response.data.message, false);
                 } else {
-                    showMessage($('#ptt-frontend-message').parent(), response.data.message, true);
+                    showMessage($messageContainer, response.data.message, true);
                     $button.prop('disabled', false);
                 }
             }).fail(function() {
-                 showMessage($('#ptt-frontend-message').parent(), 'An unexpected error occurred.', true);
+                 showMessage($messageContainer, 'An unexpected error occurred.', true);
                  $button.prop('disabled', false);
             }).always(function() {
                 hideSpinner($activeTaskDisplay);
