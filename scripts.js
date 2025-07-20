@@ -74,6 +74,57 @@ jQuery(document).ready(function ($) {
         const $timerControls = $('#ptt-timer-controls');
         const postId = $timerControls.data('postid');
 
+        // Manual Entry Toggle
+        $timerControls.on('click', '#ptt-manual-entry-toggle', function(e) {
+            e.preventDefault();
+            $('#ptt-manual-entry-form').slideToggle();
+        });
+
+        // Cancel Manual Entry
+        $timerControls.on('click', '#ptt-cancel-manual-time', function(e) {
+            e.preventDefault();
+            $('#ptt-manual-entry-form').slideUp();
+            $('#ptt-manual-hours').val('');
+        });
+
+        // Save Manual Time
+        $timerControls.on('click', '#ptt-save-manual-time', function(e) {
+            e.preventDefault();
+            const $button = $(this);
+            const manualHours = parseFloat($('#ptt-manual-hours').val());
+
+            if (isNaN(manualHours) || manualHours <= 0) {
+                showMessage($timerControls, 'Please enter a valid time greater than 0.', true);
+                return;
+            }
+
+            $button.prop('disabled', true);
+            showSpinner($timerControls);
+
+            $.post(ptt_ajax_object.ajax_url, {
+                action: 'ptt_save_manual_time',
+                nonce: ptt_ajax_object.nonce,
+                post_id: postId,
+                manual_hours: manualHours
+            }).done(function(response) {
+                if (response.success) {
+                    showMessage($timerControls, response.data.message, false);
+                    $('#ptt-manual-entry-form').slideUp();
+                    $('#ptt-manual-hours').val('');
+                    // Reload to update ACF fields
+                    setTimeout(function() { window.location.reload(); }, 1500);
+                } else {
+                    showMessage($timerControls, response.data.message, true);
+                    $button.prop('disabled', false);
+                }
+            }).fail(function() {
+                showMessage($timerControls, 'An unexpected error occurred.', true);
+                $button.prop('disabled', false);
+            }).always(function() {
+                hideSpinner($timerControls);
+            });
+        });
+
         // Start Timer
         $timerControls.on('click', '#ptt-start-timer', function (e) {
             e.preventDefault();
@@ -555,6 +606,95 @@ jQuery(document).ready(function ($) {
             }).always(function() {
                 hideSpinner($activeTaskDisplay);
             });
+        });
+
+        // Manual time entry functionality
+        $('#ptt-frontend-manual-btn').on('click', function(e) {
+            e.preventDefault();
+            $('#ptt-manual-time-section').slideToggle();
+        });
+
+        $('#ptt-cancel-manual-entry').on('click', function(e) {
+            e.preventDefault();
+            $('#ptt-manual-time-section').slideUp();
+            $('#ptt_manual_hours').val('');
+        });
+
+        $('#ptt-save-manual-entry').on('click', function(e) {
+            e.preventDefault();
+            
+            const $button = $(this);
+            const manualHours = parseFloat($('#ptt_manual_hours').val());
+            const selectedTaskId = $taskSelect.val();
+            const createNew = selectedTaskId === 'new';
+            
+            // Validation
+            if (isNaN(manualHours) || manualHours <= 0) {
+                showMessage($messageContainer, 'Please enter a valid time greater than 0.', true);
+                return;
+            }
+            
+            const client = $('#ptt_client').val();
+            const project = $projectSelect.val();
+            const task = $taskSelect.val();
+            
+            if (!client || !project || !task) {
+                showMessage($messageContainer, 'Please select a Client, Project, and Task.', true);
+                return;
+            }
+            
+            if (createNew) {
+                const taskName = $('#ptt_task_name').val();
+                if (!taskName.trim()) {
+                    showMessage($messageContainer, 'Please enter a name for the new task.', true);
+                    return;
+                }
+            }
+            
+            // Prepare data
+            let formData = {
+                action: 'ptt_frontend_manual_time',
+                nonce: ptt_ajax_object.nonce,
+                manual_hours: manualHours,
+                create_new: createNew
+            };
+            
+            if (createNew) {
+                formData.client = client;
+                formData.project = project;
+                formData.task_name = $('#ptt_task_name').val();
+                formData.notes = $('#ptt_notes').val();
+            } else {
+                formData.task_id = selectedTaskId;
+            }
+            
+            $button.prop('disabled', true);
+            showSpinner($('#ptt-manual-time-section'));
+            
+            $.post(ptt_ajax_object.ajax_url, formData)
+                .done(function(response) {
+                    if (response.success) {
+                        showMessage($messageContainer, response.data.message, false);
+                        // Reset form
+                        $newTaskForm.trigger('reset');
+                        $projectSelect.val('');
+                        $taskSelect.html('<option value="">-- Select Project First --</option>').prop('disabled', true);
+                        $createNewFields.hide();
+                        $taskBudgetDisplay.hide().data('budget-hours', '');
+                        $projectBudgetDisplay.hide();
+                        $('#ptt-manual-time-section').slideUp();
+                        $('#ptt_manual_hours').val('');
+                    } else {
+                        showMessage($messageContainer, response.data.message, true);
+                    }
+                })
+                .fail(function() {
+                    showMessage($messageContainer, 'An unexpected error occurred.', true);
+                })
+                .always(function() {
+                    $button.prop('disabled', false);
+                    hideSpinner($('#ptt-manual-time-section'));
+                });
         });
     }
 

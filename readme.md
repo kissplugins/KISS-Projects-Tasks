@@ -82,6 +82,16 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 
 ## 📋 Changelog
 
+### Version 1.6.0 (2025-07-20)
+**Manual Time Entry Feature**
+* **Added:** Manual time entry option in both admin post editor and frontend shortcode
+* **Added:** Manual override checkbox in ACF fields to switch between timer and manual modes
+* **Added:** Decimal hours input with helpful examples (1.5 = 1h 30m)
+* **Added:** Manual Entry button on frontend form for quick time logging
+* **Added:** Validation for manual time entries (must be positive, max 24 hours)
+* **Improved:** Time calculation logic now supports both timer-based and manual entries
+* **Feature:** Users can now log time retrospectively if they forgot to start the timer
+
 ### Version 1.5.0 (2025-07-20)
 **Improved Error Handling & Recovery**
 * **Fixed:** Stop button lockout issue with comprehensive error recovery

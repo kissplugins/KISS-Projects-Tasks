@@ -83,7 +83,21 @@ function ptt_task_enter_shortcode() {
             
             <div class="ptt-form-field">
                 <button type="submit" id="ptt-frontend-start-btn" class="button ptt-start-button">Start Timer</button>
+                <button type="button" id="ptt-frontend-manual-btn" class="button" style="margin-left: 10px;">Manual Entry</button>
                 <div class="ptt-ajax-spinner"></div>
+            </div>
+            
+            <div id="ptt-manual-time-section" style="display: none; margin-top: 15px; padding: 15px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 3px;">
+                <h4 style="margin-top: 0;">Manual Time Entry</h4>
+                <div class="ptt-form-field">
+                    <label for="ptt_manual_hours">Time Spent (decimal hours)</label>
+                    <input type="number" id="ptt_manual_hours" min="0" step="0.01" placeholder="e.g., 1.5">
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">Examples: 1.5 = 1h 30m, 0.25 = 15m, 2.75 = 2h 45m</div>
+                </div>
+                <div class="ptt-form-field">
+                    <button type="button" id="ptt-save-manual-entry" class="button button-primary">Save Manual Time</button>
+                    <button type="button" id="ptt-cancel-manual-entry" class="button" style="margin-left: 5px;">Cancel</button>
+                </div>
             </div>
         </form>
         <div id="ptt-frontend-message" class="ptt-ajax-message"></div>
@@ -230,3 +244,94 @@ function ptt_get_task_details_callback() {
     ]);
 }
 add_action('wp_ajax_ptt_get_task_details', 'ptt_get_task_details_callback');
+
+/**
+ * AJAX handler for manual time entry from frontend (creating new or existing task).
+ */
+function ptt_frontend_manual_time_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+
+    if ( ! is_user_logged_in() || ! current_user_can('edit_posts') ) {
+        wp_send_json_error(['message' => 'You do not have permission to perform this action.']);
+    }
+
+    $user_id = get_current_user_id();
+    
+    // Get form data
+    $manual_hours = isset($_POST['manual_hours']) ? floatval($_POST['manual_hours']) : 0;
+    $task_id = isset($_POST['task_id']) ? intval($_POST['task_id']) : 0;
+    $create_new = isset($_POST['create_new']) && $_POST['create_new'] === 'true';
+    
+    // Validate hours
+    if ( $manual_hours <= 0 ) {
+        wp_send_json_error(['message' => 'Please enter a valid time greater than 0.']);
+    }
+    
+    if ( $manual_hours > 24 ) {
+        wp_send_json_error(['message' => 'Duration cannot exceed 24 hours for a single entry.']);
+    }
+
+    // If creating new task
+    if ( $create_new ) {
+        $task_name = isset($_POST['task_name']) ? sanitize_text_field($_POST['task_name']) : '';
+        $notes = isset($_POST['notes']) ? sanitize_textarea_field($_POST['notes']) : '';
+        $client_id = isset($_POST['client']) ? intval($_POST['client']) : 0;
+        $project_id = isset($_POST['project']) ? intval($_POST['project']) : 0;
+        
+        if (empty($task_name) || empty($client_id) || empty($project_id)) {
+            wp_send_json_error(['message' => 'Please select a Client, a Project, and enter a Task Name.']);
+        }
+
+        $post_data = [
+            'post_title'   => $task_name,
+            'post_content' => $notes,
+            'post_status'  => 'publish',
+            'post_author'  => $user_id,
+            'post_type'    => 'project_task',
+        ];
+
+        $post_id = wp_insert_post($post_data);
+
+        if (is_wp_error($post_id)) {
+            wp_send_json_error(['message' => 'Failed to create task.']);
+        }
+
+        // Set taxonomies
+        wp_set_object_terms($post_id, $client_id, 'client', false);
+        wp_set_object_terms($post_id, $project_id, 'project', false);
+        
+        $task_id = $post_id;
+        $task_name = get_the_title($post_id);
+    } else {
+        // Using existing task
+        if (!$task_id) {
+            wp_send_json_error(['message' => 'Please select a task.']);
+        }
+        
+        // Verify task exists
+        $task = get_post($task_id);
+        if (!$task || $task->post_type !== 'project_task') {
+            wp_send_json_error(['message' => 'Invalid task selected.']);
+        }
+        
+        $task_name = get_the_title($task_id);
+    }
+
+    // Set manual time entry
+    $current_time = current_time('Y-m-d H:i:s');
+    update_field('manual_override', true, $task_id);
+    update_field('manual_duration', $manual_hours, $task_id);
+    update_field('start_time', $current_time, $task_id);
+    update_field('stop_time', $current_time, $task_id);
+    
+    // Calculate and save duration
+    $duration = ptt_calculate_and_save_duration($task_id);
+
+    wp_send_json_success([
+        'message' => sprintf('Manual time of %s hours saved for task: %s', $duration, $task_name),
+        'task_id' => $task_id,
+        'task_name' => $task_name,
+        'duration' => $duration
+    ]);
+}
+add_action('wp_ajax_ptt_frontend_manual_time', 'ptt_frontend_manual_time_callback');
