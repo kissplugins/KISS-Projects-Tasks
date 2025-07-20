@@ -401,4 +401,8 @@ jQuery(document).ready(function ($) {
             $spinner.hide();
         });
     });
+
+    if ($('#ptt-run-self-tests').length) {
+        $('#ptt-run-self-tests').trigger('click');
+    }
 });

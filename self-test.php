@@ -32,7 +32,7 @@ function ptt_self_test_page_html() {
     <div class="wrap">
         <h1>Plugin Settings & Self Test</h1>
         <p>This module helps verify core plugin functionality. It creates and then immediately deletes test data.</p>
-        <button id="ptt-run-self-tests" class="button button-primary">Run All Tests</button>
+        <button id="ptt-run-self-tests" class="button button-primary">Re-Run Tests</button>
         <div id="ptt-test-results-container" style="margin-top: 20px;">
              <div class="ptt-ajax-spinner" style="display:none;"></div>
         </div>
