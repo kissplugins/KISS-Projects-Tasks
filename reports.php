@@ -76,11 +76,41 @@ add_action( 'admin_menu', 'ptt_add_reports_page' );
  * Renders the HTML for the reports page.
  */
 function ptt_reports_page_html() {
+    // Check if we should use URL parameters or POST data
+    $use_get = false;
+    $params = [];
+    
+    // If we have GET parameters, use them
+    if ( isset($_GET['user_id']) || isset($_GET['client_id']) || isset($_GET['project_id']) || isset($_GET['start_date']) || isset($_GET['end_date']) ) {
+        $use_get = true;
+        $params['user_id'] = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
+        $params['client_id'] = isset($_GET['client_id']) ? intval($_GET['client_id']) : 0;
+        $params['project_id'] = isset($_GET['project_id']) ? intval($_GET['project_id']) : 0;
+        $params['start_date'] = isset($_GET['start_date']) ? sanitize_text_field($_GET['start_date']) : '';
+        $params['end_date'] = isset($_GET['end_date']) ? sanitize_text_field($_GET['end_date']) : '';
+    } elseif ( isset($_POST['run_report']) ) {
+        // Use POST data if form was submitted
+        $params['user_id'] = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+        $params['client_id'] = isset($_POST['client_id']) ? intval($_POST['client_id']) : 0;
+        $params['project_id'] = isset($_POST['project_id']) ? intval($_POST['project_id']) : 0;
+        $params['start_date'] = isset($_POST['start_date']) ? sanitize_text_field($_POST['start_date']) : '';
+        $params['end_date'] = isset($_POST['end_date']) ? sanitize_text_field($_POST['end_date']) : '';
+    } else {
+        // Default empty params
+        $params = [
+            'user_id' => 0,
+            'client_id' => 0,
+            'project_id' => 0,
+            'start_date' => '',
+            'end_date' => ''
+        ];
+    }
+    
     ?>
     <div class="wrap">
         <h1>Project & Task Time Reports</h1>
         
-        <form method="post" action="">
+        <form method="post" action="" id="ptt-reports-form">
             <?php wp_nonce_field( 'ptt_run_report_nonce' ); ?>
             <table class="form-table">
                 <tbody>
@@ -90,7 +120,7 @@ function ptt_reports_page_html() {
                             <?php wp_dropdown_users( [
                                 'name' => 'user_id',
                                 'show_option_all' => 'All Users',
-                                'selected' => isset($_POST['user_id']) ? intval($_POST['user_id']) : 0
+                                'selected' => $params['user_id']
                             ] ); ?>
                         </td>
                     </tr>
@@ -102,7 +132,7 @@ function ptt_reports_page_html() {
                                 'name'            => 'client_id',
                                 'show_option_all' => 'All Clients',
                                 'hide_empty'      => false,
-                                'selected'        => isset($_POST['client_id']) ? intval($_POST['client_id']) : 0,
+                                'selected'        => $params['client_id'],
                                 'hierarchical'    => true,
                                 'class'           => '' // Reset class to avoid conflict
                             ] ); ?>
@@ -116,7 +146,7 @@ function ptt_reports_page_html() {
                                 'name'            => 'project_id',
                                 'show_option_all' => 'All Projects',
                                 'hide_empty'      => false,
-                                'selected'        => isset($_POST['project_id']) ? intval($_POST['project_id']) : 0,
+                                'selected'        => $params['project_id'],
                                 'hierarchical'    => true,
                                 'class'           => '' // Reset class to avoid conflict
                             ] ); ?>
@@ -125,9 +155,9 @@ function ptt_reports_page_html() {
                     <tr>
                         <th scope="row"><label for="start_date">Date Range</label></th>
                         <td>
-                            <input type="date" id="start_date" name="start_date" value="<?php echo isset($_POST['start_date']) ? esc_attr($_POST['start_date']) : ''; ?>">
+                            <input type="date" id="start_date" name="start_date" value="<?php echo esc_attr($params['start_date']); ?>">
                             to
-                            <input type="date" id="end_date" name="end_date" value="<?php echo isset($_POST['end_date']) ? esc_attr($_POST['end_date']) : ''; ?>">
+                            <input type="date" id="end_date" name="end_date" value="<?php echo esc_attr($params['end_date']); ?>">
                              <button type="button" id="set-this-week" class="button">This Week (Sun-Sat)</button>
                              <button type="button" id="set-last-week" class="button">Last Week</button>
                         </td>
@@ -136,12 +166,21 @@ function ptt_reports_page_html() {
             </table>
             <p class="submit">
                 <input type="submit" name="run_report" class="button button-primary" value="Run Report">
+                <?php if ($use_get || isset($_POST['run_report'])) : ?>
+                    <button type="button" id="ptt-copy-report-url" class="button">Copy Report URL</button>
+                    <span id="ptt-url-copied" style="display: none; color: green; margin-left: 10px;">URL copied to clipboard!</span>
+                <?php endif; ?>
             </p>
         </form>
 
         <?php
-        if ( isset( $_POST['run_report'] ) ) {
-            check_admin_referer( 'ptt_run_report_nonce' );
+        // Display report if we have parameters from GET or POST
+        if ( $use_get || isset($_POST['run_report']) ) {
+            if ( isset($_POST['run_report']) ) {
+                check_admin_referer( 'ptt_run_report_nonce' );
+            }
+            // Store params temporarily for the display function
+            $_POST = array_merge($_POST, $params);
             ptt_display_report_results();
         }
         ?>
