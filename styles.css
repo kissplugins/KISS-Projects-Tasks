@@ -161,11 +161,31 @@
     padding-left: 20px;
 }
 
+/* Table column widths */
+.ptt-report-results table th:nth-child(1), /* Task Name */
+.ptt-report-results table td:nth-child(1) {
+    width: 30%;
+}
+
+.ptt-report-results table th:nth-child(2), /* Date */
+.ptt-report-results table td:nth-child(2) {
+    width: 12%;
+}
+
+.ptt-report-results table th:nth-child(3), /* Duration */
+.ptt-report-results table td:nth-child(3) {
+    width: 12%;
+}
+
+.ptt-report-results table th:nth-child(4), /* Orig. Budget */
+.ptt-report-results table td:nth-child(4) {
+    width: 15%;
+}
+
 /* Notes column styling */
 .ptt-report-results table th:last-child,
 .ptt-report-results table td:last-child {
-    width: 35%;
-    max-width: 350px;
+    width: 31%;
 }
 
 .ptt-report-results table td:last-child {
@@ -183,6 +203,12 @@
 .ptt-report-results table td:last-child a:hover {
     color: #00a0d2;
     text-decoration: underline;
+}
+
+/* Budget column styling */
+.ptt-report-results table td:nth-child(4) {
+    font-weight: 600;
+    color: #0073aa;
 }
 
 .ptt-report-results h4 {

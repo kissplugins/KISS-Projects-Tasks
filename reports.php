@@ -239,6 +239,15 @@ function ptt_display_report_results() {
         
         $duration = (float) get_field('calculated_duration', $post_id);
         
+        // Get task budget
+        $task_budget = get_field('task_max_budget', $post_id);
+        
+        // Get project budget (from taxonomy)
+        $project_budget = 0;
+        if ($project_id_term) {
+            $project_budget = get_field('project_max_budget', 'project_' . $project_id_term);
+        }
+        
         if (!isset($report_data[$author_id])) {
             $report_data[$author_id] = ['name' => $author_name, 'clients' => [], 'total' => 0];
         }
@@ -260,7 +269,9 @@ function ptt_display_report_results() {
             'title'    => get_the_title(),
             'date'     => get_field('start_time', $post_id),
             'duration' => $duration,
-            'content'  => get_the_content()
+            'content'  => get_the_content(),
+            'task_budget' => $task_budget,
+            'project_budget' => $project_budget
         ];
     }
     wp_reset_postdata();
@@ -279,13 +290,24 @@ function ptt_display_report_results() {
                 echo '<div class="project-group">';
                 echo '<h5>Project: ' . esc_html($project['name']) . ' <span class="subtotal">(Project Total: ' . number_format($project['total'], 2) . ' hrs)</span></h5>';
                 echo '<table class="wp-list-table widefat fixed striped">';
-                echo '<thead><tr><th>Task Name</th><th>Date</th><th>Duration (Hours)</th><th>Notes</th></tr></thead>';
+                echo '<thead><tr><th>Task Name</th><th>Date</th><th>Duration (Hours)</th><th>Orig. Budget</th><th>Notes</th></tr></thead>';
                 echo '<tbody>';
                 foreach ($project['tasks'] as $task) {
+                    // Format budget display
+                    $budget_display = '';
+                    if (!empty($task['task_budget']) && $task['task_budget'] > 0) {
+                        $budget_display = number_format((float)$task['task_budget'], 2) . ' (Task)';
+                    } elseif (!empty($task['project_budget']) && $task['project_budget'] > 0) {
+                        $budget_display = number_format((float)$task['project_budget'], 2) . ' (Project)';
+                    } else {
+                        $budget_display = '-';
+                    }
+                    
                     echo '<tr>';
                     echo '<td><a href="' . get_edit_post_link($task['id']) . '">' . esc_html($task['title']) . '</a></td>';
                     echo '<td>' . esc_html(date('Y-m-d', strtotime($task['date']))) . '</td>';
                     echo '<td>' . number_format($task['duration'], 2) . '</td>';
+                    echo '<td>' . $budget_display . '</td>';
                     echo '<td>' . ptt_format_task_notes($task['content']) . '</td>';
                     echo '</tr>';
                 }

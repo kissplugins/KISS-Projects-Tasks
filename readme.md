@@ -82,13 +82,21 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 
 ## 📋 Changelog
 
+### Version 1.6.2 (2025-07-20)
+**Budget Display in Reports**
+* **Added:** "Orig. Budget" column to reports showing allocated hours
+* **Feature:** Displays task-specific budget when available
+* **Feature:** Falls back to project budget if no task budget is set
+* **Display:** Shows "(Task)" or "(Project)" label to indicate budget source
+* **Improved:** Column width adjustments for better readability
+
 ### Version 1.6.1 (2025-07-20)
 **Reports Enhancement**
 * **Added:** Notes column to reports table showing task content/body
 * **Added:** Automatic URL detection and rendering as clickable links in Notes
 * **Added:** Text truncation at 200 characters with ellipses for long notes
 * **Improved:** Report table layout with proper column widths
-* **Feature:** URLs at the beginning of notes are automatically converted to clickable links
+* **Feature:** URLs anywhere in notes are automatically converted to clickable links
 
 ### Version 1.6.0 (2025-07-20)
 **Manual Time Entry Feature**
