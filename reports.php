@@ -80,8 +80,10 @@ function ptt_reports_page_html() {
     <div class="wrap">
         <h1>Project & Task Time Reports</h1>
         
-        <form method="post" action="">
+        <form method="get" action="">
             <?php wp_nonce_field( 'ptt_run_report_nonce' ); ?>
+            <input type="hidden" name="post_type" value="project_task" />
+            <input type="hidden" name="page" value="ptt-reports" />
             <table class="form-table">
                 <tbody>
                     <tr>
@@ -90,7 +92,7 @@ function ptt_reports_page_html() {
                             <?php wp_dropdown_users( [
                                 'name' => 'user_id',
                                 'show_option_all' => 'All Users',
-                                'selected' => isset($_POST['user_id']) ? intval($_POST['user_id']) : 0
+                                'selected' => isset($_REQUEST['user_id']) ? intval($_REQUEST['user_id']) : 0
                             ] ); ?>
                         </td>
                     </tr>
@@ -102,7 +104,7 @@ function ptt_reports_page_html() {
                                 'name'            => 'client_id',
                                 'show_option_all' => 'All Clients',
                                 'hide_empty'      => false,
-                                'selected'        => isset($_POST['client_id']) ? intval($_POST['client_id']) : 0,
+                                'selected'        => isset($_REQUEST['client_id']) ? intval($_REQUEST['client_id']) : 0,
                                 'hierarchical'    => true,
                                 'class'           => '' // Reset class to avoid conflict
                             ] ); ?>
@@ -116,7 +118,7 @@ function ptt_reports_page_html() {
                                 'name'            => 'project_id',
                                 'show_option_all' => 'All Projects',
                                 'hide_empty'      => false,
-                                'selected'        => isset($_POST['project_id']) ? intval($_POST['project_id']) : 0,
+                                'selected'        => isset($_REQUEST['project_id']) ? intval($_REQUEST['project_id']) : 0,
                                 'hierarchical'    => true,
                                 'class'           => '' // Reset class to avoid conflict
                             ] ); ?>
@@ -125,9 +127,9 @@ function ptt_reports_page_html() {
                     <tr>
                         <th scope="row"><label for="start_date">Date Range</label></th>
                         <td>
-                            <input type="date" id="start_date" name="start_date" value="<?php echo isset($_POST['start_date']) ? esc_attr($_POST['start_date']) : ''; ?>">
+                            <input type="date" id="start_date" name="start_date" value="<?php echo isset($_REQUEST['start_date']) ? esc_attr($_REQUEST['start_date']) : ''; ?>">
                             to
-                            <input type="date" id="end_date" name="end_date" value="<?php echo isset($_POST['end_date']) ? esc_attr($_POST['end_date']) : ''; ?>">
+                            <input type="date" id="end_date" name="end_date" value="<?php echo isset($_REQUEST['end_date']) ? esc_attr($_REQUEST['end_date']) : ''; ?>">
                              <button type="button" id="set-this-week" class="button">This Week (Sun-Sat)</button>
                              <button type="button" id="set-last-week" class="button">Last Week</button>
                         </td>
@@ -140,7 +142,7 @@ function ptt_reports_page_html() {
         </form>
 
         <?php
-        if ( isset( $_POST['run_report'] ) ) {
+        if ( isset( $_REQUEST['run_report'] ) ) {
             check_admin_referer( 'ptt_run_report_nonce' );
             ptt_display_report_results();
         }
@@ -153,11 +155,11 @@ function ptt_reports_page_html() {
  * Queries and displays the report results.
  */
 function ptt_display_report_results() {
-    $user_id    = isset( $_POST['user_id'] ) ? intval( $_POST['user_id'] ) : 0;
-    $client_id  = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
-    $project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
-    $start_date = isset( $_POST['start_date'] ) && $_POST['start_date'] ? sanitize_text_field( $_POST['start_date'] ) : null;
-    $end_date   = isset( $_POST['end_date'] ) && $_POST['end_date'] ? sanitize_text_field( $_POST['end_date'] ) : null;
+    $user_id    = isset( $_REQUEST['user_id'] ) ? intval( $_REQUEST['user_id'] ) : 0;
+    $client_id  = isset( $_REQUEST['client_id'] ) ? intval( $_REQUEST['client_id'] ) : 0;
+    $project_id = isset( $_REQUEST['project_id'] ) ? intval( $_REQUEST['project_id'] ) : 0;
+    $start_date = isset( $_REQUEST['start_date'] ) && $_REQUEST['start_date'] ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
+    $end_date   = isset( $_REQUEST['end_date'] ) && $_REQUEST['end_date'] ? sanitize_text_field( $_REQUEST['end_date'] ) : null;
 
     $args = [
         'post_type'      => 'project_task',
