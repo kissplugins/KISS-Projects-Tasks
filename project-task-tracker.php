@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.6.4
+ * Version:           1.6.5
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.6.4' );
+define( 'PTT_VERSION', '1.6.5' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -737,12 +737,28 @@ function ptt_save_manual_time_callback() {
     // Set manual override and duration
     update_field( 'manual_override', true, $post_id );
     update_field( 'manual_duration', $manual_hours, $post_id );
-    
-    // If no start/stop times exist, set them to current time for record keeping
-    if ( ! get_field( 'start_time', $post_id ) ) {
-        $current_time = current_time( 'Y-m-d H:i:s' );
-        update_field( 'start_time', $current_time, $post_id );
-        update_field( 'stop_time', $current_time, $post_id );
+
+    $start_time = get_field( 'start_time', $post_id );
+    $stop_time  = get_field( 'stop_time', $post_id );
+
+    // If no start time exists, use current time
+    if ( ! $start_time ) {
+        $start_time = current_time( 'Y-m-d H:i:s' );
+        update_field( 'start_time', $start_time, $post_id );
+    }
+
+    // Ensure a stop time is recorded so the task appears in reports
+    if ( ! $stop_time ) {
+        try {
+            $timezone = wp_timezone();
+            $start_dt = new DateTime( $start_time, $timezone );
+            $seconds  = $manual_hours * 3600;
+            $start_dt->modify( '+' . $seconds . ' seconds' );
+            $stop_time = $start_dt->format( 'Y-m-d H:i:s' );
+        } catch ( Exception $e ) {
+            $stop_time = $start_time;
+        }
+        update_field( 'stop_time', $stop_time, $post_id );
     }
     
     // Calculate and save duration
