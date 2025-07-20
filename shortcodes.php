@@ -30,7 +30,11 @@ function ptt_task_enter_shortcode() {
             <p><strong>Task:</strong> <span id="ptt-active-task-name"></span></p>
             <p><strong>Time Elapsed:</strong> <span id="ptt-active-task-timer"><span class="hours">00</span><span class="colon">:</span><span class="minutes">00</span></span></p>
             <button id="ptt-frontend-stop-btn" class="button ptt-stop-button" data-postid="">Stop Timer</button>
+            <button id="ptt-frontend-force-stop-btn" class="button button-link-delete" data-postid="" style="display: none; margin-left: 10px;">Force Stop</button>
             <div class="ptt-ajax-spinner"></div>
+            <div class="ptt-error-recovery" style="display: none; margin-top: 10px;">
+                <p class="description">Having trouble? <a href="#" id="ptt-show-recovery-options">Show recovery options</a></p>
+            </div>
         </div>
 
         <form id="ptt-new-task-form">

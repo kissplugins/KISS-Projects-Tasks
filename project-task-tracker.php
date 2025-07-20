@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.4.7
+ * Version:           1.5.0
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.4.7' );
+define( 'PTT_VERSION', '1.5.0' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -574,6 +574,30 @@ function ptt_stop_timer_callback() {
         wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
     }
 
+    // Verify the post exists and is a project_task
+    $post = get_post( $post_id );
+    if ( ! $post || $post->post_type !== 'project_task' ) {
+        wp_send_json_error( [ 'message' => 'Task not found.' ] );
+    }
+
+    // Check if the task is actually running
+    $start_time = get_field( 'start_time', $post_id );
+    $stop_time = get_field( 'stop_time', $post_id );
+    
+    if ( ! $start_time ) {
+        wp_send_json_error( [ 'message' => 'This task has not been started.' ] );
+    }
+    
+    if ( $stop_time ) {
+        wp_send_json_error( [ 'message' => 'This task has already been stopped.' ] );
+    }
+
+    // Verify the current user is the one who started the task (or is an admin)
+    $user_id = get_current_user_id();
+    if ( $post->post_author != $user_id && ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => 'You can only stop tasks that you started.' ] );
+    }
+
     $current_time = current_time( 'Y-m-d H:i:s' );
     update_field( 'stop_time', $current_time, $post_id );
 
@@ -586,6 +610,48 @@ function ptt_stop_timer_callback() {
     ] );
 }
 add_action( 'wp_ajax_ptt_stop_timer', 'ptt_stop_timer_callback' );
+
+/**
+ * AJAX handler to force-stop a timer (admin/recovery function).
+ */
+function ptt_force_stop_timer_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    if ( ! $post_id ) {
+        wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
+    }
+
+    // Get the post
+    $post = get_post( $post_id );
+    if ( ! $post || $post->post_type !== 'project_task' ) {
+        wp_send_json_error( [ 'message' => 'Task not found.' ] );
+    }
+
+    // For force stop, we just need to ensure there's a start time
+    $start_time = get_field( 'start_time', $post_id );
+    if ( ! $start_time ) {
+        wp_send_json_error( [ 'message' => 'Cannot stop a task that was never started.' ] );
+    }
+
+    // Force stop the timer
+    $current_time = current_time( 'Y-m-d H:i:s' );
+    update_field( 'stop_time', $current_time, $post_id );
+    
+    $duration = ptt_calculate_and_save_duration( $post_id );
+
+    wp_send_json_success( [
+        'message' => 'Timer force-stopped! Duration: ' . $duration . ' hours.',
+        'stop_time' => $current_time,
+        'duration' => $duration,
+        'forced' => true
+    ] );
+}
+add_action( 'wp_ajax_ptt_force_stop_timer', 'ptt_force_stop_timer_callback' );
 
 /**
  * Adds a "Settings" link to the plugin's action links on the plugins page.

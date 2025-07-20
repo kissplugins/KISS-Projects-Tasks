@@ -107,6 +107,45 @@
     text-align: center;
 }
 
+/* Error recovery styles */
+.ptt-error-recovery {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 10px;
+    color: #856404;
+}
+
+.ptt-error-recovery a {
+    color: #533f03;
+    text-decoration: underline;
+}
+
+#ptt-frontend-force-stop-btn {
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: white !important;
+}
+
+#ptt-frontend-force-stop-btn:hover {
+    background-color: #c82333 !important;
+    border-color: #bd2130 !important;
+}
+
+/* Locked button state */
+.ptt-stop-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Active timer display */
+#ptt-active-task-timer {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #4CAF50;
+    font-family: monospace;
+}
+
 /* --- Report Styles --- */
 .ptt-report-results {
     font-size: 14px;
