@@ -10,6 +10,54 @@ if ( ! defined( 'WPINC' ) ) {
 // =================================================================
 
 /**
+ * Helper function to process and format task notes for display in reports.
+ * 
+ * @param string $content The post content to process.
+ * @param int $max_length Maximum length before truncation (default: 200).
+ * @return string Formatted content with URLs converted to links and truncation.
+ */
+function ptt_format_task_notes( $content, $max_length = 200 ) {
+    // Strip all HTML tags first
+    $content = wp_strip_all_tags( $content );
+    
+    // Trim whitespace
+    $content = trim( $content );
+    
+    if ( empty( $content ) ) {
+        return '';
+    }
+    
+    // First, truncate if needed
+    $truncated = false;
+    if ( strlen( $content ) > $max_length ) {
+        $content = substr( $content, 0, $max_length - 3 );
+        $truncated = true;
+    }
+    
+    // Escape HTML entities
+    $content = esc_html( $content );
+    
+    // Pattern to match URLs anywhere in the text
+    // This pattern matches http://, https://, and common URL formats
+    $url_pattern = '/(https?:\/\/[^\s<>"{}|\\^`\[\]]+)/i';
+    
+    // Replace URLs with clickable links
+    $formatted_content = preg_replace_callback( $url_pattern, function( $matches ) {
+        $url = $matches[1];
+        // For display, truncate very long URLs in the link text
+        $display_url = strlen( $url ) > 50 ? substr( $url, 0, 47 ) . '...' : $url;
+        return '<a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . $display_url . '</a>';
+    }, $content );
+    
+    // Add ellipses if content was truncated
+    if ( $truncated ) {
+        $formatted_content .= '...';
+    }
+    
+    return $formatted_content;
+}
+
+/**
  * Adds the "Reports" page under the "Tasks" menu.
  */
 function ptt_add_reports_page() {
@@ -211,7 +259,8 @@ function ptt_display_report_results() {
             'id'       => $post_id,
             'title'    => get_the_title(),
             'date'     => get_field('start_time', $post_id),
-            'duration' => $duration
+            'duration' => $duration,
+            'content'  => get_the_content()
         ];
     }
     wp_reset_postdata();
@@ -230,13 +279,14 @@ function ptt_display_report_results() {
                 echo '<div class="project-group">';
                 echo '<h5>Project: ' . esc_html($project['name']) . ' <span class="subtotal">(Project Total: ' . number_format($project['total'], 2) . ' hrs)</span></h5>';
                 echo '<table class="wp-list-table widefat fixed striped">';
-                echo '<thead><tr><th>Task Name</th><th>Date</th><th>Duration (Hours)</th></tr></thead>';
+                echo '<thead><tr><th>Task Name</th><th>Date</th><th>Duration (Hours)</th><th>Notes</th></tr></thead>';
                 echo '<tbody>';
                 foreach ($project['tasks'] as $task) {
                     echo '<tr>';
                     echo '<td><a href="' . get_edit_post_link($task['id']) . '">' . esc_html($task['title']) . '</a></td>';
                     echo '<td>' . esc_html(date('Y-m-d', strtotime($task['date']))) . '</td>';
                     echo '<td>' . number_format($task['duration'], 2) . '</td>';
+                    echo '<td>' . ptt_format_task_notes($task['content']) . '</td>';
                     echo '</tr>';
                 }
                 echo '</tbody></table>';

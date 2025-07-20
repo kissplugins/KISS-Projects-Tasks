@@ -82,6 +82,14 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 
 ## 📋 Changelog
 
+### Version 1.6.1 (2025-07-20)
+**Reports Enhancement**
+* **Added:** Notes column to reports table showing task content/body
+* **Added:** Automatic URL detection and rendering as clickable links in Notes
+* **Added:** Text truncation at 200 characters with ellipses for long notes
+* **Improved:** Report table layout with proper column widths
+* **Feature:** URLs at the beginning of notes are automatically converted to clickable links
+
 ### Version 1.6.0 (2025-07-20)
 **Manual Time Entry Feature**
 * **Added:** Manual time entry option in both admin post editor and frontend shortcode
