@@ -1,6 +1,40 @@
 jQuery(document).ready(function ($) {
     'use strict';
 
+    // Session recovery - store active task in localStorage
+    const PTT_STORAGE_KEY = 'ptt_active_task';
+    
+    function saveActiveTaskToStorage(postId, taskName, startTime) {
+        if (postId) {
+            localStorage.setItem(PTT_STORAGE_KEY, JSON.stringify({
+                postId: postId,
+                taskName: taskName,
+                startTime: startTime,
+                timestamp: new Date().getTime()
+            }));
+        }
+    }
+    
+    function clearActiveTaskFromStorage() {
+        localStorage.removeItem(PTT_STORAGE_KEY);
+    }
+    
+    function getActiveTaskFromStorage() {
+        const stored = localStorage.getItem(PTT_STORAGE_KEY);
+        if (stored) {
+            try {
+                const data = JSON.parse(stored);
+                // Check if data is less than 24 hours old
+                if (data.timestamp && (new Date().getTime() - data.timestamp) < 86400000) {
+                    return data;
+                }
+            } catch (e) {
+                console.error('Error parsing stored task data:', e);
+            }
+        }
+        return null;
+    }
+
     /**
      * Helper to show/hide spinner and messages
      */
@@ -39,6 +73,57 @@ jQuery(document).ready(function ($) {
     if ($('#ptt-timer-controls').length) {
         const $timerControls = $('#ptt-timer-controls');
         const postId = $timerControls.data('postid');
+
+        // Manual Entry Toggle
+        $timerControls.on('click', '#ptt-manual-entry-toggle', function(e) {
+            e.preventDefault();
+            $('#ptt-manual-entry-form').slideToggle();
+        });
+
+        // Cancel Manual Entry
+        $timerControls.on('click', '#ptt-cancel-manual-time', function(e) {
+            e.preventDefault();
+            $('#ptt-manual-entry-form').slideUp();
+            $('#ptt-manual-hours').val('');
+        });
+
+        // Save Manual Time
+        $timerControls.on('click', '#ptt-save-manual-time', function(e) {
+            e.preventDefault();
+            const $button = $(this);
+            const manualHours = parseFloat($('#ptt-manual-hours').val());
+
+            if (isNaN(manualHours) || manualHours <= 0) {
+                showMessage($timerControls, 'Please enter a valid time greater than 0.', true);
+                return;
+            }
+
+            $button.prop('disabled', true);
+            showSpinner($timerControls);
+
+            $.post(ptt_ajax_object.ajax_url, {
+                action: 'ptt_save_manual_time',
+                nonce: ptt_ajax_object.nonce,
+                post_id: postId,
+                manual_hours: manualHours
+            }).done(function(response) {
+                if (response.success) {
+                    showMessage($timerControls, response.data.message, false);
+                    $('#ptt-manual-entry-form').slideUp();
+                    $('#ptt-manual-hours').val('');
+                    // Reload to update ACF fields
+                    setTimeout(function() { window.location.reload(); }, 1500);
+                } else {
+                    showMessage($timerControls, response.data.message, true);
+                    $button.prop('disabled', false);
+                }
+            }).fail(function() {
+                showMessage($timerControls, 'An unexpected error occurred.', true);
+                $button.prop('disabled', false);
+            }).always(function() {
+                hideSpinner($timerControls);
+            });
+        });
 
         // Start Timer
         $timerControls.on('click', '#ptt-start-timer', function (e) {
@@ -119,6 +204,9 @@ jQuery(document).ready(function ($) {
          * Fetches active task info and updates the UI.
          */
         function checkActiveTask() {
+            // First, check localStorage for recovery
+            const storedTask = getActiveTaskFromStorage();
+            
             $.post(ptt_ajax_object.ajax_url, {
                 action: 'ptt_get_active_task_info',
                 nonce: ptt_ajax_object.nonce
@@ -126,9 +214,38 @@ jQuery(document).ready(function ($) {
                 if (response.success) {
                     $('#ptt-active-task-name').text(response.data.task_name);
                     $('#ptt-frontend-stop-btn').data('postid', response.data.post_id);
+                    $('#ptt-frontend-force-stop-btn').data('postid', response.data.post_id);
                     $newTaskForm.hide();
                     $activeTaskDisplay.show();
                     startActiveTimer(response.data.start_time);
+                    // Update localStorage with server data
+                    saveActiveTaskToStorage(response.data.post_id, response.data.task_name, response.data.start_time);
+                } else if (storedTask && storedTask.postId) {
+                    // No active task from server, but we have one in localStorage
+                    // Try to verify if it's still valid
+                    showMessage($messageContainer, 'Recovering previous session...', false);
+                    $('#ptt-active-task-name').text(storedTask.taskName + ' (Recovering...)');
+                    $('#ptt-frontend-stop-btn').data('postid', storedTask.postId);
+                    $('#ptt-frontend-force-stop-btn').data('postid', storedTask.postId);
+                    $newTaskForm.hide();
+                    $activeTaskDisplay.show();
+                    $('.ptt-error-recovery').show();
+                    startActiveTimer(storedTask.startTime);
+                } else {
+                    // No active task at all
+                    clearActiveTaskFromStorage();
+                }
+            }).fail(function() {
+                // If server check fails but we have localStorage data, show it
+                if (storedTask && storedTask.postId) {
+                    showMessage($messageContainer, 'Connection error. Showing cached task data.', true);
+                    $('#ptt-active-task-name').text(storedTask.taskName + ' (Offline)');
+                    $('#ptt-frontend-stop-btn').data('postid', storedTask.postId);
+                    $('#ptt-frontend-force-stop-btn').data('postid', storedTask.postId);
+                    $newTaskForm.hide();
+                    $activeTaskDisplay.show();
+                    $('.ptt-error-recovery').show();
+                    startActiveTimer(storedTask.startTime);
                 }
             });
         }
@@ -321,12 +438,16 @@ jQuery(document).ready(function ($) {
                 .done(function (response) {
                     if (response.success) {
                         const currentTaskName = (selectedTaskId === 'new') ? formData.task_name : $taskSelect.find('option:selected').text();
+                        const taskPostId = response.data.post_id || selectedTaskId;
                         $('#ptt-active-task-name').text(currentTaskName);
-                        $('#ptt-frontend-stop-btn').data('postid', response.data.post_id);
+                        $('#ptt-frontend-stop-btn').data('postid', taskPostId);
+                        $('#ptt-frontend-force-stop-btn').data('postid', taskPostId);
                         $newTaskForm.hide();
                         $activeTaskDisplay.show();
                         $('#ptt-frontend-message').hide();
                         startActiveTimer(response.data.start_time);
+                        // Save to localStorage for recovery
+                        saveActiveTaskToStorage(taskPostId, currentTaskName, response.data.start_time);
                     } else {
                          if (response.data.active_task_id) {
                             const stopLink = `<a href="#" class="ptt-stop-and-start-new" data-postid="${response.data.active_task_id}">stop</a>`;
@@ -383,6 +504,12 @@ jQuery(document).ready(function ($) {
             if (activeTimerInterval) clearInterval(activeTimerInterval);
             const $button = $(this);
             const postId = $button.data('postid');
+            
+            if (!postId) {
+                showMessage($messageContainer, 'Error: No task ID found. Please refresh the page.', true);
+                return;
+            }
+            
             showSpinner($activeTaskDisplay);
             $button.prop('disabled', true);
             
@@ -402,17 +529,172 @@ jQuery(document).ready(function ($) {
                     $projectBudgetDisplay.hide();
                     $newTaskForm.show();
                     $('#ptt-frontend-start-btn').prop('disabled', false);
+                    $('.ptt-error-recovery').hide();
+                    $('#ptt-frontend-force-stop-btn').hide();
                     showMessage($messageContainer, response.data.message, false);
+                    // Clear localStorage on successful stop
+                    clearActiveTaskFromStorage();
                 } else {
                     showMessage($messageContainer, response.data.message, true);
                     $button.prop('disabled', false);
+                    // Show recovery options after error
+                    $('.ptt-error-recovery').show();
                 }
-            }).fail(function() {
-                 showMessage($messageContainer, 'An unexpected error occurred.', true);
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                 showMessage($messageContainer, 'Connection error: ' + textStatus + '. Please check your internet connection.', true);
                  $button.prop('disabled', false);
+                 $('.ptt-error-recovery').show();
             }).always(function() {
                 hideSpinner($activeTaskDisplay);
             });
+        });
+
+        // Show recovery options
+        $('#ptt-show-recovery-options').on('click', function(e) {
+            e.preventDefault();
+            $('#ptt-frontend-force-stop-btn').show();
+            $(this).parent().html('Use Force Stop if the regular Stop button is not working. This will end the timer immediately.');
+        });
+
+        // Force stop handler
+        $('#ptt-frontend-force-stop-btn').on('click', function() {
+            if (!confirm('Force stop will immediately end this timer. Are you sure?')) {
+                return;
+            }
+            
+            const $button = $(this);
+            const postId = $button.data('postid') || $('#ptt-frontend-stop-btn').data('postid');
+            
+            if (!postId) {
+                showMessage($messageContainer, 'Error: No task ID found. Please refresh the page.', true);
+                return;
+            }
+            
+            showSpinner($activeTaskDisplay);
+            $button.prop('disabled', true);
+            $('#ptt-frontend-stop-btn').prop('disabled', true);
+            
+            $.post(ptt_ajax_object.ajax_url, {
+                action: 'ptt_force_stop_timer',
+                nonce: ptt_ajax_object.nonce,
+                post_id: postId,
+            }).done(function(response) {
+                if (response.success) {
+                    $activeTaskDisplay.hide();
+                    $newTaskForm.trigger('reset');
+                    $projectSelect.val('');
+                    $taskSelect.html('<option value="">-- Select Project First --</option>').prop('disabled', true);
+                    $createNewFields.hide();
+                    $taskBudgetDisplay.hide().data('budget-hours', '');
+                    $projectBudgetDisplay.hide();
+                    $newTaskForm.show();
+                    $('#ptt-frontend-start-btn').prop('disabled', false);
+                    $('.ptt-error-recovery').hide();
+                    $('#ptt-frontend-force-stop-btn').hide();
+                    showMessage($messageContainer, 'Timer force-stopped successfully!', false);
+                    // Clear localStorage on successful force stop
+                    clearActiveTaskFromStorage();
+                } else {
+                    showMessage($messageContainer, 'Force stop failed: ' + response.data.message, true);
+                    $button.prop('disabled', false);
+                    $('#ptt-frontend-stop-btn').prop('disabled', false);
+                }
+            }).fail(function() {
+                showMessage($messageContainer, 'Critical error. Please contact support.', true);
+                $button.prop('disabled', false);
+                $('#ptt-frontend-stop-btn').prop('disabled', false);
+            }).always(function() {
+                hideSpinner($activeTaskDisplay);
+            });
+        });
+
+        // Manual time entry functionality
+        $('#ptt-frontend-manual-btn').on('click', function(e) {
+            e.preventDefault();
+            $('#ptt-manual-time-section').slideToggle();
+        });
+
+        $('#ptt-cancel-manual-entry').on('click', function(e) {
+            e.preventDefault();
+            $('#ptt-manual-time-section').slideUp();
+            $('#ptt_manual_hours').val('');
+        });
+
+        $('#ptt-save-manual-entry').on('click', function(e) {
+            e.preventDefault();
+            
+            const $button = $(this);
+            const manualHours = parseFloat($('#ptt_manual_hours').val());
+            const selectedTaskId = $taskSelect.val();
+            const createNew = selectedTaskId === 'new';
+            
+            // Validation
+            if (isNaN(manualHours) || manualHours <= 0) {
+                showMessage($messageContainer, 'Please enter a valid time greater than 0.', true);
+                return;
+            }
+            
+            const client = $('#ptt_client').val();
+            const project = $projectSelect.val();
+            const task = $taskSelect.val();
+            
+            if (!client || !project || !task) {
+                showMessage($messageContainer, 'Please select a Client, Project, and Task.', true);
+                return;
+            }
+            
+            if (createNew) {
+                const taskName = $('#ptt_task_name').val();
+                if (!taskName.trim()) {
+                    showMessage($messageContainer, 'Please enter a name for the new task.', true);
+                    return;
+                }
+            }
+            
+            // Prepare data
+            let formData = {
+                action: 'ptt_frontend_manual_time',
+                nonce: ptt_ajax_object.nonce,
+                manual_hours: manualHours,
+                create_new: createNew
+            };
+            
+            if (createNew) {
+                formData.client = client;
+                formData.project = project;
+                formData.task_name = $('#ptt_task_name').val();
+                formData.notes = $('#ptt_notes').val();
+            } else {
+                formData.task_id = selectedTaskId;
+            }
+            
+            $button.prop('disabled', true);
+            showSpinner($('#ptt-manual-time-section'));
+            
+            $.post(ptt_ajax_object.ajax_url, formData)
+                .done(function(response) {
+                    if (response.success) {
+                        showMessage($messageContainer, response.data.message, false);
+                        // Reset form
+                        $newTaskForm.trigger('reset');
+                        $projectSelect.val('');
+                        $taskSelect.html('<option value="">-- Select Project First --</option>').prop('disabled', true);
+                        $createNewFields.hide();
+                        $taskBudgetDisplay.hide().data('budget-hours', '');
+                        $projectBudgetDisplay.hide();
+                        $('#ptt-manual-time-section').slideUp();
+                        $('#ptt_manual_hours').val('');
+                    } else {
+                        showMessage($messageContainer, response.data.message, true);
+                    }
+                })
+                .fail(function() {
+                    showMessage($messageContainer, 'An unexpected error occurred.', true);
+                })
+                .always(function() {
+                    $button.prop('disabled', false);
+                    hideSpinner($('#ptt-manual-time-section'));
+                });
         });
     }
 

@@ -107,6 +107,45 @@
     text-align: center;
 }
 
+/* Error recovery styles */
+.ptt-error-recovery {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    padding: 10px;
+    color: #856404;
+}
+
+.ptt-error-recovery a {
+    color: #533f03;
+    text-decoration: underline;
+}
+
+#ptt-frontend-force-stop-btn {
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: white !important;
+}
+
+#ptt-frontend-force-stop-btn:hover {
+    background-color: #c82333 !important;
+    border-color: #bd2130 !important;
+}
+
+/* Locked button state */
+.ptt-stop-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Active timer display */
+#ptt-active-task-timer {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #4CAF50;
+    font-family: monospace;
+}
+
 /* --- Report Styles --- */
 .ptt-report-results {
     font-size: 14px;
@@ -120,6 +159,56 @@
 .ptt-report-results .project-group {
     margin-bottom: 20px;
     padding-left: 20px;
+}
+
+/* Table column widths */
+.ptt-report-results table th:nth-child(1), /* Task Name */
+.ptt-report-results table td:nth-child(1) {
+    width: 30%;
+}
+
+.ptt-report-results table th:nth-child(2), /* Date */
+.ptt-report-results table td:nth-child(2) {
+    width: 12%;
+}
+
+.ptt-report-results table th:nth-child(3), /* Duration */
+.ptt-report-results table td:nth-child(3) {
+    width: 12%;
+}
+
+.ptt-report-results table th:nth-child(4), /* Orig. Budget */
+.ptt-report-results table td:nth-child(4) {
+    width: 15%;
+}
+
+/* Notes column styling */
+.ptt-report-results table th:last-child,
+.ptt-report-results table td:last-child {
+    width: 31%;
+}
+
+.ptt-report-results table td:last-child {
+    font-size: 13px;
+    line-height: 1.4;
+    color: #555;
+}
+
+.ptt-report-results table td:last-child a {
+    color: #0073aa;
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.ptt-report-results table td:last-child a:hover {
+    color: #00a0d2;
+    text-decoration: underline;
+}
+
+/* Budget column styling */
+.ptt-report-results table td:nth-child(4) {
+    font-weight: 600;
+    color: #0073aa;
 }
 
 .ptt-report-results h4 {

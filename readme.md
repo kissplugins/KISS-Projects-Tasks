@@ -78,4 +78,49 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 2.  Select a user and/or date range.
 3.  Click **Run Report** to see a detailed breakdown of time tracked.
 
+***
+
+## 📋 Changelog
+
+### Version 1.6.2 (2025-07-20)
+**Budget Display in Reports**
+* **Added:** "Orig. Budget" column to reports showing allocated hours
+* **Feature:** Displays task-specific budget when available
+* **Feature:** Falls back to project budget if no task budget is set
+* **Display:** Shows "(Task)" or "(Project)" label to indicate budget source
+* **Improved:** Column width adjustments for better readability
+
+### Version 1.6.1 (2025-07-20)
+**Reports Enhancement**
+* **Added:** Notes column to reports table showing task content/body
+* **Added:** Automatic URL detection and rendering as clickable links in Notes
+* **Added:** Text truncation at 200 characters with ellipses for long notes
+* **Improved:** Report table layout with proper column widths
+* **Feature:** URLs anywhere in notes are automatically converted to clickable links
+
+### Version 1.6.0 (2025-07-20)
+**Manual Time Entry Feature**
+* **Added:** Manual time entry option in both admin post editor and frontend shortcode
+* **Added:** Manual override checkbox in ACF fields to switch between timer and manual modes
+* **Added:** Decimal hours input with helpful examples (1.5 = 1h 30m)
+* **Added:** Manual Entry button on frontend form for quick time logging
+* **Added:** Validation for manual time entries (must be positive, max 24 hours)
+* **Improved:** Time calculation logic now supports both timer-based and manual entries
+* **Feature:** Users can now log time retrospectively if they forgot to start the timer
+
+### Version 1.5.0 (2025-07-20)
+**Improved Error Handling & Recovery**
+* **Fixed:** Stop button lockout issue with comprehensive error recovery
+* **Added:** Force Stop button for emergency timer recovery
+* **Added:** Session recovery using localStorage - tasks persist across page refreshes
+* **Added:** Auto-detection of active tasks on page load
+* **Added:** Visual timer display showing elapsed time (HH:MM format)
+* **Improved:** Error messages now show specific causes and recovery options
+* **Improved:** Better handling of concurrent tasks with clear user guidance
+* **Enhanced:** Stop button validation to prevent invalid operations
+* **Security:** Added user ownership verification for timer operations
+
+### Version 1.4.7
+* Previous stable release
+
 </canvas>
