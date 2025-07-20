@@ -381,8 +381,9 @@ jQuery(document).ready(function ($) {
             nonce: ptt_ajax_object.nonce
         }).done(function (response) {
             if (response.success) {
+                const results = response.data.results || response.data;
                 let tableHtml = '<table class="wp-list-table widefat striped"><thead><tr><th>Test Name</th><th>Status</th><th>Message</th></tr></thead><tbody>';
-                response.data.forEach(function (result) {
+                results.forEach(function (result) {
                     tableHtml += `<tr>
                         <td>${result.name}</td>
                         <td class="status-${result.status.toLowerCase()}">${result.status}</td>
@@ -391,6 +392,9 @@ jQuery(document).ready(function ($) {
                 });
                 tableHtml += '</tbody></table>';
                 $resultsContainer.append(tableHtml);
+                if (response.data.time) {
+                    $('#ptt-last-test-time').text('Tests Last Ran at ' + response.data.time);
+                }
             } else {
                 $resultsContainer.append('<p class="error">An error occurred while running tests.</p>');
             }
