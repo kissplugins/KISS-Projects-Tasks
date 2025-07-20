@@ -78,4 +78,23 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 2.  Select a user and/or date range.
 3.  Click **Run Report** to see a detailed breakdown of time tracked.
 
+***
+
+## 📋 Changelog
+
+### Version 1.5.0 (2025-07-20)
+**Improved Error Handling & Recovery**
+* **Fixed:** Stop button lockout issue with comprehensive error recovery
+* **Added:** Force Stop button for emergency timer recovery
+* **Added:** Session recovery using localStorage - tasks persist across page refreshes
+* **Added:** Auto-detection of active tasks on page load
+* **Added:** Visual timer display showing elapsed time (HH:MM format)
+* **Improved:** Error messages now show specific causes and recovery options
+* **Improved:** Better handling of concurrent tasks with clear user guidance
+* **Enhanced:** Stop button validation to prevent invalid operations
+* **Security:** Added user ownership verification for timer operations
+
+### Version 1.4.7
+* Previous stable release
+
 </canvas>
