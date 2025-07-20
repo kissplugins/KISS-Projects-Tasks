@@ -82,6 +82,15 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 
 ## 📋 Changelog
 
+### Version 1.7.0 (2025-07-20)
+**Shareable Report URLs**
+* **Added:** URL parameters for all report filters (user, client, project, dates)
+* **Added:** "Copy Report URL" button to easily share report configurations
+* **Feature:** Bookmarkable report URLs - parameters persist in the URL
+* **Feature:** Direct report loading from URL parameters
+* **Improved:** Browser history updates when running reports
+* **Use Case:** Share specific report views via email or bookmarks
+
 ### Version 1.6.2 (2025-07-20)
 **Budget Display in Reports**
 * **Added:** "Orig. Budget" column to reports showing allocated hours

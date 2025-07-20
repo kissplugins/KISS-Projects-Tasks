@@ -740,6 +740,85 @@ jQuery(document).ready(function ($) {
         $('#end_date').val(formatDate(lastSaturday));
     });
 
+    // Handle reports form submission to update URL
+    if ($('#ptt-reports-form').length) {
+        $('#ptt-reports-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            // Get form values
+            const userId = $('#user_id').val() || '0';
+            const clientId = $('#client_id').val() || '0';
+            const projectId = $('#project_id').val() || '0';
+            const startDate = $('#start_date').val() || '';
+            const endDate = $('#end_date').val() || '';
+            
+            // Build URL parameters
+            const params = new URLSearchParams();
+            if (userId !== '0') params.append('user_id', userId);
+            if (clientId !== '0') params.append('client_id', clientId);
+            if (projectId !== '0') params.append('project_id', projectId);
+            if (startDate) params.append('start_date', startDate);
+            if (endDate) params.append('end_date', endDate);
+            
+            // Get base URL
+            const baseUrl = window.location.pathname + window.location.search.split('&')[0];
+            const newUrl = baseUrl + (params.toString() ? '&' + params.toString() : '');
+            
+            // Update browser URL without reload
+            window.history.pushState({}, '', newUrl);
+            
+            // Submit form normally
+            this.submit();
+        });
+    }
+
+    // Copy report URL to clipboard
+    $('#ptt-copy-report-url').on('click', function(e) {
+        e.preventDefault();
+        
+        // Get current form values
+        const userId = $('#user_id').val() || '0';
+        const clientId = $('#client_id').val() || '0';
+        const projectId = $('#project_id').val() || '0';
+        const startDate = $('#start_date').val() || '';
+        const endDate = $('#end_date').val() || '';
+        
+        // Build URL parameters
+        const params = new URLSearchParams();
+        if (userId !== '0') params.append('user_id', userId);
+        if (clientId !== '0') params.append('client_id', clientId);
+        if (projectId !== '0') params.append('project_id', projectId);
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        
+        // Get base URL (remove existing parameters)
+        const baseUrl = window.location.origin + window.location.pathname + window.location.search.split('&')[0];
+        const fullUrl = baseUrl + (params.toString() ? '&' + params.toString() : '');
+        
+        // Copy to clipboard
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(fullUrl).then(function() {
+                $('#ptt-url-copied').fadeIn().delay(2000).fadeOut();
+            }).catch(function(err) {
+                // Fallback for older browsers
+                copyToClipboardFallback(fullUrl);
+            });
+        } else {
+            // Fallback for older browsers
+            copyToClipboardFallback(fullUrl);
+        }
+    });
+    
+    // Fallback function for copying to clipboard
+    function copyToClipboardFallback(text) {
+        const $temp = $('<textarea>');
+        $('body').append($temp);
+        $temp.val(text).select();
+        document.execCommand('copy');
+        $temp.remove();
+        $('#ptt-url-copied').fadeIn().delay(2000).fadeOut();
+    }
+
 
     /**
      * ---------------------------------------------------------------
