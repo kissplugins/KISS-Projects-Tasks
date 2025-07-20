@@ -82,6 +82,8 @@ function ptt_reports_page_html() {
         
         <form method="get" action="">
             <?php wp_nonce_field( 'ptt_run_report_nonce' ); ?>
+            <input type="hidden" name="post_type" value="project_task" />
+            <input type="hidden" name="page" value="ptt-reports" />
             <table class="form-table">
                 <tbody>
                     <tr>
