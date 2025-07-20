@@ -24,6 +24,16 @@
     justify-content: center;
 }
 
+#ptt-active-task-timer .colon {
+    animation: ptt-blink 1s step-end infinite;
+}
+
+@keyframes ptt-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
 /* Spinner for AJAX actions */
 .ptt-ajax-spinner {
     display: none;
@@ -35,7 +45,7 @@
 }
 
 .ptt-ajax-message {
-    font-size: 13px;
+    font-size: 14px;
     padding: 5px 0;
     color: #444;
 }
@@ -54,6 +64,7 @@
     padding: 20px;
     border-radius: 4px;
     background: #f9f9f9;
+    font-size: 14px;
 }
 
 .ptt-frontend-container .ptt-form-field {
@@ -97,6 +108,9 @@
 }
 
 /* --- Report Styles --- */
+.ptt-report-results {
+    font-size: 14px;
+}
 .ptt-report-results .client-group {
     margin-bottom: 30px;
     padding: 15px;
@@ -116,11 +130,12 @@
 .ptt-report-results h5 {
     border-bottom: 1px solid #ddd;
     padding-bottom: 5px;
+    font-size: 14px;
 }
 
 .subtotal {
     font-weight: normal;
-    font-size: 0.9em;
+    font-size: 14px;
     color: #666;
 }
 
@@ -129,11 +144,14 @@
     padding: 15px;
     background: #333;
     color: #fff;
-    font-size: 1.2em;
+    font-size: 14px;
     text-align: right;
 }
 
 /* --- Self Test Styles --- */
+#ptt-test-results-container {
+    font-size: 14px;
+}
 #ptt-test-results-container table {
     width: 100%;
     margin-top: 1em;

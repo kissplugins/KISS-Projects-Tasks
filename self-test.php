@@ -32,7 +32,17 @@ function ptt_self_test_page_html() {
     <div class="wrap">
         <h1>Plugin Settings & Self Test</h1>
         <p>This module helps verify core plugin functionality. It creates and then immediately deletes test data.</p>
-        <button id="ptt-run-self-tests" class="button button-primary">Run All Tests</button>
+        <button id="ptt-run-self-tests" class="button button-primary">Re-Run Tests</button>
+        <p id="ptt-last-test-time">
+            <?php
+            $last_run = get_option( 'ptt_tests_last_run' );
+            if ( $last_run ) {
+                echo 'Tests Last Ran at ' . esc_html( date_i18n( get_option( 'time_format' ), $last_run ) );
+            } else {
+                echo 'Tests Last Ran at --:--:--';
+            }
+            ?>
+        </p>
         <div id="ptt-test-results-container" style="margin-top: 20px;">
              <div class="ptt-ajax-spinner" style="display:none;"></div>
         </div>
@@ -100,6 +110,12 @@ function ptt_run_self_tests_callback() {
          $results[] = ['name' => 'Calculate Total Time', 'status' => 'Fail', 'message' => 'Could not create post for calculation test.'];
     }
     
-    wp_send_json_success($results);
+    $timestamp = current_time( 'timestamp' );
+    update_option( 'ptt_tests_last_run', $timestamp );
+
+    wp_send_json_success([
+        'results' => $results,
+        'time'    => date_i18n( get_option( 'time_format' ), $timestamp ),
+    ]);
 }
 add_action( 'wp_ajax_ptt_run_self_tests', 'ptt_run_self_tests_callback' );
