@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.4.7
+ * Version:           1.6.2
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.4.7' );
+define( 'PTT_VERSION', '1.6.2' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -264,6 +264,34 @@ function ptt_register_acf_fields() {
                 'readonly' => 1,
                 'step' => '0.01',
             ),
+            array(
+                'key' => 'field_ptt_manual_override',
+                'label' => 'Manual Time Entry',
+                'name' => 'manual_override',
+                'type' => 'true_false',
+                'instructions' => 'Check this to manually enter time instead of using the timer.',
+                'ui' => 1,
+                'ui_on_text' => 'Manual',
+                'ui_off_text' => 'Timer',
+            ),
+            array(
+                'key' => 'field_ptt_manual_duration',
+                'label' => 'Manual Duration (Hours)',
+                'name' => 'manual_duration',
+                'type' => 'number',
+                'instructions' => 'Enter the time spent in decimal hours (e.g., 1.5 = 1 hour 30 mins)',
+                'step' => '0.01',
+                'min' => '0',
+                'conditional_logic' => array(
+                    array(
+                        array(
+                            'field' => 'field_ptt_manual_override',
+                            'operator' => '==',
+                            'value' => '1',
+                        ),
+                    ),
+                ),
+            ),
         ),
         'location' => array(
             array(
@@ -357,25 +385,35 @@ add_action( 'wp_enqueue_scripts', 'ptt_enqueue_assets' );
  * @return float The calculated duration in decimal hours.
  */
 function ptt_calculate_and_save_duration( $post_id ) {
-    $start_time_str = get_field( 'start_time', $post_id );
-    $stop_time_str  = get_field( 'stop_time', $post_id );
-    $duration       = 0.00;
+    // Check if manual override is enabled
+    $manual_override = get_field( 'manual_override', $post_id );
+    
+    if ( $manual_override ) {
+        // Use manual duration if override is enabled
+        $manual_duration = get_field( 'manual_duration', $post_id );
+        $duration = $manual_duration ? (float) $manual_duration : 0.00;
+    } else {
+        // Calculate duration from start/stop times
+        $start_time_str = get_field( 'start_time', $post_id );
+        $stop_time_str  = get_field( 'stop_time', $post_id );
+        $duration       = 0.00;
 
-    if ( $start_time_str && $stop_time_str ) {
-        try {
-            $timezone   = wp_timezone();
-            $start_time = new DateTime( $start_time_str, $timezone );
-            $stop_time  = new DateTime( $stop_time_str, $timezone );
+        if ( $start_time_str && $stop_time_str ) {
+            try {
+                $timezone   = wp_timezone();
+                $start_time = new DateTime( $start_time_str, $timezone );
+                $stop_time  = new DateTime( $stop_time_str, $timezone );
 
-            if ( $stop_time > $start_time ) {
-                $diff_seconds = $stop_time->getTimestamp() - $start_time->getTimestamp();
-                $duration_hours = $diff_seconds / 3600;
-                // Round up to two decimal places
-                $duration = ceil( $duration_hours * 100 ) / 100;
+                if ( $stop_time > $start_time ) {
+                    $diff_seconds = $stop_time->getTimestamp() - $start_time->getTimestamp();
+                    $duration_hours = $diff_seconds / 3600;
+                    // Round up to two decimal places
+                    $duration = ceil( $duration_hours * 100 ) / 100;
+                }
+            } catch ( Exception $e ) {
+                // Handle potential DateTime errors silently
+                $duration = 0.00;
             }
-        } catch ( Exception $e ) {
-            // Handle potential DateTime errors silently
-            $duration = 0.00;
         }
     }
     
@@ -431,6 +469,18 @@ function ptt_add_start_stop_buttons() {
     if ( $start_time && ! $stop_time ) {
         echo '<button type="button" id="ptt-stop-timer" class="button button-large ptt-stop-button">Stop Timer</button>';
     }
+
+    // Show manual entry button
+    echo '<button type="button" id="ptt-manual-entry-toggle" class="button button-small" style="margin-top: 8px;">Manual Entry</button>';
+    
+    // Manual entry form (hidden by default)
+    echo '<div id="ptt-manual-entry-form" style="display: none; margin-top: 10px; padding: 10px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 3px;">';
+    echo '<label for="ptt-manual-hours" style="display: block; margin-bottom: 5px;">Enter time in decimal hours:</label>';
+    echo '<input type="number" id="ptt-manual-hours" min="0" step="0.01" placeholder="e.g., 1.5" style="width: 100%; margin-bottom: 8px;">';
+    echo '<div style="font-size: 12px; color: #666; margin-bottom: 8px;">Examples: 1.5 = 1h 30m, 0.25 = 15m, 2.75 = 2h 45m</div>';
+    echo '<button type="button" id="ptt-save-manual-time" class="button button-primary">Save Manual Time</button>';
+    echo '<button type="button" id="ptt-cancel-manual-time" class="button" style="margin-left: 5px;">Cancel</button>';
+    echo '</div>';
 
     echo '<div class="ptt-ajax-spinner"></div>';
     echo '<div class="ptt-ajax-message"></div>';
@@ -574,6 +624,30 @@ function ptt_stop_timer_callback() {
         wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
     }
 
+    // Verify the post exists and is a project_task
+    $post = get_post( $post_id );
+    if ( ! $post || $post->post_type !== 'project_task' ) {
+        wp_send_json_error( [ 'message' => 'Task not found.' ] );
+    }
+
+    // Check if the task is actually running
+    $start_time = get_field( 'start_time', $post_id );
+    $stop_time = get_field( 'stop_time', $post_id );
+    
+    if ( ! $start_time ) {
+        wp_send_json_error( [ 'message' => 'This task has not been started.' ] );
+    }
+    
+    if ( $stop_time ) {
+        wp_send_json_error( [ 'message' => 'This task has already been stopped.' ] );
+    }
+
+    // Verify the current user is the one who started the task (or is an admin)
+    $user_id = get_current_user_id();
+    if ( $post->post_author != $user_id && ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => 'You can only stop tasks that you started.' ] );
+    }
+
     $current_time = current_time( 'Y-m-d H:i:s' );
     update_field( 'stop_time', $current_time, $post_id );
 
@@ -586,6 +660,100 @@ function ptt_stop_timer_callback() {
     ] );
 }
 add_action( 'wp_ajax_ptt_stop_timer', 'ptt_stop_timer_callback' );
+
+/**
+ * AJAX handler to force-stop a timer (admin/recovery function).
+ */
+function ptt_force_stop_timer_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    if ( ! $post_id ) {
+        wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
+    }
+
+    // Get the post
+    $post = get_post( $post_id );
+    if ( ! $post || $post->post_type !== 'project_task' ) {
+        wp_send_json_error( [ 'message' => 'Task not found.' ] );
+    }
+
+    // For force stop, we just need to ensure there's a start time
+    $start_time = get_field( 'start_time', $post_id );
+    if ( ! $start_time ) {
+        wp_send_json_error( [ 'message' => 'Cannot stop a task that was never started.' ] );
+    }
+
+    // Force stop the timer
+    $current_time = current_time( 'Y-m-d H:i:s' );
+    update_field( 'stop_time', $current_time, $post_id );
+    
+    $duration = ptt_calculate_and_save_duration( $post_id );
+
+    wp_send_json_success( [
+        'message' => 'Timer force-stopped! Duration: ' . $duration . ' hours.',
+        'stop_time' => $current_time,
+        'duration' => $duration,
+        'forced' => true
+    ] );
+}
+add_action( 'wp_ajax_ptt_force_stop_timer', 'ptt_force_stop_timer_callback' );
+
+/**
+ * AJAX handler for manual time entry.
+ */
+function ptt_save_manual_time_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    $manual_hours = isset( $_POST['manual_hours'] ) ? floatval( $_POST['manual_hours'] ) : 0;
+
+    if ( ! $post_id ) {
+        wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
+    }
+
+    if ( $manual_hours < 0 ) {
+        wp_send_json_error( [ 'message' => 'Duration cannot be negative.' ] );
+    }
+
+    if ( $manual_hours > 24 ) {
+        wp_send_json_error( [ 'message' => 'Duration cannot exceed 24 hours for a single entry.' ] );
+    }
+
+    // Get the post
+    $post = get_post( $post_id );
+    if ( ! $post || $post->post_type !== 'project_task' ) {
+        wp_send_json_error( [ 'message' => 'Task not found.' ] );
+    }
+
+    // Set manual override and duration
+    update_field( 'manual_override', true, $post_id );
+    update_field( 'manual_duration', $manual_hours, $post_id );
+    
+    // If no start/stop times exist, set them to current time for record keeping
+    if ( ! get_field( 'start_time', $post_id ) ) {
+        $current_time = current_time( 'Y-m-d H:i:s' );
+        update_field( 'start_time', $current_time, $post_id );
+        update_field( 'stop_time', $current_time, $post_id );
+    }
+    
+    // Calculate and save duration
+    $duration = ptt_calculate_and_save_duration( $post_id );
+
+    wp_send_json_success( [
+        'message' => 'Manual time saved! Duration: ' . $duration . ' hours.',
+        'duration' => $duration
+    ] );
+}
+add_action( 'wp_ajax_ptt_save_manual_time', 'ptt_save_manual_time_callback' );
 
 /**
  * Adds a "Settings" link to the plugin's action links on the plugins page.
