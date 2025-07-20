@@ -14,32 +14,15 @@ if ( ! defined( 'WPINC' ) ) {
  * 
  * @param string $content The post content to process.
  * @param int $max_length Maximum length before truncation (default: 200).
- * @return string Formatted content with URLs converted to links and truncation.
+ * @return string Formatted and truncated content.
  */
 function ptt_format_task_notes( $content, $max_length = 200 ) {
-    // Strip all HTML tags first
-    $content = wp_strip_all_tags( $content );
-    
-    // Trim whitespace
-    $content = trim( $content );
-    
-    if ( empty( $content ) ) {
-        return '';
-    }
-    
-    // First, truncate if needed
-    $truncated = false;
-    if ( strlen( $content ) > $max_length ) {
-        $content = substr( $content, 0, $max_length - 3 );
-        $truncated = true;
-    }
-    
     // Escape HTML entities
     $content = esc_html( $content );
     
     // Pattern to match URLs anywhere in the text
     // This pattern matches http://, https://, and common URL formats
-    $url_pattern = '/(https?:\/\/[^\s<>"{}|\\^`\[\]]+)/i';
+    $url_pattern = '/(https?:\/\/[^\s<>"{}|\^`\[\]]+)/i';
     
     // Replace URLs with clickable links
     $formatted_content = preg_replace_callback( $url_pattern, function( $matches ) {
@@ -49,21 +32,21 @@ function ptt_format_task_notes( $content, $max_length = 200 ) {
         return '<a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . $display_url . '</a>';
     }, $content );
     
-    // Add ellipses if content was truncated
-    if ( $truncated ) {
-        $formatted_content .= '...';
+    // Truncate if longer than max length
+    if ( strlen( strip_tags( $formatted_content ) ) > $max_length ) {
+        $truncated = substr( strip_tags( $formatted_content ), 0, $max_length - 3 ) . '...';
+        return esc_html( $truncated );
     }
     
     return $formatted_content;
 }
 
 /**
- * Adds the "Reports" page under the "Tasks" menu.
+ * Add Reports page to admin menu.
  */
 function ptt_add_reports_page() {
-    add_submenu_page(
-        'edit.php?post_type=project_task', // Parent slug
-        'Time Reports',                    // Page title
+    add_menu_page(
+        'Reports',                         // Page title
         'Reports',                         // Menu title
         'manage_options',                  // Capability
         'ptt-reports',                     // Menu slug
@@ -78,111 +61,98 @@ add_action( 'admin_menu', 'ptt_add_reports_page' );
 function ptt_reports_page_html() {
     ?>
     <div class="wrap">
-        <h1>Project & Task Time Reports</h1>
-        
-        <form method="get" action="">
-            <?php wp_nonce_field( 'ptt_run_report_nonce' ); ?>
-            <input type="hidden" name="post_type" value="project_task" />
+        <h1>Project &amp; Task Time Reports</h1>
+
+        <form method="get">
             <input type="hidden" name="page" value="ptt-reports" />
             <table class="form-table">
-                <tbody>
-                    <tr>
-                        <th scope="row"><label for="user_id">Select User</label></th>
-                        <td>
-                            <?php wp_dropdown_users( [
-                                'name' => 'user_id',
-                                'show_option_all' => 'All Users',
-                                'selected' => isset($_REQUEST['user_id']) ? intval($_REQUEST['user_id']) : 0
-                            ] ); ?>
-                        </td>
-                    </tr>
-                     <tr>
-                        <th scope="row"><label for="client_id">Select Client</label></th>
-                        <td>
-                            <?php wp_dropdown_categories( [
-                                'taxonomy'        => 'client',
-                                'name'            => 'client_id',
-                                'show_option_all' => 'All Clients',
-                                'hide_empty'      => false,
-                                'selected'        => isset($_REQUEST['client_id']) ? intval($_REQUEST['client_id']) : 0,
-                                'hierarchical'    => true,
-                                'class'           => '' // Reset class to avoid conflict
-                            ] ); ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="project_id">Select Project</label></th>
-                        <td>
-                             <?php wp_dropdown_categories( [
-                                'taxonomy'        => 'project',
-                                'name'            => 'project_id',
-                                'show_option_all' => 'All Projects',
-                                'hide_empty'      => false,
-                                'selected'        => isset($_REQUEST['project_id']) ? intval($_REQUEST['project_id']) : 0,
-                                'hierarchical'    => true,
-                                'class'           => '' // Reset class to avoid conflict
-                            ] ); ?>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="start_date">Date Range</label></th>
-                        <td>
-                            <input type="date" id="start_date" name="start_date" value="<?php echo isset($_REQUEST['start_date']) ? esc_attr($_REQUEST['start_date']) : ''; ?>">
-                            to
-                            <input type="date" id="end_date" name="end_date" value="<?php echo isset($_REQUEST['end_date']) ? esc_attr($_REQUEST['end_date']) : ''; ?>">
-                             <button type="button" id="set-this-week" class="button">This Week (Sun-Sat)</button>
-                             <button type="button" id="set-last-week" class="button">Last Week</button>
-                        </td>
-                    </tr>
-                </tbody>
+                <tr>
+                    <th scope="row"><label for="user">User</label></th>
+                    <td>
+                        <?php
+                        wp_dropdown_users( [
+                            'show_option_all' => 'All Users',
+                            'name'            => 'user',
+                            'selected'        => isset( $_GET['user'] ) ? intval( $_GET['user'] ) : 0,
+                        ] );
+                        ?>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="client">Client</label></th>
+                    <td>
+                        <?php
+                        $clients = get_terms( [
+                            'taxonomy'   => 'client',
+                            'hide_empty' => false,
+                        ] );
+                        echo '<select name="client"><option value="0">All Clients</option>';
+                        foreach ( $clients as $client ) {
+                            $selected = ( isset( $_GET['client'] ) && intval( $_GET['client'] ) === $client->term_id ) ? 'selected' : '';
+                            echo '<option value="' . esc_attr( $client->term_id ) . '" ' . $selected . '>' . esc_html( $client->name ) . '</option>';
+                        }
+                        echo '</select>';
+                        ?>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="project">Project</label></th>
+                    <td>
+                        <?php
+                        $projects = get_terms( [
+                            'taxonomy'   => 'project',
+                            'hide_empty' => false,
+                        ] );
+                        echo '<select name="project"><option value="0">All Projects</option>';
+                        foreach ( $projects as $project ) {
+                            $selected = ( isset( $_GET['project'] ) && intval( $_GET['project'] ) === $project->term_id ) ? 'selected' : '';
+                            echo '<option value="' . esc_attr( $project->term_id ) . '" ' . $selected . '>' . esc_html( $project->name ) . '</option>';
+                        }
+                        echo '</select>';
+                        ?>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="start_date">Start Date</label></th>
+                    <td><input type="date" name="start_date" value="<?php echo esc_attr( isset( $_GET['start_date'] ) ? $_GET['start_date'] : '' ); ?>" /></td>
+                </tr>
+                <tr>
+                    <th scope="row"><label for="end_date">End Date</label></th>
+                    <td><input type="date" name="end_date" value="<?php echo esc_attr( isset( $_GET['end_date'] ) ? $_GET['end_date'] : '' ); ?>" /></td>
+                </tr>
             </table>
-            <p class="submit">
-                <input type="submit" name="run_report" class="button button-primary" value="Run Report">
-            </p>
+            <?php submit_button( 'Run Report' ); ?>
         </form>
-
-        <?php
-        if ( isset( $_REQUEST['run_report'] ) ) {
-            check_admin_referer( 'ptt_run_report_nonce' );
-            ptt_display_report_results();
-        }
-        ?>
-    </div>
     <?php
-}
 
-/**
- * Queries and displays the report results.
- */
-function ptt_display_report_results() {
-    $user_id    = isset( $_REQUEST['user_id'] ) ? intval( $_REQUEST['user_id'] ) : 0;
-    $client_id  = isset( $_REQUEST['client_id'] ) ? intval( $_REQUEST['client_id'] ) : 0;
-    $project_id = isset( $_REQUEST['project_id'] ) ? intval( $_REQUEST['project_id'] ) : 0;
-    $start_date = isset( $_REQUEST['start_date'] ) && $_REQUEST['start_date'] ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
-    $end_date   = isset( $_REQUEST['end_date'] ) && $_REQUEST['end_date'] ? sanitize_text_field( $_REQUEST['end_date'] ) : null;
-
+    // Build query args based on filters
     $args = [
-        'post_type'      => 'project_task',
+        'post_type'      => 'task',
         'posts_per_page' => -1,
-        'post_status'    => 'publish',
-        'orderby'        => 'author',
-        'order'          => 'ASC',
-        'meta_query'     => [
-            'relation' => 'AND',
-            [ // Only include tasks that have been completed
-                'key'     => 'stop_time',
-                'compare' => 'EXISTS'
-            ],
-            [
-                'key'     => 'stop_time',
-                'value'   => '',
-                'compare' => '!='
-            ]
-        ]
+        'date_query'     => [],
+        'tax_query'      => [],
     ];
-    
-    if ( $user_id ) {
+
+    $user_id   = isset( $_GET['user'] ) ? intval( $_GET['user'] ) : 0;
+    $client_id = isset( $_GET['client'] ) ? intval( $_GET['client'] ) : 0;
+    $project_id = isset( $_GET['project'] ) ? intval( $_GET['project'] ) : 0;
+
+    if ( $user_id > 0 ) {
         $args['author'] = $user_id;
+    }
+
+    if ( ! empty( $_GET['start_date'] ) ) {
+        $args['date_query'][] = [
+            'after'     => sanitize_text_field( $_GET['start_date'] ),
+            'inclusive' => true,
+        ];
+    }
+
+    if ( ! empty( $_GET['end_date'] ) ) {
+        $args['date_query'][] = [
+            'before'    => sanitize_text_field( $_GET['end_date'] ),
+            'inclusive' => true,
+        ];
     }
 
     // Add taxonomy query
@@ -205,19 +175,10 @@ function ptt_display_report_results() {
         $args['tax_query'] = $tax_query;
     }
 
-    if ( $start_date && $end_date ) {
-        $args['meta_query'][] = [
-            'key'     => 'start_time',
-            'value'   => [ $start_date . ' 00:00:00', $end_date . ' 23:59:59' ],
-            'compare' => 'BETWEEN',
-            'type'    => 'DATETIME'
-        ];
-    }
-
+    // Fetch tasks
     $query = new WP_Query( $args );
-
     if ( ! $query->have_posts() ) {
-        echo '<p>No completed tasks found for the selected criteria.</p>';
+        echo '<p>No tasks found for the selected criteria.</p>';
         return;
     }
 
@@ -228,98 +189,118 @@ function ptt_display_report_results() {
     while ( $query->have_posts() ) {
         $query->the_post();
         $post_id      = get_the_ID();
-        $author_id    = get_the_author_meta('ID');
-        $author_name  = get_the_author_meta('display_name');
+        $author_id    = get_the_author_meta( 'ID' );
+        $author_name  = get_the_author_meta( 'display_name' );
 
-        $clients      = get_the_terms($post_id, 'client');
-        $client_name  = !is_wp_error($clients) && !empty($clients) ? $clients[0]->name : 'Uncategorized';
-        $client_id_term = !is_wp_error($clients) && !empty($clients) ? $clients[0]->term_id : 0;
-        
-        $projects     = get_the_terms($post_id, 'project');
-        $project_name = !is_wp_error($projects) && !empty($projects) ? $projects[0]->name : 'Uncategorized';
-        $project_id_term = !is_wp_error($projects) && !empty($projects) ? $projects[0]->term_id : 0;
-        
-        $duration = (float) get_field('calculated_duration', $post_id);
-        
+        $clients       = get_the_terms( $post_id, 'client' );
+        $client_name   = ! is_wp_error( $clients ) && ! empty( $clients ) ? $clients[0]->name : 'Uncategorized';
+        $client_id_term = ! is_wp_error( $clients ) && ! empty( $clients ) ? $clients[0]->term_id : 0;
+
+        $projects       = get_the_terms( $post_id, 'project' );
+        $project_name   = ! is_wp_error( $projects ) && ! empty( $projects ) ? $projects[0]->name : 'Uncategorized';
+        $project_id_term = ! is_wp_error( $projects ) && ! empty( $projects ) ? $projects[0]->term_id : 0;
+
+        // Determine duration, using manual override if enabled
+        $manual_override = get_field( 'manual_override', $post_id );
+        if ( $manual_override ) {
+            $duration = (float) get_field( 'manual_duration', $post_id );
+        } else {
+            $duration = (float) get_field( 'calculated_duration', $post_id );
+        }
+
         // Get task budget
-        $task_budget = get_field('task_max_budget', $post_id);
-        
+        $task_budget = get_field( 'task_max_budget', $post_id );
+
         // Get project budget (from taxonomy)
         $project_budget = 0;
-        if ($project_id_term) {
-            $project_budget = get_field('project_max_budget', 'project_' . $project_id_term);
-        }
-        
-        if (!isset($report_data[$author_id])) {
-            $report_data[$author_id] = ['name' => $author_name, 'clients' => [], 'total' => 0];
+        if ( $project_id_term ) {
+            $project_budget = get_field( 'project_max_budget', 'project_' . $project_id_term );
         }
 
-        if (!isset($report_data[$author_id]['clients'][$client_id_term])) {
-            $report_data[$author_id]['clients'][$client_id_term] = ['name' => $client_name, 'projects' => [], 'total' => 0];
+        if ( ! isset( $report_data[ $author_id ] ) ) {
+            $report_data[ $author_id ] = [
+                'name'    => $author_name,
+                'clients' => [],
+                'total'   => 0,
+            ];
         }
 
-        if (!isset($report_data[$author_id]['clients'][$client_id_term]['projects'][$project_id_term])) {
-            $report_data[$author_id]['clients'][$client_id_term]['projects'][$project_id_term] = ['name' => $project_name, 'tasks' => [], 'total' => 0];
+        if ( ! isset( $report_data[ $author_id ]['clients'][ $client_id_term ] ) ) {
+            $report_data[ $author_id ]['clients'][ $client_id_term ] = [
+                'name'     => $client_name,
+                'projects' => [],
+                'total'    => 0,
+            ];
         }
-        
+
+        if ( ! isset( $report_data[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] ) ) {
+            $report_data[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] = [
+                'name'  => $project_name,
+                'tasks' => [],
+                'total' => 0,
+            ];
+        }
+
         $grand_total += $duration;
-        $report_data[$author_id]['total'] += $duration;
-        $report_data[$author_id]['clients'][$client_id_term]['total'] += $duration;
-        $report_data[$author_id]['clients'][$client_id_term]['projects'][$project_id_term]['total'] += $duration;
-        $report_data[$author_id]['clients'][$client_id_term]['projects'][$project_id_term]['tasks'][] = [
-            'id'       => $post_id,
-            'title'    => get_the_title(),
-            'date'     => get_field('start_time', $post_id),
-            'duration' => $duration,
-            'content'  => get_the_content(),
-            'task_budget' => $task_budget,
-            'project_budget' => $project_budget
+        $report_data[ $author_id ]['total'] += $duration;
+        $report_data[ $author_id ]['clients'][ $client_id_term ]['total'] += $duration;
+        $report_data[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['total'] += $duration;
+        $report_data[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['tasks'][] = [
+            'id'              => $post_id,
+            'title'           => get_the_title(),
+            'date'            => get_field( 'start_time', $post_id ),
+            'duration'        => $duration,
+            'task_budget'     => $task_budget,
+            'project_budget'  => $project_budget,
+            'content'         => get_the_content(),
         ];
     }
     wp_reset_postdata();
 
-    // Display results
-    echo '<h2>Report Results</h2>';
+    // Output report HTML
     echo '<div class="ptt-report-results">';
-    
-    foreach ($report_data as $author) {
-        echo '<h3>User: ' . esc_html($author['name']) . ' <span class="subtotal">(User Total: ' . number_format($author['total'], 2) . ' hrs)</span></h3>';
-       
-        foreach ($author['clients'] as $client) {
+    foreach ( $report_data as $author ) {
+        echo '<h3>User: ' . esc_html( $author['name'] ) . ' <span class="total">(' . number_format( $author['total'], 2 ) . ' hrs)</span></h3>';
+
+        foreach ( $author['clients'] as $client ) {
             echo '<div class="client-group">';
-            echo '<h4>Client: ' . esc_html($client['name']) . ' <span class="subtotal">(Client Total: ' . number_format($client['total'], 2) . ' hrs)</span></h4>';
-            foreach ($client['projects'] as $project) {
+            echo '<h4>Client: ' . esc_html( $client['name'] ) . ' <span class="total">(' . number_format( $client['total'], 2 ) . ' hrs)</span></h4>';
+
+            foreach ( $client['projects'] as $project ) {
                 echo '<div class="project-group">';
-                echo '<h5>Project: ' . esc_html($project['name']) . ' <span class="subtotal">(Project Total: ' . number_format($project['total'], 2) . ' hrs)</span></h5>';
+                echo '<h5>Project: ' . esc_html( $project['name'] ) . ' <span class="total">(' . number_format( $project['total'], 2 ) . ' hrs)</span></h5>';
                 echo '<table class="wp-list-table widefat fixed striped">';
                 echo '<thead><tr><th>Task Name</th><th>Date</th><th>Duration (Hours)</th><th>Orig. Budget</th><th>Notes</th></tr></thead>';
                 echo '<tbody>';
-                foreach ($project['tasks'] as $task) {
+
+                foreach ( $project['tasks'] as $task ) {
                     // Format budget display
                     $budget_display = '';
-                    if (!empty($task['task_budget']) && $task['task_budget'] > 0) {
-                        $budget_display = number_format((float)$task['task_budget'], 2) . ' (Task)';
-                    } elseif (!empty($task['project_budget']) && $task['project_budget'] > 0) {
-                        $budget_display = number_format((float)$task['project_budget'], 2) . ' (Project)';
+                    if ( ! empty( $task['task_budget'] ) && $task['task_budget'] > 0 ) {
+                        $budget_display = number_format( (float) $task['task_budget'], 2 ) . ' (Task)';
+                    } elseif ( ! empty( $task['project_budget'] ) && $task['project_budget'] > 0 ) {
+                        $budget_display = number_format( (float) $task['project_budget'], 2 ) . ' (Project)';
                     } else {
                         $budget_display = '-';
                     }
-                    
+
                     echo '<tr>';
-                    echo '<td><a href="' . get_edit_post_link($task['id']) . '">' . esc_html($task['title']) . '</a></td>';
-                    echo '<td>' . esc_html(date('Y-m-d', strtotime($task['date']))) . '</td>';
-                    echo '<td>' . number_format($task['duration'], 2) . '</td>';
+                    echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
+                    echo '<td>' . esc_html( date( 'Y-m-d', strtotime( $task['date'] ) ) ) . '</td>';
+                    echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
                     echo '<td>' . $budget_display . '</td>';
-                    echo '<td>' . ptt_format_task_notes($task['content']) . '</td>';
+                    echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
                     echo '</tr>';
                 }
+
                 echo '</tbody></table>';
                 echo '</div>'; // .project-group
             }
-             echo '</div>'; // .client-group
+
+            echo '</div>'; // .client-group
         }
     }
-    
-    echo '<div class="grand-total"><strong>Grand Total: ' . number_format($grand_total, 2) . ' hours</strong></div>';
+
+    echo '<div class="grand-total"><strong>Grand Total: ' . number_format( $grand_total, 2 ) . ' hours</strong></div>';
     echo '</div>'; // .ptt-report-results
 }
