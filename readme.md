@@ -81,6 +81,11 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 ***
 
 ## 📋 Changelog
+### Version 1.6.3 (2025-07-20)
+**Sharable Reports**
+* **Added:** URL parameters for reports (user, client, project, dates)
+* **Feature:** Reports auto-load based on incoming URL parameters
+
 
 ### Version 1.6.2 (2025-07-20)
 **Budget Display in Reports**
