@@ -98,10 +98,27 @@ function ptt_reports_page_html() {
 								'name'            => 'user_id',
 								'show_option_all' => 'All Users',
 								'selected'        => isset( $_REQUEST['user_id'] ) ? intval( $_REQUEST['user_id'] ) : 0,
-							] );
-							?>
-						</td>
-					</tr>
+                                                        ] );
+                                                        ?>
+                                                </td>
+                                        </tr>
+
+                                        <tr>
+                                                <th scope="row"><label for="status_id">Select&nbsp;Status</label></th>
+                                                <td>
+                                                        <?php
+                                                        wp_dropdown_categories([
+                                                                'taxonomy'  => 'task_status',
+                                                                'name'     => 'status_id',
+                                                                'show_option_all' => 'Show All',
+                                                                'hide_empty' => false,
+                                                                'selected' => isset( $_REQUEST['status_id'] ) ? intval( $_REQUEST['status_id'] ) : 0,
+                                                                'hierarchical' => false,
+                                                                'class' => '',
+                                                        ] );
+                                                        ?>
+                                                </td>
+                                        </tr>
 
 					<tr>
 						<th scope="row"><label for="client_id">Select Client</label></th>
@@ -175,7 +192,8 @@ function ptt_display_report_results() {
 
 	$user_id    = isset( $_REQUEST['user_id'] )    ? intval( $_REQUEST['user_id'] )    : 0;
 	$client_id  = isset( $_REQUEST['client_id'] )  ? intval( $_REQUEST['client_id'] )  : 0;
-	$project_id = isset( $_REQUEST['project_id'] ) ? intval( $_REQUEST['project_id'] ) : 0;
+        $project_id = isset( $_REQUEST['project_id'] ) ? intval( $_REQUEST['project_id'] ) : 0;
+        $status_id  = isset( $_REQUEST['status_id'] )  ? intval( $_REQUEST['status_id'] )  : 0;
 	$start_date = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
 	$end_date   = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
 
@@ -234,13 +252,20 @@ function ptt_display_report_results() {
 			'terms'    => $client_id,
 		];
 	}
-	if ( $project_id ) {
-		$tax_query[] = [
-			'taxonomy' => 'project',
-			'field'    => 'term_id',
-			'terms'    => $project_id,
-		];
-	}
+        if ( $project_id ) {
+                $tax_query[] = [
+                        'taxonomy' => 'project',
+                        'field'    => 'term_id',
+                        'terms'    => $project_id,
+                ];
+        }
+        if ( $status_id ) {
+                $tax_query[] = [
+                        'taxonomy' => 'task_status',
+                        'field'    => 'term_id',
+                        'terms'    => $status_id,
+                ];
+        }
 	if ( count( $tax_query ) > 1 ) {
 		$args['tax_query'] = $tax_query;
 	}
@@ -283,9 +308,12 @@ function ptt_display_report_results() {
 		$client_id_term = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->term_id : 0;
 		$client_name    = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name     : 'Uncategorized';
 
-		$project_terms = get_the_terms( $post_id, 'project' );
-		$project_id_term = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->term_id : 0;
-		$project_name    = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name     : 'Uncategorized';
+                $project_terms = get_the_terms( $post_id, 'project' );
+                $project_id_term = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->term_id : 0;
+                $project_name    = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name     : 'Uncategorized';
+
+                $status_terms = get_the_terms( $post_id, 'task_status' );
+                $status_name  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
 
 		// -------- Duration / Budget --------
 		$duration       = (float) get_field( 'calculated_duration', $post_id );
@@ -331,8 +359,9 @@ function ptt_display_report_results() {
 			'duration'       => $duration,
 			'content'        => get_the_content(),
 			'task_budget'    => $task_budget,
-			'project_budget' => $project_budget,
-		];
+                        'project_budget' => $project_budget,
+                        'status'         => $status_name,
+                ];
 
 		$grand_total += $duration;
 	}
@@ -363,7 +392,7 @@ function ptt_display_report_results() {
 				echo '<table class="wp-list-table widefat fixed striped">';
 				echo '<thead><tr>
 						<th>Task Name</th><th>Date</th><th>Duration (Hours)</th>
-						<th>Orig.&nbsp;Budget</th><th>Notes</th>
+						<th>Orig.&nbsp;Budget</th><th>Notes</th><th>Status</th>
 					  </tr></thead><tbody>';
 
 				foreach ( $project['tasks'] as $task ) {
@@ -381,9 +410,10 @@ function ptt_display_report_results() {
 					echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
 					echo '<td>' . esc_html( date( 'Y-m-d', strtotime( $task['date'] ) ) ) . '</td>';
 					echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
-					echo '<td>' . $budget_display . '</td>';
-					echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
-					echo '</tr>';
+                                        echo '<td>' . $budget_display . '</td>';
+                                        echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
+                                        echo '<td>' . esc_html( $task['status'] ) . '</td>';
+                                        echo '</tr>';
 				}
 
 				echo '</tbody></table></div>'; // .project-group

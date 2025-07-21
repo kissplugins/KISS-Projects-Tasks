@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.6.6
+ * Version:           1.6.8
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.6.6' );
+define( 'PTT_VERSION', '1.6.8' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -57,6 +57,14 @@ function ptt_activate() {
     // Register CPT and Taxonomies to make them available.
     ptt_register_post_type();
     ptt_register_taxonomies();
+
+    // Ensure default Task Status terms exist
+    $default_statuses = [ 'In Progress', 'Completed', 'Paused' ];
+    foreach ( $default_statuses as $status ) {
+        if ( ! term_exists( $status, 'task_status' ) ) {
+            wp_insert_term( $status, 'task_status' );
+        }
+    }
 
     // Create a baseline test post.
     if ( ! get_page_by_title( 'Test First Task', OBJECT, 'project_task' ) ) {
@@ -223,6 +231,28 @@ function ptt_register_taxonomies() {
         'rewrite'           => [ 'slug' => 'project' ],
     ];
     register_taxonomy( 'project', [ 'project_task' ], $project_args );
+
+    // Task Status Taxonomy
+    $status_labels = [
+        'name'              => _x( 'Statuses', 'taxonomy general name', 'ptt' ),
+        'singular_name'     => _x( 'Status', 'taxonomy singular name', 'ptt' ),
+        'search_items'      => __( 'Search Statuses', 'ptt' ),
+        'all_items'         => __( 'All Statuses', 'ptt' ),
+        'edit_item'         => __( 'Edit Status', 'ptt' ),
+        'update_item'       => __( 'Update Status', 'ptt' ),
+        'add_new_item'      => __( 'Add New Status', 'ptt' ),
+        'new_item_name'     => __( 'New Status Name', 'ptt' ),
+        'menu_name'         => __( 'Task Statuses', 'ptt' ),
+    ];
+    $status_args = [
+        'hierarchical'      => false,
+        'labels'            => $status_labels,
+        'show_ui'           => true,
+        'show_admin_column' => true,
+        'query_var'         => true,
+        'rewrite'           => [ 'slug' => 'task_status' ],
+    ];
+    register_taxonomy( 'task_status', [ 'project_task' ], $status_args );
 }
 add_action( 'init', 'ptt_register_taxonomies' );
 
@@ -536,6 +566,36 @@ function ptt_add_start_stop_buttons() {
 }
 add_action( 'post_submitbox_misc_actions', 'ptt_add_start_stop_buttons' );
 
+/**
+ * Adds a Status column to the Tasks list table.
+ *
+ * @param array $columns Existing columns.
+ * @return array Modified columns.
+ */
+function ptt_add_status_column( $columns ) {
+    $columns['task_status'] = 'Status';
+    return $columns;
+}
+add_filter( 'manage_project_task_posts_columns', 'ptt_add_status_column' );
+
+/**
+ * Renders the Status column content.
+ *
+ * @param string $column  Column name.
+ * @param int    $post_id Post ID.
+ */
+function ptt_render_status_column( $column, $post_id ) {
+    if ( 'task_status' === $column ) {
+        $terms = get_the_terms( $post_id, 'task_status' );
+        if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
+            echo esc_html( implode( ', ', wp_list_pluck( $terms, 'name' ) ) );
+        } else {
+            echo '&#8212;';
+        }
+    }
+}
+add_action( 'manage_project_task_posts_custom_column', 'ptt_render_status_column', 10, 2 );
+
 
 // =================================================================
 // 8.0 AJAX HANDLERS
@@ -625,7 +685,15 @@ function ptt_start_timer_callback() {
     // This is useful if an admin creates a a task and a developer starts it
     wp_update_post( ['ID' => $post_id, 'post_author' => $user_id] );
 
-    wp_send_json_success( [ 'message' => 'Timer started!', 'start_time' => $current_time, 'post_id' => $post_id ] );
+    $status_terms = get_the_terms( $post_id, 'task_status' );
+    $status_name  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
+
+    wp_send_json_success( [
+        'message'     => 'Timer started!',
+        'start_time'  => $current_time,
+        'post_id'     => $post_id,
+        'task_status' => $status_name,
+    ] );
 }
 add_action( 'wp_ajax_ptt_start_timer', 'ptt_start_timer_callback' );
 
@@ -646,12 +714,15 @@ function ptt_get_active_task_info_callback() {
         wp_send_json_error(['message' => 'No active task found.']);
     }
 
-    $start_time = get_field('start_time', $active_task_id);
+    $start_time    = get_field( 'start_time', $active_task_id );
+    $status_terms  = get_the_terms( $active_task_id, 'task_status' );
+    $status_name   = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
 
     wp_send_json_success([
-        'post_id'    => $active_task_id,
-        'task_name'  => get_the_title($active_task_id),
-        'start_time' => $start_time,
+        'post_id'     => $active_task_id,
+        'task_name'   => get_the_title( $active_task_id ),
+        'start_time'  => $start_time,
+        'task_status' => $status_name,
     ]);
 }
 add_action('wp_ajax_ptt_get_active_task_info', 'ptt_get_active_task_info_callback');
