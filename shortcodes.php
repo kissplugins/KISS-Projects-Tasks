@@ -28,6 +28,7 @@ function ptt_task_enter_shortcode() {
         <div id="ptt-active-task-display" style="display: none;">
             <h3>Active Task</h3>
             <p><strong>Task:</strong> <span id="ptt-active-task-name"></span></p>
+            <p><strong>Status:</strong> <span id="ptt-active-task-status"></span></p>
             <p><strong>Time Elapsed:</strong> <span id="ptt-active-task-timer"><span class="hours">00</span><span class="colon">:</span><span class="minutes">00</span></span></p>
             <button id="ptt-frontend-stop-btn" class="button ptt-stop-button" data-postid="">Stop Timer</button>
             <button id="ptt-frontend-force-stop-btn" class="button button-link-delete" data-postid="" style="display: none; margin-left: 10px;">Force Stop</button>
@@ -68,6 +69,7 @@ function ptt_task_enter_shortcode() {
             </div>
             
             <div id="ptt-task-budget-display" class="ptt-task-budget" style="display: none;"></div>
+            <div id="ptt-task-status-display" class="ptt-task-status" style="display: none;"></div>
 
             <div id="ptt-create-new-fields" style="display:none;">
                 <div class="ptt-form-field">
@@ -155,6 +157,7 @@ function ptt_frontend_start_task_callback() {
     // Set taxonomies
     wp_set_object_terms($post_id, $client_id, 'client', false);
     wp_set_object_terms($post_id, $project_id, 'project', false);
+    wp_set_object_terms($post_id, 'In Progress', 'task_status', false);
 
     // Start timer
     $current_time = current_time('Y-m-d H:i:s');
@@ -162,9 +165,10 @@ function ptt_frontend_start_task_callback() {
     update_field('calculated_duration', '0.00', $post_id);
 
     wp_send_json_success([
-        'message' => 'New task created and timer started!',
-        'post_id' => $post_id,
-        'task_name' => get_the_title($post_id),
+        'message'     => 'New task created and timer started!',
+        'post_id'     => $post_id,
+        'task_name'   => get_the_title($post_id),
+        'task_status' => 'In Progress',
     ]);
 }
 add_action('wp_ajax_ptt_frontend_start_task', 'ptt_frontend_start_task_callback');
@@ -237,10 +241,13 @@ function ptt_get_task_details_callback() {
         wp_send_json_error(['message' => 'Invalid task or permissions.']);
     }
     
-    $task_budget = get_field('task_max_budget', $task_id);
-    
+    $task_budget  = get_field( 'task_max_budget', $task_id );
+    $status_terms = get_the_terms( $task_id, 'task_status' );
+    $status_name  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
+
     wp_send_json_success([
         'task_budget' => $task_budget,
+        'task_status' => $status_name,
     ]);
 }
 add_action('wp_ajax_ptt_get_task_details', 'ptt_get_task_details_callback');
@@ -299,6 +306,7 @@ function ptt_frontend_manual_time_callback() {
         // Set taxonomies
         wp_set_object_terms($post_id, $client_id, 'client', false);
         wp_set_object_terms($post_id, $project_id, 'project', false);
+        wp_set_object_terms($post_id, 'In Progress', 'task_status', false);
         
         $task_id = $post_id;
         $task_name = get_the_title($post_id);

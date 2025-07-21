@@ -81,6 +81,10 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 ***
 
 ## 📋 Changelog
+### Version 1.6.7 (2025-07-21)
+* **Status Taxonomy:** Tasks now include a Task Status with default terms.
+* **Reports/Tasks:** New Status column and filtering options.
+
 ### Version 1.6.6 (2025-07-21)
 * **Permalinks:** Task links now include the post ID for easier reference.
 * **Template:** Added front-end task view with timer and manual entry (authors+ only).

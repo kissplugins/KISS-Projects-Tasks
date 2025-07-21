@@ -195,6 +195,7 @@ jQuery(document).ready(function ($) {
         const $createNewFields = $('#ptt-create-new-fields');
         const $projectBudgetDisplay = $('#ptt-project-budget-display');
         const $taskBudgetDisplay = $('#ptt-task-budget-display');
+        const $taskStatusDisplay = $('#ptt-task-status-display');
         const $messageContainer = $('#ptt-frontend-message').parent();
         let suggestedTimeInterval = null;
         let activeTimerInterval = null;
@@ -213,6 +214,7 @@ jQuery(document).ready(function ($) {
             }).done(function(response) {
                 if (response.success) {
                     $('#ptt-active-task-name').text(response.data.task_name);
+                    $('#ptt-active-task-status').text(response.data.task_status || '');
                     $('#ptt-frontend-stop-btn').data('postid', response.data.post_id);
                     $('#ptt-frontend-force-stop-btn').data('postid', response.data.post_id);
                     $newTaskForm.hide();
@@ -225,6 +227,7 @@ jQuery(document).ready(function ($) {
                     // Try to verify if it's still valid
                     showMessage($messageContainer, 'Recovering previous session...', false);
                     $('#ptt-active-task-name').text(storedTask.taskName + ' (Recovering...)');
+                    $('#ptt-active-task-status').text('');
                     $('#ptt-frontend-stop-btn').data('postid', storedTask.postId);
                     $('#ptt-frontend-force-stop-btn').data('postid', storedTask.postId);
                     $newTaskForm.hide();
@@ -240,6 +243,7 @@ jQuery(document).ready(function ($) {
                 if (storedTask && storedTask.postId) {
                     showMessage($messageContainer, 'Connection error. Showing cached task data.', true);
                     $('#ptt-active-task-name').text(storedTask.taskName + ' (Offline)');
+                    $('#ptt-active-task-status').text('');
                     $('#ptt-frontend-stop-btn').data('postid', storedTask.postId);
                     $('#ptt-frontend-force-stop-btn').data('postid', storedTask.postId);
                     $newTaskForm.hide();
@@ -323,6 +327,7 @@ jQuery(document).ready(function ($) {
             $taskSelect.html('<option value="">Loading tasks...</option>').prop('disabled', true);
             $createNewFields.hide();
             $taskBudgetDisplay.hide().data('budget-hours', '');
+            $taskStatusDisplay.hide();
             $projectBudgetDisplay.hide();
 
             if (!projectId) {
@@ -377,10 +382,17 @@ jQuery(document).ready(function ($) {
                         nonce: ptt_ajax_object.nonce,
                         task_id: taskId
                     }).done(function(response) {
-                        if (response.success && response.data.task_budget && parseFloat(response.data.task_budget) > 0) {
-                            $taskBudgetDisplay.data('budget-hours', response.data.task_budget).show();
-                            updateSuggestedTime(); // Initial call
-                            suggestedTimeInterval = setInterval(updateSuggestedTime, 300000); // 5 minutes
+                        if (response.success) {
+                            if (response.data.task_budget && parseFloat(response.data.task_budget) > 0) {
+                                $taskBudgetDisplay.data('budget-hours', response.data.task_budget).show();
+                                updateSuggestedTime(); // Initial call
+                                suggestedTimeInterval = setInterval(updateSuggestedTime, 300000); // 5 minutes
+                            }
+                            if (response.data.task_status) {
+                                $taskStatusDisplay.text('Current Status: ' + response.data.task_status).show();
+                            } else {
+                                $taskStatusDisplay.hide();
+                            }
                         }
                     });
                 }
@@ -440,6 +452,7 @@ jQuery(document).ready(function ($) {
                         const currentTaskName = (selectedTaskId === 'new') ? formData.task_name : $taskSelect.find('option:selected').text();
                         const taskPostId = response.data.post_id || selectedTaskId;
                         $('#ptt-active-task-name').text(currentTaskName);
+                        $('#ptt-active-task-status').text(response.data.task_status || '');
                         $('#ptt-frontend-stop-btn').data('postid', taskPostId);
                         $('#ptt-frontend-force-stop-btn').data('postid', taskPostId);
                         $newTaskForm.hide();
@@ -526,6 +539,7 @@ jQuery(document).ready(function ($) {
                     $taskSelect.html('<option value="">-- Select Project First --</option>').prop('disabled', true);
                     $createNewFields.hide();
                     $taskBudgetDisplay.hide().data('budget-hours', '');
+                    $taskStatusDisplay.hide();
                     $projectBudgetDisplay.hide();
                     $newTaskForm.show();
                     $('#ptt-frontend-start-btn').prop('disabled', false);
@@ -586,6 +600,7 @@ jQuery(document).ready(function ($) {
                     $taskSelect.html('<option value="">-- Select Project First --</option>').prop('disabled', true);
                     $createNewFields.hide();
                     $taskBudgetDisplay.hide().data('budget-hours', '');
+                    $taskStatusDisplay.hide();
                     $projectBudgetDisplay.hide();
                     $newTaskForm.show();
                     $('#ptt-frontend-start-btn').prop('disabled', false);
