@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.6.5
+ * Version:           1.6.6
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.6.5' );
+define( 'PTT_VERSION', '1.6.6' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -148,6 +148,29 @@ function ptt_register_post_type() {
     register_post_type( 'project_task', $args );
 }
 add_action( 'init', 'ptt_register_post_type' );
+
+/**
+ * Adds the post ID to Task permalinks for uniqueness and easier referencing.
+ *
+ * @param string   $post_link The generated permalink.
+ * @param WP_Post  $post      The current post object.
+ * @return string  Modified permalink with post ID appended.
+ */
+function ptt_task_id_permalink( $post_link, $post ) {
+    if ( 'project_task' === get_post_type( $post ) ) {
+        return home_url( 'project_task/' . $post->post_name . '-' . $post->ID . '/' );
+    }
+    return $post_link;
+}
+add_filter( 'post_type_link', 'ptt_task_id_permalink', 10, 2 );
+
+/**
+ * Registers rewrite rule to parse the custom Task permalink structure.
+ */
+function ptt_task_id_rewrite() {
+    add_rewrite_rule( '^project_task/[^/]+-([0-9]+)/?$', 'index.php?post_type=project_task&p=$matches[1]', 'top' );
+}
+add_action( 'init', 'ptt_task_id_rewrite' );
 
 /**
  * Registers custom taxonomies "Clients" and "Projects".
@@ -445,35 +468,28 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
 // =================================================================
 
 /**
- * Adds Start/Stop buttons to the 'Publish' meta box on the task editor screen.
+ * Returns the timer controls HTML for a given task ID.
+ *
+ * @param int $post_id The task ID.
+ * @return string HTML markup for timer controls.
  */
-function ptt_add_start_stop_buttons() {
-    global $post;
-    if ( get_post_type( $post ) !== 'project_task' ) {
-        return;
-    }
-
-    $post_id    = $post->ID;
+function ptt_get_timer_controls_html( $post_id ) {
     $start_time = get_field( 'start_time', $post_id );
     $stop_time  = get_field( 'stop_time', $post_id );
 
-    // Button container
+    ob_start();
     echo '<div id="ptt-timer-controls" class="misc-pub-section" data-postid="' . esc_attr( $post_id ) . '">';
 
-    // Show START button if not started
     if ( ! $start_time ) {
-         echo '<button type="button" id="ptt-start-timer" class="button button-primary button-large ptt-start-button">Start Timer</button>';
+        echo '<button type="button" id="ptt-start-timer" class="button button-primary button-large ptt-start-button">Start Timer</button>';
     }
 
-    // Show STOP button if started but not stopped
     if ( $start_time && ! $stop_time ) {
         echo '<button type="button" id="ptt-stop-timer" class="button button-large ptt-stop-button">Stop Timer</button>';
     }
 
-    // Show manual entry button
     echo '<button type="button" id="ptt-manual-entry-toggle" class="button button-small" style="margin-top: 8px;">Manual Entry</button>';
-    
-    // Manual entry form (hidden by default)
+
     echo '<div id="ptt-manual-entry-form" style="display: none; margin-top: 10px; padding: 10px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 3px;">';
     echo '<label for="ptt-manual-hours" style="display: block; margin-bottom: 5px;">Enter time in decimal hours:</label>';
     echo '<input type="number" id="ptt-manual-hours" min="0" step="0.01" placeholder="e.g., 1.5" style="width: 100%; margin-bottom: 8px;">';
@@ -485,6 +501,38 @@ function ptt_add_start_stop_buttons() {
     echo '<div class="ptt-ajax-spinner"></div>';
     echo '<div class="ptt-ajax-message"></div>';
     echo '</div>';
+
+    return ob_get_clean();
+}
+
+/**
+ * Forces the plugin's template for single Task views.
+ *
+ * @param string $template Path to the template.
+ * @return string Modified template path when viewing a Task.
+ */
+function ptt_task_single_template( $template ) {
+    if ( is_singular( 'project_task' ) ) {
+        $custom = PTT_PLUGIN_DIR . 'templates/single-project_task.php';
+        if ( file_exists( $custom ) ) {
+            return $custom;
+        }
+    }
+    return $template;
+}
+add_filter( 'template_include', 'ptt_task_single_template' );
+
+/**
+ * Adds Start/Stop buttons to the 'Publish' meta box on the task editor screen.
+ */
+function ptt_add_start_stop_buttons() {
+    global $post;
+    if ( get_post_type( $post ) !== 'project_task' ) {
+        return;
+    }
+
+    $post_id = $post->ID;
+    echo ptt_get_timer_controls_html( $post_id );
 }
 add_action( 'post_submitbox_misc_actions', 'ptt_add_start_stop_buttons' );
 

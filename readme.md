@@ -81,6 +81,10 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 ***
 
 ## 📋 Changelog
+### Version 1.6.6 (2025-07-21)
+* **Permalinks:** Task links now include the post ID for easier reference.
+* **Template:** Added front-end task view with timer and manual entry (authors+ only).
+* **Shortcodes:** New `[daily-planner]` and `[weekly-planner]` shortcodes list upcoming tasks.
 ### Version 1.6.4 (2025-07-20)
 **Bug Fixes**
 * **Fixed:** Reports page reloaded to task list after submitting query
