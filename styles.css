@@ -169,38 +169,44 @@
 
 .ptt-report-results table th:nth-child(2), /* Date */
 .ptt-report-results table td:nth-child(2) {
-    width: 12%;
+    width: 10%;
 }
 
 .ptt-report-results table th:nth-child(3), /* Duration */
 .ptt-report-results table td:nth-child(3) {
-    width: 12%;
+    width: 10%;
 }
 
 .ptt-report-results table th:nth-child(4), /* Orig. Budget */
 .ptt-report-results table td:nth-child(4) {
-    width: 15%;
+    width: 10%;
 }
 
 /* Notes column styling */
-.ptt-report-results table th:last-child,
-.ptt-report-results table td:last-child {
-    width: 31%;
+.ptt-report-results table th:nth-child(5),
+.ptt-report-results table td:nth-child(5) {
+    width: 30%;
 }
 
-.ptt-report-results table td:last-child {
+/* Status column styling */
+.ptt-report-results table th:nth-child(6),
+.ptt-report-results table td:nth-child(6) {
+    width: 10%;
+}
+
+.ptt-report-results table td:nth-child(5) {
     font-size: 13px;
     line-height: 1.4;
     color: #555;
 }
 
-.ptt-report-results table td:last-child a {
+.ptt-report-results table td:nth-child(5) a {
     color: #0073aa;
     text-decoration: none;
     word-break: break-all;
 }
 
-.ptt-report-results table td:last-child a:hover {
+.ptt-report-results table td:nth-child(5) a:hover {
     color: #00a0d2;
     text-decoration: underline;
 }
