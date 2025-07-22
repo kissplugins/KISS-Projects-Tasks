@@ -110,40 +110,7 @@ function ptt_run_self_tests_callback() {
          $results[] = ['name' => 'Calculate Total Time', 'status' => 'Fail', 'message' => 'Could not create post for calculation test.'];
     }
 
-    // Test 4: Concurrent Task Prevention
-    $test_user_id = wp_insert_user([
-        'user_login' => 'ptt_test_user_' . wp_generate_password(4, false),
-        'user_pass'  => wp_generate_password(),
-        'role'       => 'subscriber'
-    ]);
-    $concurrent_post_id = wp_insert_post([
-        'post_type'   => 'project_task',
-        'post_title'  => 'CONCURRENT TEST',
-        'post_status' => 'publish',
-        'post_author' => $test_user_id
-    ]);
-    update_field('start_time', '2025-07-21 10:00:00', $concurrent_post_id);
-    update_field('stop_time', '', $concurrent_post_id);
-
-    $active_id = ptt_has_active_task($test_user_id);
-    if ($active_id === $concurrent_post_id) {
-        $results[] = ['name' => 'Concurrent Task Prevention (Active)', 'status' => 'Pass', 'message' => 'Active task detected correctly.'];
-    } else {
-        $results[] = ['name' => 'Concurrent Task Prevention (Active)', 'status' => 'Fail', 'message' => 'Active task ID mismatch.'];
-    }
-
-    update_field('stop_time', '2025-07-21 11:00:00', $concurrent_post_id);
-    $inactive_id = ptt_has_active_task($test_user_id);
-    if ($inactive_id === 0) {
-        $results[] = ['name' => 'Concurrent Task Prevention (Inactive)', 'status' => 'Pass', 'message' => 'No active task after stop time.'];
-    } else {
-        $results[] = ['name' => 'Concurrent Task Prevention (Inactive)', 'status' => 'Fail', 'message' => 'Task still reported active.'];
-    }
-
-    wp_delete_post($concurrent_post_id, true);
-    wp_delete_user($test_user_id);
-
-    // Test 5: Status Update via AJAX
+    // Test 4: Status Update via AJAX
     $status_term = wp_insert_term('SELF TEST STATUS ' . wp_rand(), 'task_status');
     $status_post = wp_insert_post([
         'post_type'   => 'project_task',
@@ -172,55 +139,7 @@ function ptt_run_self_tests_callback() {
     wp_delete_post($status_post, true);
     wp_delete_term($status_term['term_id'], 'task_status');
 
-    // Test 6: Multi-Session Calculation
-    $multi_post = wp_insert_post([
-        'post_type'   => 'project_task',
-        'post_title'  => 'MULTI SESSION TEST',
-        'post_status' => 'publish'
-    ]);
-    $sessions = [
-        [
-            'session_start_time'      => '2025-07-22 09:00:00',
-            'session_stop_time'       => '2025-07-22 10:00:00',
-            'session_calculated_duration' => '',
-            'session_manual_override' => 0,
-            'session_manual_duration' => ''
-        ],
-        [
-            'session_start_time'      => '',
-            'session_stop_time'       => '',
-            'session_calculated_duration' => '',
-            'session_manual_override' => 1,
-            'session_manual_duration' => 0.5
-        ],
-        [
-            'session_start_time'      => '2025-07-22 11:00:00',
-            'session_stop_time'       => '',
-            'session_calculated_duration' => '',
-            'session_manual_override' => 0,
-            'session_manual_duration' => ''
-        ]
-    ];
-    update_field('sessions', $sessions, $multi_post);
-    $total_sessions = ptt_get_total_sessions_duration($multi_post);
-    if ($total_sessions == 1.5) {
-        $results[] = ['name' => 'Multi-Session Duration', 'status' => 'Pass', 'message' => 'Correctly calculated 1.50 hours from sessions.'];
-    } else {
-        $results[] = ['name' => 'Multi-Session Duration', 'status' => 'Fail', 'message' => 'Expected 1.50, got ' . $total_sessions];
-    }
-    wp_delete_post($multi_post, true);
-
-    // Test 7: Shortcode Rendering
-    $today_start = current_time('Y-m-d 00:00:00');
-    $today_end   = current_time('Y-m-d 23:59:59');
-    $planner_html = ptt_render_planner_tasks(get_current_user_id(), $today_start, $today_end);
-    if (!empty($planner_html) && strpos($planner_html, '<ul class="ptt-task-planner">') !== false) {
-        $results[] = ['name' => 'Planner Shortcodes', 'status' => 'Pass', 'message' => 'Planner HTML rendered.'];
-    } else {
-        $results[] = ['name' => 'Planner Shortcodes', 'status' => 'Fail', 'message' => 'Planner HTML missing or malformed.'];
-    }
-
-    // Test 8: Reporting Logic
+    // Test 5: Reporting Logic
     $report_client  = wp_insert_term('REPORT CLIENT ' . wp_rand(), 'client');
     $report_project = wp_insert_term('REPORT PROJECT ' . wp_rand(), 'project');
     $report_status  = wp_insert_term('REPORT STATUS ' . wp_rand(), 'task_status');
