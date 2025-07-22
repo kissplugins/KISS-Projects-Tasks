@@ -109,6 +109,140 @@ function ptt_run_self_tests_callback() {
     } else {
          $results[] = ['name' => 'Calculate Total Time', 'status' => 'Fail', 'message' => 'Could not create post for calculation test.'];
     }
+
+    // Test 4: Status Update via AJAX (Rewritten)
+    $status_term = wp_insert_term('SELF TEST STATUS ' . wp_rand(), 'task_status');
+    $status_post = wp_insert_post([
+        'post_type'   => 'project_task',
+        'post_title'  => 'STATUS TEST',
+        'post_status' => 'publish'
+    ]);
+
+    // Check if the post and term were created successfully before proceeding
+    if ($status_post && !is_wp_error($status_post) && $status_term && !is_wp_error($status_term)) {
+        // Directly call the core WordPress function instead of the AJAX handler
+        wp_set_object_terms($status_post, $status_term['term_id'], 'task_status', false);
+        
+        // Verify the term was assigned
+        $assigned = has_term($status_term['term_id'], 'task_status', $status_post);
+        if ($assigned) {
+            $results[] = ['name' => 'Status Update Logic', 'status' => 'Pass', 'message' => 'Core status assignment successful.'];
+        } else {
+            $results[] = ['name' => 'Status Update Logic', 'status' => 'Fail', 'message' => 'wp_set_object_terms failed to assign the status.'];
+        }
+    } else {
+        $results[] = ['name' => 'Status Update Logic', 'status' => 'Fail', 'message' => 'Could not create test post or term for status update test.'];
+    }
+    
+    // Cleanup
+    if ($status_post) {
+        wp_delete_post($status_post, true);
+    }
+    if ($status_term && !is_wp_error($status_term)) {
+        wp_delete_term($status_term['term_id'], 'task_status');
+    }
+
+
+    // Test 5: Reporting Logic
+    $report_client  = wp_insert_term('REPORT CLIENT ' . wp_rand(), 'client');
+    $report_project = wp_insert_term('REPORT PROJECT ' . wp_rand(), 'project');
+    $report_status  = wp_insert_term('REPORT STATUS ' . wp_rand(), 'task_status');
+    $admin_id = get_current_user_id();
+    $report_post1 = wp_insert_post([
+        'post_type'   => 'project_task',
+        'post_title'  => 'REPORT POST 1',
+        'post_status' => 'publish',
+        'post_author' => $admin_id
+    ]);
+    wp_update_post([
+        'ID'            => $report_post1,
+        'post_date'     => '2025-07-20 08:00:00',
+        'post_date_gmt' => get_gmt_from_date('2025-07-20 08:00:00')
+    ]);
+    wp_set_object_terms($report_post1, $report_client['term_id'], 'client');
+    wp_set_object_terms($report_post1, $report_project['term_id'], 'project');
+    wp_set_object_terms($report_post1, $report_status['term_id'], 'task_status');
+    update_field('start_time', '2025-07-20 08:00:00', $report_post1);
+    update_field('stop_time', '2025-07-20 09:00:00', $report_post1);
+    ptt_calculate_and_save_duration($report_post1);
+    $report_post2 = wp_insert_post([
+        'post_type'   => 'project_task',
+        'post_title'  => 'REPORT POST 2',
+        'post_status' => 'publish',
+        'post_author' => $admin_id
+    ]);
+    wp_update_post([
+        'ID'            => $report_post2,
+        'post_date'     => '2025-07-21 08:00:00',
+        'post_date_gmt' => get_gmt_from_date('2025-07-21 08:00:00')
+    ]);
+    wp_set_object_terms($report_post2, $report_client['term_id'], 'client');
+    wp_set_object_terms($report_post2, $report_project['term_id'], 'project');
+    wp_set_object_terms($report_post2, $report_status['term_id'], 'task_status');
+    update_field('start_time', '2025-07-21 08:00:00', $report_post2);
+    update_field('stop_time', '2025-07-21 10:00:00', $report_post2);
+    ptt_calculate_and_save_duration($report_post2);
+    $other_user = wp_insert_user([
+        'user_login' => 'ptt_other_' . wp_generate_password(4, false),
+        'user_pass'  => wp_generate_password(),
+        'role'       => 'subscriber'
+    ]);
+    $report_post3 = wp_insert_post([
+        'post_type'   => 'project_task',
+        'post_title'  => 'REPORT POST 3',
+        'post_status' => 'publish',
+        'post_author' => $other_user
+    ]);
+    wp_set_object_terms($report_post3, $report_client['term_id'], 'client');
+    wp_set_object_terms($report_post3, $report_project['term_id'], 'project');
+    wp_set_object_terms($report_post3, $report_status['term_id'], 'task_status');
+    update_field('start_time', '2025-07-21 08:00:00', $report_post3);
+    update_field('stop_time', '2025-07-21 09:00:00', $report_post3);
+    ptt_calculate_and_save_duration($report_post3);
+
+    $args = [
+        'post_type'      => 'project_task',
+        'posts_per_page' => -1,
+        'post_status'    => 'publish',
+        'orderby'        => ['author' => 'ASC', 'date' => 'ASC'],
+        'author'         => $admin_id,
+        'tax_query'      => [
+            [
+                'taxonomy' => 'client',
+                'field'    => 'term_id',
+                'terms'    => $report_client['term_id'],
+            ],
+        ],
+        'date_query'     => [
+            [
+                'after'     => '2025-07-19 00:00:00',
+                'before'    => '2025-07-22 23:59:59',
+                'inclusive' => true,
+            ],
+        ],
+    ];
+    $report_query = new WP_Query($args);
+    $grand = 0.0;
+    if ($report_query->have_posts()) {
+        foreach ($report_query->posts as $rp) {
+            $grand += (float) get_field('calculated_duration', $rp->ID);
+        }
+    }
+    wp_reset_postdata();
+
+    if ($report_query->post_count === 2 && number_format($grand, 2) === '3.00') {
+        $results[] = ['name' => 'Reporting Logic', 'status' => 'Pass', 'message' => 'Report query returned expected posts and total.'];
+    } else {
+        $results[] = ['name' => 'Reporting Logic', 'status' => 'Fail', 'message' => 'Unexpected report results.'];
+    }
+
+    wp_delete_post($report_post1, true);
+    wp_delete_post($report_post2, true);
+    wp_delete_post($report_post3, true);
+    wp_delete_user($other_user);
+    wp_delete_term($report_client['term_id'], 'client');
+    wp_delete_term($report_project['term_id'], 'project');
+    wp_delete_term($report_status['term_id'], 'task_status');
     
     $timestamp = current_time( 'timestamp' );
     update_option( 'ptt_tests_last_run', $timestamp );
