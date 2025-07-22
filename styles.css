@@ -57,6 +57,10 @@
     color: #d94848;
 }
 
+.ptt-session-controls {
+    margin-top: 8px;
+}
+
 /* --- Frontend Shortcode Styles --- */
 .ptt-frontend-container {
     max-width: 600px;

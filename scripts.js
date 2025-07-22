@@ -180,6 +180,114 @@ jQuery(document).ready(function ($) {
         });
     }
 
+    function initSessionRows($context) {
+        $context = $context || $(document);
+        $context.find('.ptt-session-timer').each(function() {
+            const $container = $(this);
+            if ($container.data('initialized')) return;
+            $container.data('initialized', true);
+
+            const $row = $container.closest('.acf-row');
+            const $startInput = $row.find('[data-key="field_ptt_session_start_time"] input');
+            const $stopInput = $row.find('[data-key="field_ptt_session_stop_time"] input');
+
+            const controlsHtml = '<div class="ptt-session-controls">' +
+                '<button type="button" class="button ptt-session-start">Start Session</button>' +
+                '<button type="button" class="button ptt-session-stop">Stop Session</button>' +
+                '<div class="ptt-ajax-spinner"></div><div class="ptt-ajax-message"></div>' +
+            '</div>';
+            $container.find('.acf-input > p').html(controlsHtml);
+
+            function updateButtons() {
+                const startVal = $startInput.val();
+                const stopVal = $stopInput.val();
+                if (!startVal) {
+                    $container.find('.ptt-session-start').show();
+                    $container.find('.ptt-session-stop').hide();
+                } else if (startVal && !stopVal) {
+                    $container.find('.ptt-session-start').hide();
+                    $container.find('.ptt-session-stop').show();
+                } else {
+                    $container.find('.ptt-session-start').hide();
+                    $container.find('.ptt-session-stop').hide();
+                }
+            }
+
+            updateButtons();
+            $startInput.on('change', updateButtons);
+            $stopInput.on('change', updateButtons);
+        });
+    }
+
+    initSessionRows();
+    if (window.acf) {
+        window.acf.addAction('append', function($el){
+            initSessionRows($el);
+        });
+    }
+
+    $(document).on('click', '.ptt-session-start', function(e){
+        e.preventDefault();
+        const $btn = $(this);
+        const $row = $btn.closest('.acf-row');
+        const index = $row.index();
+        const postId = $('#post_ID').val();
+        const $container = $btn.closest('.ptt-session-controls');
+        $btn.prop('disabled', true);
+        showSpinner($container);
+
+        $.post(ptt_ajax_object.ajax_url, {
+            action: 'ptt_start_session_timer',
+            nonce: ptt_ajax_object.nonce,
+            post_id: postId,
+            row_index: index
+        }).done(function(response){
+            if(response.success){
+                showMessage($container, response.data.message, false);
+                setTimeout(function(){ window.location.reload(); }, 1000);
+            } else {
+                showMessage($container, response.data.message, true);
+                $btn.prop('disabled', false);
+            }
+        }).fail(function(){
+            showMessage($container, 'An unexpected error occurred.', true);
+            $btn.prop('disabled', false);
+        }).always(function(){
+            hideSpinner($container);
+        });
+    });
+
+    $(document).on('click', '.ptt-session-stop', function(e){
+        e.preventDefault();
+        const $btn = $(this);
+        const $row = $btn.closest('.acf-row');
+        const index = $row.index();
+        const postId = $('#post_ID').val();
+        const $container = $btn.closest('.ptt-session-controls');
+        $btn.prop('disabled', true);
+        showSpinner($container);
+
+        $.post(ptt_ajax_object.ajax_url, {
+            action: 'ptt_stop_session_timer',
+            nonce: ptt_ajax_object.nonce,
+            post_id: postId,
+            row_index: index
+        }).done(function(response){
+            if(response.success){
+                showMessage($container, response.data.message, false);
+                setTimeout(function(){ window.location.reload(); }, 1000);
+            } else {
+                showMessage($container, response.data.message, true);
+                $btn.prop('disabled', false);
+            }
+        }).fail(function(){
+            showMessage($container, 'An unexpected error occurred.', true);
+            $btn.prop('disabled', false);
+        }).always(function(){
+            hideSpinner($container);
+        });
+    });
+
 
     /**
      * ---------------------------------------------------------------
