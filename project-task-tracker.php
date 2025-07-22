@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.6.2
+ * Version:           1.7.4
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.6.2' );
+define( 'PTT_VERSION', '1.7.4' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -57,6 +57,14 @@ function ptt_activate() {
     // Register CPT and Taxonomies to make them available.
     ptt_register_post_type();
     ptt_register_taxonomies();
+
+    // Ensure default Task Status terms exist
+    $default_statuses = [ 'In Progress', 'Completed', 'Paused' ];
+    foreach ( $default_statuses as $status ) {
+        if ( ! term_exists( $status, 'task_status' ) ) {
+            wp_insert_term( $status, 'task_status' );
+        }
+    }
 
     // Create a baseline test post.
     if ( ! get_page_by_title( 'Test First Task', OBJECT, 'project_task' ) ) {
@@ -150,6 +158,29 @@ function ptt_register_post_type() {
 add_action( 'init', 'ptt_register_post_type' );
 
 /**
+ * Adds the post ID to Task permalinks for uniqueness and easier referencing.
+ *
+ * @param string   $post_link The generated permalink.
+ * @param WP_Post  $post      The current post object.
+ * @return string  Modified permalink with post ID appended.
+ */
+function ptt_task_id_permalink( $post_link, $post ) {
+    if ( 'project_task' === get_post_type( $post ) ) {
+        return home_url( 'project_task/' . $post->post_name . '-' . $post->ID . '/' );
+    }
+    return $post_link;
+}
+add_filter( 'post_type_link', 'ptt_task_id_permalink', 10, 2 );
+
+/**
+ * Registers rewrite rule to parse the custom Task permalink structure.
+ */
+function ptt_task_id_rewrite() {
+    add_rewrite_rule( '^project_task/[^/]+-([0-9]+)/?$', 'index.php?post_type=project_task&p=$matches[1]', 'top' );
+}
+add_action( 'init', 'ptt_task_id_rewrite' );
+
+/**
  * Registers custom taxonomies "Clients" and "Projects".
  */
 function ptt_register_taxonomies() {
@@ -200,6 +231,28 @@ function ptt_register_taxonomies() {
         'rewrite'           => [ 'slug' => 'project' ],
     ];
     register_taxonomy( 'project', [ 'project_task' ], $project_args );
+
+    // Task Status Taxonomy
+    $status_labels = [
+        'name'              => _x( 'Statuses', 'taxonomy general name', 'ptt' ),
+        'singular_name'     => _x( 'Status', 'taxonomy singular name', 'ptt' ),
+        'search_items'      => __( 'Search Statuses', 'ptt' ),
+        'all_items'         => __( 'All Statuses', 'ptt' ),
+        'edit_item'         => __( 'Edit Status', 'ptt' ),
+        'update_item'       => __( 'Update Status', 'ptt' ),
+        'add_new_item'      => __( 'Add New Status', 'ptt' ),
+        'new_item_name'     => __( 'New Status Name', 'ptt' ),
+        'menu_name'         => __( 'Task Statuses', 'ptt' ),
+    ];
+    $status_args = [
+        'hierarchical'      => false,
+        'labels'            => $status_labels,
+        'show_ui'           => true,
+        'show_admin_column' => true,
+        'query_var'         => true,
+        'rewrite'           => [ 'slug' => 'task_status' ],
+    ];
+    register_taxonomy( 'task_status', [ 'project_task' ], $status_args );
 }
 add_action( 'init', 'ptt_register_taxonomies' );
 
@@ -292,6 +345,86 @@ function ptt_register_acf_fields() {
                     ),
                 ),
             ),
+            array(
+                'key' => 'field_ptt_sessions',
+                'label' => 'Sessions',
+                'name' => 'sessions',
+                'type' => 'repeater',
+                'instructions' => 'Track multiple work sessions for this task.',
+                'button_label' => 'Add Session',
+                'sub_fields' => array(
+                    array(
+                        'key' => 'field_ptt_session_title',
+                        'label' => 'Session Title',
+                        'name' => 'session_title',
+                        'type' => 'text',
+                    ),
+                    array(
+                        'key' => 'field_ptt_session_notes',
+                        'label' => 'Notes',
+                        'name' => 'session_notes',
+                        'type' => 'textarea',
+                    ),
+                    array(
+                        'key' => 'field_ptt_session_start_time',
+                        'label' => 'Start Time',
+                        'name' => 'session_start_time',
+                        'type' => 'date_time_picker',
+                        'display_format' => 'Y-m-d H:i:s',
+                        'return_format' => 'Y-m-d H:i:s',
+                    ),
+                    array(
+                        'key' => 'field_ptt_session_stop_time',
+                        'label' => 'Stop Time',
+                        'name' => 'session_stop_time',
+                        'type' => 'date_time_picker',
+                        'display_format' => 'Y-m-d H:i:s',
+                        'return_format' => 'Y-m-d H:i:s',
+                    ),
+                    array(
+                        'key' => 'field_ptt_session_manual_override',
+                        'label' => 'Manual Time Entry',
+                        'name' => 'session_manual_override',
+                        'type' => 'true_false',
+                        'ui' => 1,
+                        'ui_on_text' => 'Manual',
+                        'ui_off_text' => 'Timer',
+                    ),
+                    array(
+                        'key' => 'field_ptt_session_manual_duration',
+                        'label' => 'Manual Duration (Hours)',
+                        'name' => 'session_manual_duration',
+                        'type' => 'number',
+                        'step' => '0.01',
+                        'min' => '0',
+                        'conditional_logic' => array(
+                            array(
+                                array(
+                                    'field' => 'field_ptt_session_manual_override',
+                                    'operator' => '==',
+                                    'value' => '1',
+                                ),
+                            ),
+                        ),
+                    ),
+                    array(
+                        'key' => 'field_ptt_session_calculated_duration',
+                        'label' => 'Calculated Duration (Hours)',
+                        'name' => 'session_calculated_duration',
+                        'type' => 'number',
+                        'readonly' => 1,
+                        'step' => '0.01',
+                    ),
+                    array(
+                        'key' => 'field_ptt_session_timer_controls',
+                        'label' => 'Timer',
+                        'name' => 'session_timer_controls',
+                        'type' => 'message',
+                        'wrapper' => array('class' => 'ptt-session-timer'),
+                        'escape_html' => 0,
+                    ),
+                ),
+            ),
         ),
         'location' => array(
             array(
@@ -361,11 +494,12 @@ function ptt_enqueue_assets() {
     
     // Localize script to pass data like nonces and AJAX URL
     wp_localize_script( 'ptt-scripts', 'ptt_ajax_object', [
-        'ajax_url' => admin_url( 'admin-ajax.php' ),
-        'nonce'    => wp_create_nonce( 'ptt_ajax_nonce' ),
-        'confirm_stop' => __('Are you sure you want to stop the timer?', 'ptt'),
-        'concurrent_error' => __('You have another task running. Please stop it before starting a new one.', 'ptt'),
-        'edit_post_link' => admin_url('post.php?action=edit&post='), // Add this line
+        'ajax_url'              => admin_url( 'admin-ajax.php' ),
+        'nonce'                 => wp_create_nonce( 'ptt_ajax_nonce' ),
+        'confirm_stop'          => __('Are you sure you want to stop the timer?', 'ptt'),
+        'concurrent_error'      => __('You have another task running. Please stop it before starting a new one.', 'ptt'),
+        'edit_post_link'        => admin_url('post.php?action=edit&post='),
+        'todays_date_formatted' => date_i18n( get_option( 'date_format' ), current_time( 'timestamp' ) ),
     ]);
 }
 // Enqueue for admin screens
@@ -385,17 +519,83 @@ add_action( 'wp_enqueue_scripts', 'ptt_enqueue_assets' );
  * @return float The calculated duration in decimal hours.
  */
 function ptt_calculate_and_save_duration( $post_id ) {
-    // Check if manual override is enabled
-    $manual_override = get_field( 'manual_override', $post_id );
-    
-    if ( $manual_override ) {
-        // Use manual duration if override is enabled
-        $manual_duration = get_field( 'manual_duration', $post_id );
-        $duration = $manual_duration ? (float) $manual_duration : 0.00;
+    $sessions = get_field( 'sessions', $post_id );
+    $duration = 0.00;
+
+    if ( ! empty( $sessions ) ) {
+        $duration = ptt_get_total_sessions_duration( $post_id );
     } else {
-        // Calculate duration from start/stop times
-        $start_time_str = get_field( 'start_time', $post_id );
-        $stop_time_str  = get_field( 'stop_time', $post_id );
+        $manual_override = get_field( 'manual_override', $post_id );
+
+        if ( $manual_override ) {
+            $manual_duration = get_field( 'manual_duration', $post_id );
+            $duration        = $manual_duration ? (float) $manual_duration : 0.00;
+        } else {
+            $start_time_str = get_field( 'start_time', $post_id );
+            $stop_time_str  = get_field( 'stop_time', $post_id );
+
+            if ( $start_time_str && $stop_time_str ) {
+                try {
+                    $timezone   = wp_timezone();
+                    $start_time = new DateTime( $start_time_str, $timezone );
+                    $stop_time  = new DateTime( $stop_time_str, $timezone );
+
+                    if ( $stop_time > $start_time ) {
+                        $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
+                        $duration_hours = $diff_seconds / 3600;
+                        $duration       = ceil( $duration_hours * 100 ) / 100;
+                    }
+                } catch ( Exception $e ) {
+                    $duration = 0.00;
+                }
+            }
+        }
+    }
+
+    $formatted_duration = number_format( (float) $duration, 2, '.', '' );
+    update_field( 'calculated_duration', $formatted_duration, $post_id );
+
+    return $formatted_duration;
+}
+
+/**
+ * Returns the index of any active session for a task.
+ *
+ * @param int $post_id The task ID.
+ * @return int|false The active session index or false if none.
+ */
+function ptt_get_active_session_index( $post_id ) {
+    $sessions = get_field( 'sessions', $post_id );
+    if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+        foreach ( $sessions as $index => $session ) {
+            if ( ! empty( $session['session_start_time'] ) && empty( $session['session_stop_time'] ) ) {
+                return $index;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Calculates and saves duration for a specific session row.
+ *
+ * @param int $post_id The task ID.
+ * @param int $index   Session index (0 based).
+ * @return string      Formatted duration hours.
+ */
+function ptt_calculate_session_duration( $post_id, $index ) {
+    $sessions = get_field( 'sessions', $post_id );
+    if ( empty( $sessions ) || ! isset( $sessions[ $index ] ) ) {
+        return '0.00';
+    }
+
+    $session = $sessions[ $index ];
+
+    if ( ! empty( $session['session_manual_override'] ) ) {
+        $duration = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.00;
+    } else {
+        $start_time_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+        $stop_time_str  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
         $duration       = 0.00;
 
         if ( $start_time_str && $stop_time_str ) {
@@ -405,26 +605,63 @@ function ptt_calculate_and_save_duration( $post_id ) {
                 $stop_time  = new DateTime( $stop_time_str, $timezone );
 
                 if ( $stop_time > $start_time ) {
-                    $diff_seconds = $stop_time->getTimestamp() - $start_time->getTimestamp();
+                    $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
                     $duration_hours = $diff_seconds / 3600;
-                    // Round up to two decimal places
-                    $duration = ceil( $duration_hours * 100 ) / 100;
+                    $duration       = ceil( $duration_hours * 100 ) / 100;
                 }
             } catch ( Exception $e ) {
-                // Handle potential DateTime errors silently
                 $duration = 0.00;
             }
         }
     }
-    
-    // Ensure format is always two decimal places
-    $formatted_duration = number_format( (float) $duration, 2, '.', '' );
-    
-    // Update the custom field
-    update_field( 'calculated_duration', $formatted_duration, $post_id );
 
-    return $formatted_duration;
+    $formatted = number_format( (float) $duration, 2, '.', '' );
+    update_sub_field( array( 'sessions', $index + 1, 'session_calculated_duration' ), $formatted, $post_id );
+    return $formatted;
 }
+
+/**
+ * Calculates the total duration of all sessions for a task.
+ *
+ * @param int $post_id Task ID.
+ * @return float Total hours rounded to two decimals.
+ */
+function ptt_get_total_sessions_duration( $post_id ) {
+    $sessions = get_field( 'sessions', $post_id );
+    $total    = 0.0;
+
+    if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+        foreach ( $sessions as $session ) {
+            if ( ! empty( $session['session_manual_override'] ) ) {
+                $dur = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
+            } else {
+                $start = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+                $stop  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
+                $dur   = 0.0;
+
+                if ( $start && $stop ) {
+                    try {
+                        $timezone   = wp_timezone();
+                        $start_time = new DateTime( $start, $timezone );
+                        $stop_time  = new DateTime( $stop, $timezone );
+                        if ( $stop_time > $start_time ) {
+                            $diff_seconds = $stop_time->getTimestamp() - $start_time->getTimestamp();
+                            $dur          = $diff_seconds / 3600;
+                        }
+                    } catch ( Exception $e ) {
+                        $dur = 0.0;
+                    }
+                }
+            }
+
+            $total += $dur;
+        }
+    }
+
+    $total = ceil( $total * 100 ) / 100;
+    return $total;
+}
+
 
 /**
  * Recalculates duration whenever a task post is saved.
@@ -434,6 +671,12 @@ function ptt_calculate_and_save_duration( $post_id ) {
  */
 function ptt_recalculate_on_save( $post_id ) {
     if ( get_post_type( $post_id ) === 'project_task' ) {
+        $sessions = get_field( 'sessions', $post_id );
+        if ( ! empty( $sessions ) ) {
+            foreach ( array_keys( $sessions ) as $index ) {
+                ptt_calculate_session_duration( $post_id, $index );
+            }
+        }
         ptt_calculate_and_save_duration( $post_id );
     }
 }
@@ -445,35 +688,28 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
 // =================================================================
 
 /**
- * Adds Start/Stop buttons to the 'Publish' meta box on the task editor screen.
+ * Returns the timer controls HTML for a given task ID.
+ *
+ * @param int $post_id The task ID.
+ * @return string HTML markup for timer controls.
  */
-function ptt_add_start_stop_buttons() {
-    global $post;
-    if ( get_post_type( $post ) !== 'project_task' ) {
-        return;
-    }
-
-    $post_id    = $post->ID;
+function ptt_get_timer_controls_html( $post_id ) {
     $start_time = get_field( 'start_time', $post_id );
     $stop_time  = get_field( 'stop_time', $post_id );
 
-    // Button container
+    ob_start();
     echo '<div id="ptt-timer-controls" class="misc-pub-section" data-postid="' . esc_attr( $post_id ) . '">';
 
-    // Show START button if not started
     if ( ! $start_time ) {
-         echo '<button type="button" id="ptt-start-timer" class="button button-primary button-large ptt-start-button">Start Timer</button>';
+        echo '<button type="button" id="ptt-start-timer" class="button button-primary button-large ptt-start-button">Start Timer</button>';
     }
 
-    // Show STOP button if started but not stopped
     if ( $start_time && ! $stop_time ) {
         echo '<button type="button" id="ptt-stop-timer" class="button button-large ptt-stop-button">Stop Timer</button>';
     }
 
-    // Show manual entry button
     echo '<button type="button" id="ptt-manual-entry-toggle" class="button button-small" style="margin-top: 8px;">Manual Entry</button>';
-    
-    // Manual entry form (hidden by default)
+
     echo '<div id="ptt-manual-entry-form" style="display: none; margin-top: 10px; padding: 10px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 3px;">';
     echo '<label for="ptt-manual-hours" style="display: block; margin-bottom: 5px;">Enter time in decimal hours:</label>';
     echo '<input type="number" id="ptt-manual-hours" min="0" step="0.01" placeholder="e.g., 1.5" style="width: 100%; margin-bottom: 8px;">';
@@ -485,8 +721,70 @@ function ptt_add_start_stop_buttons() {
     echo '<div class="ptt-ajax-spinner"></div>';
     echo '<div class="ptt-ajax-message"></div>';
     echo '</div>';
+
+    return ob_get_clean();
 }
-add_action( 'post_submitbox_misc_actions', 'ptt_add_start_stop_buttons' );
+
+/**
+ * Forces the plugin's template for single Task views.
+ *
+ * @param string $template Path to the template.
+ * @return string Modified template path when viewing a Task.
+ */
+function ptt_task_single_template( $template ) {
+    if ( is_singular( 'project_task' ) ) {
+        $custom = PTT_PLUGIN_DIR . 'templates/single-project_task.php';
+        if ( file_exists( $custom ) ) {
+            return $custom;
+        }
+    }
+    return $template;
+}
+add_filter( 'template_include', 'ptt_task_single_template' );
+
+/**
+ * Adds Start/Stop buttons to the 'Publish' meta box on the task editor screen.
+ */
+function ptt_add_start_stop_buttons() {
+    global $post;
+    if ( get_post_type( $post ) !== 'project_task' ) {
+        return;
+    }
+
+    $post_id = $post->ID;
+    echo ptt_get_timer_controls_html( $post_id );
+}
+// add_action( 'post_submitbox_misc_actions', 'ptt_add_start_stop_buttons' );
+
+/**
+ * Adds a Status column to the Tasks list table.
+ *
+ * @param array $columns Existing columns.
+ * @return array Modified columns.
+ */
+function ptt_add_status_column( $columns ) {
+    $columns['task_status'] = 'Status';
+    return $columns;
+}
+add_filter( 'manage_project_task_posts_columns', 'ptt_add_status_column' );
+
+/**
+ * Renders the Status column content.
+ *
+ * @param string $column  Column name.
+ * @param int    $post_id Post ID.
+ */
+function ptt_render_status_column( $column, $post_id ) {
+    if ( 'task_status' === $column ) {
+        $terms = get_the_terms( $post_id, 'task_status' );
+        if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
+            echo esc_html( implode( ', ', wp_list_pluck( $terms, 'name' ) ) );
+        } else {
+            echo '&#8212;';
+        }
+    }
+}
+add_action( 'manage_project_task_posts_custom_column', 'ptt_render_status_column', 10, 2 );
 
 
 // =================================================================
@@ -577,7 +875,15 @@ function ptt_start_timer_callback() {
     // This is useful if an admin creates a a task and a developer starts it
     wp_update_post( ['ID' => $post_id, 'post_author' => $user_id] );
 
-    wp_send_json_success( [ 'message' => 'Timer started!', 'start_time' => $current_time, 'post_id' => $post_id ] );
+    $status_terms = get_the_terms( $post_id, 'task_status' );
+    $status_name  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
+
+    wp_send_json_success( [
+        'message'     => 'Timer started!',
+        'start_time'  => $current_time,
+        'post_id'     => $post_id,
+        'task_status' => $status_name,
+    ] );
 }
 add_action( 'wp_ajax_ptt_start_timer', 'ptt_start_timer_callback' );
 
@@ -598,12 +904,15 @@ function ptt_get_active_task_info_callback() {
         wp_send_json_error(['message' => 'No active task found.']);
     }
 
-    $start_time = get_field('start_time', $active_task_id);
+    $start_time    = get_field( 'start_time', $active_task_id );
+    $status_terms  = get_the_terms( $active_task_id, 'task_status' );
+    $status_name   = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
 
     wp_send_json_success([
-        'post_id'    => $active_task_id,
-        'task_name'  => get_the_title($active_task_id),
-        'start_time' => $start_time,
+        'post_id'     => $active_task_id,
+        'task_name'   => get_the_title( $active_task_id ),
+        'start_time'  => $start_time,
+        'task_status' => $status_name,
     ]);
 }
 add_action('wp_ajax_ptt_get_active_task_info', 'ptt_get_active_task_info_callback');
@@ -737,12 +1046,28 @@ function ptt_save_manual_time_callback() {
     // Set manual override and duration
     update_field( 'manual_override', true, $post_id );
     update_field( 'manual_duration', $manual_hours, $post_id );
-    
-    // If no start/stop times exist, set them to current time for record keeping
-    if ( ! get_field( 'start_time', $post_id ) ) {
-        $current_time = current_time( 'Y-m-d H:i:s' );
-        update_field( 'start_time', $current_time, $post_id );
-        update_field( 'stop_time', $current_time, $post_id );
+
+    $start_time = get_field( 'start_time', $post_id );
+    $stop_time  = get_field( 'stop_time', $post_id );
+
+    // If no start time exists, use current time
+    if ( ! $start_time ) {
+        $start_time = current_time( 'Y-m-d H:i:s' );
+        update_field( 'start_time', $start_time, $post_id );
+    }
+
+    // Ensure a stop time is recorded so the task appears in reports
+    if ( ! $stop_time ) {
+        try {
+            $timezone = wp_timezone();
+            $start_dt = new DateTime( $start_time, $timezone );
+            $seconds  = $manual_hours * 3600;
+            $start_dt->modify( '+' . $seconds . ' seconds' );
+            $stop_time = $start_dt->format( 'Y-m-d H:i:s' );
+        } catch ( Exception $e ) {
+            $stop_time = $start_time;
+        }
+        update_field( 'stop_time', $stop_time, $post_id );
     }
     
     // Calculate and save duration
@@ -754,6 +1079,76 @@ function ptt_save_manual_time_callback() {
     ] );
 }
 add_action( 'wp_ajax_ptt_save_manual_time', 'ptt_save_manual_time_callback' );
+
+/**
+ * AJAX handler to start a session timer.
+ */
+function ptt_start_session_timer_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $post_id   = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    $row_index = isset( $_POST['row_index'] ) ? intval( $_POST['row_index'] ) : 0;
+    if ( ! $post_id ) {
+        wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
+    }
+
+    $active = ptt_get_active_session_index( $post_id );
+    if ( $active !== false && $active !== $row_index ) {
+        ptt_stop_session( $post_id, $active );
+    }
+
+    $current_time = current_time( 'Y-m-d H:i:s' );
+    update_sub_field( array( 'sessions', $row_index + 1, 'session_start_time' ), $current_time, $post_id );
+    update_sub_field( array( 'sessions', $row_index + 1, 'session_stop_time' ), '', $post_id );
+    update_sub_field( array( 'sessions', $row_index + 1, 'session_calculated_duration' ), '0.00', $post_id );
+
+    wp_send_json_success( [ 'message' => 'Session started!', 'start_time' => $current_time ] );
+}
+add_action( 'wp_ajax_ptt_start_session_timer', 'ptt_start_session_timer_callback' );
+
+/**
+ * Stops a session timer and calculates duration.
+ *
+ * @param int $post_id Task ID.
+ * @param int $index   Session index.
+ */
+function ptt_stop_session( $post_id, $index ) {
+    $current_time = current_time( 'Y-m-d H:i:s' );
+    update_sub_field( array( 'sessions', $index + 1, 'session_stop_time' ), $current_time, $post_id );
+    $duration = ptt_calculate_session_duration( $post_id, $index );
+    ptt_calculate_and_save_duration( $post_id );
+    return $duration;
+}
+
+/**
+ * AJAX handler to stop a session timer.
+ */
+function ptt_stop_session_timer_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $post_id   = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    $row_index = isset( $_POST['row_index'] ) ? intval( $_POST['row_index'] ) : 0;
+    if ( ! $post_id ) {
+        wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
+    }
+
+    $duration = ptt_stop_session( $post_id, $row_index );
+
+    wp_send_json_success( [
+        'message'   => 'Session stopped! Duration: ' . $duration . ' hours.',
+        'stop_time' => current_time( 'Y-m-d H:i:s' ),
+        'duration'  => $duration,
+    ] );
+}
+add_action( 'wp_ajax_ptt_stop_session_timer', 'ptt_stop_session_timer_callback' );
 
 /**
  * Adds a "Settings" link to the plugin's action links on the plugins page.

@@ -28,6 +28,7 @@ function ptt_task_enter_shortcode() {
         <div id="ptt-active-task-display" style="display: none;">
             <h3>Active Task</h3>
             <p><strong>Task:</strong> <span id="ptt-active-task-name"></span></p>
+            <p><strong>Status:</strong> <span id="ptt-active-task-status"></span></p>
             <p><strong>Time Elapsed:</strong> <span id="ptt-active-task-timer"><span class="hours">00</span><span class="colon">:</span><span class="minutes">00</span></span></p>
             <button id="ptt-frontend-stop-btn" class="button ptt-stop-button" data-postid="">Stop Timer</button>
             <button id="ptt-frontend-force-stop-btn" class="button button-link-delete" data-postid="" style="display: none; margin-left: 10px;">Force Stop</button>
@@ -68,6 +69,7 @@ function ptt_task_enter_shortcode() {
             </div>
             
             <div id="ptt-task-budget-display" class="ptt-task-budget" style="display: none;"></div>
+            <div id="ptt-task-status-display" class="ptt-task-status" style="display: none;"></div>
 
             <div id="ptt-create-new-fields" style="display:none;">
                 <div class="ptt-form-field">
@@ -155,6 +157,7 @@ function ptt_frontend_start_task_callback() {
     // Set taxonomies
     wp_set_object_terms($post_id, $client_id, 'client', false);
     wp_set_object_terms($post_id, $project_id, 'project', false);
+    wp_set_object_terms($post_id, 'In Progress', 'task_status', false);
 
     // Start timer
     $current_time = current_time('Y-m-d H:i:s');
@@ -162,9 +165,10 @@ function ptt_frontend_start_task_callback() {
     update_field('calculated_duration', '0.00', $post_id);
 
     wp_send_json_success([
-        'message' => 'New task created and timer started!',
-        'post_id' => $post_id,
-        'task_name' => get_the_title($post_id),
+        'message'     => 'New task created and timer started!',
+        'post_id'     => $post_id,
+        'task_name'   => get_the_title($post_id),
+        'task_status' => 'In Progress',
     ]);
 }
 add_action('wp_ajax_ptt_frontend_start_task', 'ptt_frontend_start_task_callback');
@@ -237,10 +241,13 @@ function ptt_get_task_details_callback() {
         wp_send_json_error(['message' => 'Invalid task or permissions.']);
     }
     
-    $task_budget = get_field('task_max_budget', $task_id);
-    
+    $task_budget  = get_field( 'task_max_budget', $task_id );
+    $status_terms = get_the_terms( $task_id, 'task_status' );
+    $status_name  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
+
     wp_send_json_success([
         'task_budget' => $task_budget,
+        'task_status' => $status_name,
     ]);
 }
 add_action('wp_ajax_ptt_get_task_details', 'ptt_get_task_details_callback');
@@ -299,6 +306,7 @@ function ptt_frontend_manual_time_callback() {
         // Set taxonomies
         wp_set_object_terms($post_id, $client_id, 'client', false);
         wp_set_object_terms($post_id, $project_id, 'project', false);
+        wp_set_object_terms($post_id, 'In Progress', 'task_status', false);
         
         $task_id = $post_id;
         $task_name = get_the_title($post_id);
@@ -335,3 +343,114 @@ function ptt_frontend_manual_time_callback() {
     ]);
 }
 add_action('wp_ajax_ptt_frontend_manual_time', 'ptt_frontend_manual_time_callback');
+
+/**
+ * Helper to render tasks list for a date range.
+ *
+ * @param int    $user_id The user ID.
+ * @param string $start   Start datetime Y-m-d H:i:s.
+ * @param string $end     End datetime Y-m-d H:i:s.
+ * @return string HTML list of tasks.
+ */
+function ptt_render_planner_tasks( $user_id, $start, $end ) {
+    $args = [
+        'post_type'      => 'project_task',
+        'posts_per_page' => -1,
+        'author'         => $user_id,
+        'meta_query'     => [
+            [
+                'key'     => 'start_time',
+                'value'   => [ $start, $end ],
+                'compare' => 'BETWEEN',
+                'type'    => 'DATETIME',
+            ],
+        ],
+        'orderby'        => 'meta_value',
+        'meta_key'       => 'start_time',
+        'order'          => 'ASC',
+    ];
+    $query = new WP_Query( $args );
+    ob_start();
+    echo '<ul class="ptt-task-planner">';
+    if ( $query->have_posts() ) {
+        while ( $query->have_posts() ) {
+            $query->the_post();
+            echo '<li><a href="' . esc_url( get_permalink() ) . '">' . esc_html( get_the_title() ) . '</a></li>';
+        }
+    } else {
+        echo '<li>' . esc_html__( 'No tasks found.', 'ptt' ) . '</li>';
+    }
+    echo '</ul>';
+    wp_reset_postdata();
+    return ob_get_clean();
+}
+
+/**
+ * Outputs user selector form if current user can list users.
+ */
+function ptt_planner_user_dropdown( $current_user ) {
+    if ( ! current_user_can( 'list_users' ) ) {
+        return '';
+    }
+
+    $users = get_users( [ 'who' => 'authors' ] );
+    $out   = '<form method="get" style="margin-bottom:10px;">';
+    $out  .= '<select name="planner_user" onchange="this.form.submit()">';
+    foreach ( $users as $user ) {
+        $selected = selected( $user->ID, $current_user, false );
+        $out     .= '<option value="' . esc_attr( $user->ID ) . '"' . $selected . '>' . esc_html( $user->display_name ) . '</option>';
+    }
+    $out .= '</select></form>';
+    return $out;
+}
+
+/**
+ * Shortcode: [daily-planner]
+ */
+function ptt_daily_planner_shortcode() {
+    if ( ! is_user_logged_in() || ! current_user_can( 'edit_posts' ) ) {
+        return '<p>' . esc_html__( 'You must be logged in to view tasks.', 'ptt' ) . '</p>';
+    }
+
+    $user_id = get_current_user_id();
+    if ( isset( $_GET['planner_user'] ) && current_user_can( 'list_users' ) ) {
+        $user_id = absint( $_GET['planner_user'] );
+    }
+
+    $start = current_time( 'Y-m-d 00:00:00' );
+    $end   = current_time( 'Y-m-d 23:59:59' );
+
+    $output  = ptt_planner_user_dropdown( $user_id );
+    $output .= ptt_render_planner_tasks( $user_id, $start, $end );
+    return $output;
+}
+add_shortcode( 'daily-planner', 'ptt_daily_planner_shortcode' );
+
+/**
+ * Shortcode: [weekly-planner]
+ */
+function ptt_weekly_planner_shortcode() {
+    if ( ! is_user_logged_in() || ! current_user_can( 'edit_posts' ) ) {
+        return '<p>' . esc_html__( 'You must be logged in to view tasks.', 'ptt' ) . '</p>';
+    }
+
+    $user_id = get_current_user_id();
+    if ( isset( $_GET['planner_user'] ) && current_user_can( 'list_users' ) ) {
+        $user_id = absint( $_GET['planner_user'] );
+    }
+
+    $today   = current_time( 'timestamp' );
+    $sunday  = strtotime( 'last sunday', $today );
+    if ( date( 'w', $today ) === '0' ) {
+        $sunday = $today;
+    }
+    $saturday = strtotime( 'next saturday', $sunday );
+
+    $start = date( 'Y-m-d 00:00:00', $sunday );
+    $end   = date( 'Y-m-d 23:59:59', $saturday );
+
+    $output  = ptt_planner_user_dropdown( $user_id );
+    $output .= ptt_render_planner_tasks( $user_id, $start, $end );
+    return $output;
+}
+add_shortcode( 'weekly-planner', 'ptt_weekly_planner_shortcode' );

@@ -64,121 +64,297 @@ jQuery(document).ready(function ($) {
             .show();
     }
 
+    function validateSessionRows() {
+        let valid = true;
+        $('.acf-field[data-key="field_ptt_sessions"] .acf-row').each(function(){
+            const $row = $(this);
+            if ($row.find('.acf-row-handle.order').text() === 'New') return; // Skip new unsaved rows
+
+            const title = $row.find('[data-key="field_ptt_session_title"] input').val();
+            const notes = $row.find('[data-key="field_ptt_session_notes"] textarea').val();
+            const start = $row.find('[data-key="field_ptt_session_start_time"] input').val();
+            const stop = $row.find('[data-key="field_ptt_session_stop_time"] input').val();
+            const override = $row.find('[data-key="field_ptt_session_manual_override"] input').prop('checked');
+            const manual = $row.find('[data-key="field_ptt_session_manual_duration"] input').val();
+
+            if (!title) {
+                valid = false; return false;
+            }
+
+            if (override) {
+                if (manual === '' || manual === null) {
+                    valid = false; return false;
+                }
+            } else {
+                if (start && !stop) {
+                    valid = false; return false;
+                }
+            }
+        });
+        return valid;
+    }
+
 
     /**
      * ---------------------------------------------------------------
      * ADMIN UI (CPT EDITOR)
      * ---------------------------------------------------------------
      */
-    if ($('#ptt-timer-controls').length) {
-        const $timerControls = $('#ptt-timer-controls');
-        const postId = $timerControls.data('postid');
 
-        // Manual Entry Toggle
-        $timerControls.on('click', '#ptt-manual-entry-toggle', function(e) {
-            e.preventDefault();
-            $('#ptt-manual-entry-form').slideToggle();
-        });
+    // --- START DEBUGGING INFO ---
+    // This adds a debugging box to the top of the "Edit Task" page.
+    // To disable this, you can delete this entire block of code.
+    if ($('body').hasClass('post-type-project_task')) {
+        const debugBox = $('<div id="ptt-timer-debug-log" style="background: #fff; border: 2px dashed red; padding: 10px; margin-bottom: 15px; font-family: monospace;"><h3>Timer Debugging Info</h3></div>');
+        $('#poststuff').before(debugBox);
+    }
+    // --- END DEBUGGING INFO ---
 
-        // Cancel Manual Entry
-        $timerControls.on('click', '#ptt-cancel-manual-time', function(e) {
-            e.preventDefault();
-            $('#ptt-manual-entry-form').slideUp();
-            $('#ptt-manual-hours').val('');
-        });
 
-        // Save Manual Time
-        $timerControls.on('click', '#ptt-save-manual-time', function(e) {
-            e.preventDefault();
-            const $button = $(this);
-            const manualHours = parseFloat($('#ptt-manual-hours').val());
+    // Add "Use Today's Date" button next to the title input
+    if ($('body').hasClass('post-type-project_task') && ($('body').hasClass('post-new-php') || $('body').hasClass('post-php'))) {
+        const $titlewrap = $('#titlewrap');
+        if ($titlewrap.length) {
+            const dateButton = $('<button type="button" id="ptt-use-todays-date" class="button" style="margin-bottom: 10px;">Use Today\'s Date</button>');
+            $titlewrap.after(dateButton); // Place button after the title wrapper
 
-            if (isNaN(manualHours) || manualHours <= 0) {
-                showMessage($timerControls, 'Please enter a valid time greater than 0.', true);
-                return;
+            dateButton.on('click', function(e) {
+                e.preventDefault();
+                const today = ptt_ajax_object.todays_date_formatted;
+                const $titleInput = $('#title');
+                const currentTitle = $titleInput.val();
+                let newTitle = today + ' - ' + currentTitle;
+                
+                if ( !currentTitle.trim() ) {
+                    newTitle = today + ' - ';
+                } else if (currentTitle.includes(today)) {
+                    // Don't add if date is already there
+                    return; 
+                }
+                
+                $titleInput.val(newTitle);
+                $('#title-prompt-text').addClass('screen-reader-text');
+            });
+        }
+    }
+    
+    /**
+     * Reusable live timer function for session rows.
+     */
+    function manageLiveTimer($container, startTimeStr) {
+        // Clear any existing timer for this container
+        if ($container.data('timerIntervalId')) {
+            clearInterval($container.data('timerIntervalId'));
+        }
+
+        // FIX: Treat the incoming time string as UTC by appending 'Z'
+        const startTime = new Date(startTimeStr.replace(' ', 'T') + 'Z');
+        const $timerDisplay = $container.find('.ptt-session-elapsed-time');
+
+        const updateTimer = () => {
+            const now = new Date();
+            const diff = now - startTime; // in milliseconds
+
+            // --- START DEBUGGING INFO ---
+            const debugLog = $('#ptt-timer-debug-log');
+            if (debugLog.length) {
+                debugLog.html(
+                    '<h3>Timer Debugging Info</h3>' +
+                    '<b>Start Time String (from server/UTC):</b> ' + startTimeStr + '<br>' +
+                    '<b>Browser "Now" Time (local):</b> ' + now.toString() + '<br>' +
+                    '<b>Parsed Start Time (local):</b> ' + startTime.toString() + '<br>' +
+                    '<b>Difference (ms):</b> ' + diff
+                );
             }
+            // --- END DEBUGGING INFO ---
 
-            $button.prop('disabled', true);
-            showSpinner($timerControls);
+            // FIX: Correctly calculate and display negative time if it occurs
+            const isNegative = diff < 0;
+            const absDiff = Math.abs(diff);
 
-            $.post(ptt_ajax_object.ajax_url, {
-                action: 'ptt_save_manual_time',
-                nonce: ptt_ajax_object.nonce,
-                post_id: postId,
-                manual_hours: manualHours
-            }).done(function(response) {
-                if (response.success) {
-                    showMessage($timerControls, response.data.message, false);
-                    $('#ptt-manual-entry-form').slideUp();
-                    $('#ptt-manual-hours').val('');
-                    // Reload to update ACF fields
-                    setTimeout(function() { window.location.reload(); }, 1500);
-                } else {
-                    showMessage($timerControls, response.data.message, true);
-                    $button.prop('disabled', false);
+            const hours = Math.floor(absDiff / 3600000);
+            const minutes = Math.floor((absDiff % 3600000) / 60000);
+            const seconds = Math.floor((absDiff % 60000) / 1000);
+
+            const formattedHours = ('0' + hours).slice(-2);
+            const formattedMinutes = ('0' + minutes).slice(-2);
+            const formattedSeconds = ('0' + seconds).slice(-2);
+            
+            let timeString = `${formattedHours}<span class="colon">:</span>${formattedMinutes}<span class="colon">:</span>${formattedSeconds}`;
+            if (isNegative) {
+                timeString = '-' + timeString;
+            }
+            $timerDisplay.html(timeString);
+        };
+
+        updateTimer(); // Initial call
+        const intervalId = setInterval(updateTimer, 1000); // Update every second
+        $container.data('timerIntervalId', intervalId);
+    }
+    
+    function stopLiveTimer($container) {
+        if ($container.data('timerIntervalId')) {
+            clearInterval($container.data('timerIntervalId'));
+            $container.removeData('timerIntervalId');
+        }
+    }
+
+    /**
+     * Initializes the timer controls for each session row.
+     */
+    function initSessionRows($context) {
+        $context = $context || $(document);
+
+        $context.find('.ptt-session-timer').each(function() {
+            const $container = $(this);
+            if ($container.data('initialized')) return;
+            $container.data('initialized', true);
+
+            const $row = $container.closest('.acf-row');
+            const $startInput = $row.find('[data-key="field_ptt_session_start_time"] input');
+            const $stopInput = $row.find('[data-key="field_ptt_session_stop_time"] input');
+            const $durationInput = $row.find('[data-key="field_ptt_session_calculated_duration"] input');
+
+            const controlsHtml = `
+                <div class="ptt-session-controls">
+                    <button type="button" class="button ptt-session-start">Start Timer</button>
+                    <div class="ptt-session-active-timer" style="display: none;">
+                        <span class="duration-label">Duration: </span>
+                        <span class="ptt-session-elapsed-time">00:00:00</span>
+                        <button type="button" class="button ptt-session-stop ptt-stop-button">Stop Timer</button>
+                    </div>
+                    <div class="ptt-session-message" style="display: none;"></div>
+                    <div class="ptt-ajax-spinner" style="display: none; margin-left: 8px;"></div>
+                </div>`;
+            $container.find('.acf-input').html(controlsHtml);
+            
+            const $controls = $container.find('.ptt-session-controls');
+            const $startButton = $controls.find('.ptt-session-start');
+            const $stopButton = $controls.find('.ptt-session-stop');
+            const $activeDisplay = $controls.find('.ptt-session-active-timer');
+            const $message = $controls.find('.ptt-session-message');
+
+            function updateUIState() {
+                const startVal = $startInput.val();
+                const stopVal = $stopInput.val();
+
+                stopLiveTimer($controls);
+
+                if (startVal && !stopVal) { // Running
+                    $startButton.hide();
+                    $activeDisplay.css('display', 'inline-flex');
+                    $message.hide();
+                    manageLiveTimer($controls, startVal);
+                } else if (startVal && stopVal) { // Stopped
+                    $startButton.hide();
+                    $activeDisplay.hide();
+                    const duration = parseFloat($durationInput.val() || 0).toFixed(2);
+                    $message.text(`Session completed. Duration: ${duration} hrs.`).show();
+                } else { // Not started
+                    $startButton.show();
+                    $activeDisplay.hide();
+                    $message.hide();
                 }
-            }).fail(function() {
-                showMessage($timerControls, 'An unexpected error occurred.', true);
-                $button.prop('disabled', false);
-            }).always(function() {
-                hideSpinner($timerControls);
-            });
-        });
-
-        // Start Timer
-        $timerControls.on('click', '#ptt-start-timer', function (e) {
-            e.preventDefault();
-            const $button = $(this);
-            $button.prop('disabled', true);
-            showSpinner($timerControls);
-
-            $.post(ptt_ajax_object.ajax_url, {
-                action: 'ptt_start_timer',
-                nonce: ptt_ajax_object.nonce,
-                post_id: postId,
-            }).done(function (response) {
-                if (response.success) {
-                    showMessage($timerControls, response.data.message, false);
-                    setTimeout(function() { window.location.reload(); }, 1000);
-                } else {
-                    showMessage($timerControls, response.data.message, true);
-                    $button.prop('disabled', false);
-                }
-            }).fail(function () {
-                showMessage($timerControls, 'An unexpected error occurred.', true);
-                $button.prop('disabled', false);
-            }).always(function () {
-                hideSpinner($timerControls);
-            });
-        });
-
-        // Stop Timer
-        $timerControls.on('click', '#ptt-stop-timer', function (e) {
-            e.preventDefault();
-            const $button = $(this);
-            $button.prop('disabled', true);
-            showSpinner($timerControls);
-
-            $.post(ptt_ajax_object.ajax_url, {
-                action: 'ptt_stop_timer',
-                nonce: ptt_ajax_object.nonce,
-                post_id: postId,
-            }).done(function (response) {
-                if (response.success) {
-                    showMessage($timerControls, response.data.message, false);
-                    setTimeout(function() { window.location.reload(); }, 1000);
-                } else {
-                    showMessage($timerControls, response.data.message, true);
-                    $button.prop('disabled', false);
-                }
-            }).fail(function () {
-                showMessage($timerControls, 'An unexpected error occurred.', true);
-                $button.prop('disabled', false);
-            }).always(function () {
-                hideSpinner($timerControls);
-            });
+            }
+            
+            updateUIState();
         });
     }
+    
+    // Initialise existing rows
+    initSessionRows();
+
+    // Handle ACF Repeater "Add Row" event
+    if (window.acf) {
+        window.acf.addAction('append', function($el) {
+            initSessionRows($el);
+        });
+    }
+
+    // New unified click handlers using event delegation
+    $(document).on('click', '.ptt-session-start', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const $controls = $btn.closest('.ptt-session-controls');
+        const $row = $btn.closest('.acf-row');
+        const index = $row.index();
+        const postId = $('#post_ID').val();
+
+        $btn.prop('disabled', true);
+        showSpinner($controls);
+
+        $.post(ptt_ajax_object.ajax_url, {
+            action: 'ptt_start_session_timer',
+            nonce: ptt_ajax_object.nonce,
+            post_id: postId,
+            row_index: index
+        }).done(function(response){
+            if (response.success) {
+                $row.find('[data-key="field_ptt_session_start_time"] input').val(response.data.start_time).trigger('change');
+                $btn.hide();
+                $controls.find('.ptt-session-active-timer').css('display', 'inline-flex');
+                manageLiveTimer($controls, response.data.start_time);
+            } else {
+                alert(response.data.message || 'An error occurred.');
+            }
+        }).fail(function(){
+            alert('An unexpected server error occurred.');
+        }).always(function(){
+            $btn.prop('disabled', false);
+            hideSpinner($controls);
+        });
+    });
+
+    $(document).on('click', '.ptt-session-stop', function(e) {
+        e.preventDefault();
+        const $btn = $(this);
+        const $controls = $btn.closest('.ptt-session-controls');
+        const $row = $btn.closest('.acf-row');
+        const index = $row.index();
+        const postId = $('#post_ID').val();
+
+        $btn.prop('disabled', true);
+        showSpinner($controls);
+
+        $.post(ptt_ajax_object.ajax_url, {
+            action: 'ptt_stop_session_timer',
+            nonce: ptt_ajax_object.nonce,
+            post_id: postId,
+            row_index: index
+        }).done(function(response){
+            if (response.success) {
+                stopLiveTimer($controls);
+                $row.find('[data-key="field_ptt_session_stop_time"] input').val(response.data.stop_time).trigger('change');
+                $row.find('[data-key="field_ptt_session_calculated_duration"] input').val(response.data.duration).trigger('change');
+                
+                $controls.find('.ptt-session-active-timer').hide();
+                const $message = $controls.find('.ptt-session-message');
+                $message.text(`Session stopped. Duration: ${response.data.duration} hrs.`).show();
+                
+                // Trigger save post to update total duration
+                $('#publish').trigger('click');
+            } else {
+                alert(response.data.message || 'An error occurred.');
+            }
+        }).fail(function(){
+            alert('An unexpected server error occurred.');
+        }).always(function(){
+            $btn.prop('disabled', false);
+            hideSpinner($controls);
+        });
+    });
+
+    $(document).on('click', '.acf-field[data-key="field_ptt_sessions"] [data-event="add-row"], .acf-field[data-key="field_ptt_sessions"] [data-name="add-row"]', function(e){
+        if (!validateSessionRows()) {
+            e.preventDefault();
+            alert('Please complete all fields for open sessions and stop any running timers before adding a new one.');
+            return false;
+        }
+        const $saveButton = $('#publish');
+        if ($saveButton.length && $saveButton.is(':enabled')) {
+            setTimeout(function(){ $saveButton.trigger('click'); }, 100);
+        }
+    });
 
 
     /**
@@ -195,6 +371,7 @@ jQuery(document).ready(function ($) {
         const $createNewFields = $('#ptt-create-new-fields');
         const $projectBudgetDisplay = $('#ptt-project-budget-display');
         const $taskBudgetDisplay = $('#ptt-task-budget-display');
+        const $taskStatusDisplay = $('#ptt-task-status-display');
         const $messageContainer = $('#ptt-frontend-message').parent();
         let suggestedTimeInterval = null;
         let activeTimerInterval = null;
@@ -213,6 +390,7 @@ jQuery(document).ready(function ($) {
             }).done(function(response) {
                 if (response.success) {
                     $('#ptt-active-task-name').text(response.data.task_name);
+                    $('#ptt-active-task-status').text(response.data.task_status || '');
                     $('#ptt-frontend-stop-btn').data('postid', response.data.post_id);
                     $('#ptt-frontend-force-stop-btn').data('postid', response.data.post_id);
                     $newTaskForm.hide();
@@ -225,6 +403,7 @@ jQuery(document).ready(function ($) {
                     // Try to verify if it's still valid
                     showMessage($messageContainer, 'Recovering previous session...', false);
                     $('#ptt-active-task-name').text(storedTask.taskName + ' (Recovering...)');
+                    $('#ptt-active-task-status').text('');
                     $('#ptt-frontend-stop-btn').data('postid', storedTask.postId);
                     $('#ptt-frontend-force-stop-btn').data('postid', storedTask.postId);
                     $newTaskForm.hide();
@@ -240,6 +419,7 @@ jQuery(document).ready(function ($) {
                 if (storedTask && storedTask.postId) {
                     showMessage($messageContainer, 'Connection error. Showing cached task data.', true);
                     $('#ptt-active-task-name').text(storedTask.taskName + ' (Offline)');
+                    $('#ptt-active-task-status').text('');
                     $('#ptt-frontend-stop-btn').data('postid', storedTask.postId);
                     $('#ptt-frontend-force-stop-btn').data('postid', storedTask.postId);
                     $newTaskForm.hide();
@@ -259,7 +439,8 @@ jQuery(document).ready(function ($) {
         function startActiveTimer(startTimeStr) {
             if (activeTimerInterval) clearInterval(activeTimerInterval);
 
-            const startTime = new Date(startTimeStr.replace(/-/g, '/')); // Fix for cross-browser parsing
+            // FIX: Treat the incoming time string as UTC
+            const startTime = new Date(startTimeStr.replace(' ', 'T') + 'Z');
 
             const updateTimer = () => {
                 const now = new Date();
@@ -323,6 +504,7 @@ jQuery(document).ready(function ($) {
             $taskSelect.html('<option value="">Loading tasks...</option>').prop('disabled', true);
             $createNewFields.hide();
             $taskBudgetDisplay.hide().data('budget-hours', '');
+            $taskStatusDisplay.hide();
             $projectBudgetDisplay.hide();
 
             if (!projectId) {
@@ -377,10 +559,17 @@ jQuery(document).ready(function ($) {
                         nonce: ptt_ajax_object.nonce,
                         task_id: taskId
                     }).done(function(response) {
-                        if (response.success && response.data.task_budget && parseFloat(response.data.task_budget) > 0) {
-                            $taskBudgetDisplay.data('budget-hours', response.data.task_budget).show();
-                            updateSuggestedTime(); // Initial call
-                            suggestedTimeInterval = setInterval(updateSuggestedTime, 300000); // 5 minutes
+                        if (response.success) {
+                            if (response.data.task_budget && parseFloat(response.data.task_budget) > 0) {
+                                $taskBudgetDisplay.data('budget-hours', response.data.task_budget).show();
+                                updateSuggestedTime(); // Initial call
+                                suggestedTimeInterval = setInterval(updateSuggestedTime, 300000); // 5 minutes
+                            }
+                            if (response.data.task_status) {
+                                $taskStatusDisplay.text('Current Status: ' + response.data.task_status).show();
+                            } else {
+                                $taskStatusDisplay.hide();
+                            }
                         }
                     });
                 }
@@ -440,6 +629,7 @@ jQuery(document).ready(function ($) {
                         const currentTaskName = (selectedTaskId === 'new') ? formData.task_name : $taskSelect.find('option:selected').text();
                         const taskPostId = response.data.post_id || selectedTaskId;
                         $('#ptt-active-task-name').text(currentTaskName);
+                        $('#ptt-active-task-status').text(response.data.task_status || '');
                         $('#ptt-frontend-stop-btn').data('postid', taskPostId);
                         $('#ptt-frontend-force-stop-btn').data('postid', taskPostId);
                         $newTaskForm.hide();
@@ -526,6 +716,7 @@ jQuery(document).ready(function ($) {
                     $taskSelect.html('<option value="">-- Select Project First --</option>').prop('disabled', true);
                     $createNewFields.hide();
                     $taskBudgetDisplay.hide().data('budget-hours', '');
+                    $taskStatusDisplay.hide();
                     $projectBudgetDisplay.hide();
                     $newTaskForm.show();
                     $('#ptt-frontend-start-btn').prop('disabled', false);
@@ -586,6 +777,7 @@ jQuery(document).ready(function ($) {
                     $taskSelect.html('<option value="">-- Select Project First --</option>').prop('disabled', true);
                     $createNewFields.hide();
                     $taskBudgetDisplay.hide().data('budget-hours', '');
+                    $taskStatusDisplay.hide();
                     $projectBudgetDisplay.hide();
                     $newTaskForm.show();
                     $('#ptt-frontend-start-btn').prop('disabled', false);

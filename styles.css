@@ -24,7 +24,8 @@
     justify-content: center;
 }
 
-#ptt-active-task-timer .colon {
+#ptt-active-task-timer .colon,
+.ptt-session-elapsed-time .colon {
     animation: ptt-blink 1s step-end infinite;
 }
 
@@ -56,6 +57,42 @@
 .ptt-ajax-message.error {
     color: #d94848;
 }
+
+/* --- Session Timer Styles --- */
+.ptt-session-controls {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ptt-session-active-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ptt-session-elapsed-time {
+    font-family: monospace;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #f44336; /* Red for running timer */
+    background: #fdf2f2;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #fde0e0;
+}
+
+.ptt-session-elapsed-time .colon {
+    position: relative;
+    top: -1px;
+}
+
+.ptt-session-message {
+    font-style: italic;
+    color: #555;
+}
+
 
 /* --- Frontend Shortcode Styles --- */
 .ptt-frontend-container {
@@ -169,38 +206,44 @@
 
 .ptt-report-results table th:nth-child(2), /* Date */
 .ptt-report-results table td:nth-child(2) {
-    width: 12%;
+    width: 10%;
 }
 
 .ptt-report-results table th:nth-child(3), /* Duration */
 .ptt-report-results table td:nth-child(3) {
-    width: 12%;
+    width: 10%;
 }
 
 .ptt-report-results table th:nth-child(4), /* Orig. Budget */
 .ptt-report-results table td:nth-child(4) {
-    width: 15%;
+    width: 10%;
 }
 
 /* Notes column styling */
-.ptt-report-results table th:last-child,
-.ptt-report-results table td:last-child {
-    width: 31%;
+.ptt-report-results table th:nth-child(5),
+.ptt-report-results table td:nth-child(5) {
+    width: 30%;
 }
 
-.ptt-report-results table td:last-child {
+/* Status column styling */
+.ptt-report-results table th:nth-child(6),
+.ptt-report-results table td:nth-child(6) {
+    width: 10%;
+}
+
+.ptt-report-results table td:nth-child(5) {
     font-size: 13px;
     line-height: 1.4;
     color: #555;
 }
 
-.ptt-report-results table td:last-child a {
+.ptt-report-results table td:nth-child(5) a {
     color: #0073aa;
     text-decoration: none;
     word-break: break-all;
 }
 
-.ptt-report-results table td:last-child a:hover {
+.ptt-report-results table td:nth-child(5) a:hover {
     color: #00a0d2;
     text-decoration: underline;
 }
