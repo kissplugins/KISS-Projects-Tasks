@@ -9,6 +9,10 @@
  *
  * CHANGELOG (excerpt)
  * ------------------------------------------------------------------
+ * 1.7.8 – 2025-07-22
+ * • Feature: Added an inline-editable dropdown to the Status column on the reports page, allowing for quick task status updates.
+ * • Improved: The new status dropdown saves changes instantly via AJAX without a page reload.
+ *
  * 1.6.7 – 2025-07-22
  * • Fixed: Reports now include all tasks (including "Not Started") that match the filters, not just those with logged time.
  * • Improved: Report query now uses the task's publish date for date-range filtering, making it more reliable.
@@ -287,6 +291,7 @@ function ptt_display_report_results() {
 		$project_name    = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : 'Uncategorized';
 
 		$status_terms = get_the_terms( $post_id, 'task_status' );
+		$status_id_term = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->term_id : 0;
 		$status_name  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
 
 		// -------- Duration / Budget --------
@@ -334,7 +339,8 @@ function ptt_display_report_results() {
 			'content'        => get_the_content(),
 			'task_budget'    => $task_budget,
 			'project_budget' => $project_budget,
-			'status'         => $status_name,
+			'status_id'      => $status_id_term,
+			'status_name'    => $status_name,
 		];
 
 		$grand_total += $duration;
@@ -345,6 +351,9 @@ function ptt_display_report_results() {
 	 * Render HTML
 	 *-------------------------------------------------------------*/
 	echo '<h2>Report Results</h2><div class="ptt-report-results">';
+
+	// Get all status terms once to build dropdowns
+	$all_statuses = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
 
 	foreach ( $report as $author ) {
 
@@ -388,13 +397,24 @@ function ptt_display_report_results() {
 						$budget_td_style = 'style="color: #f44336; font-weight: bold;"';
 					}
 
+					// --- Status column dropdown ---
+					$status_dropdown  = '<div class="ptt-status-control">';
+					$status_dropdown .= '<select class="ptt-report-status-select" data-postid="' . esc_attr( $task['id'] ) . '">';
+					foreach ( $all_statuses as $status ) {
+						$selected = selected( $task['status_id'], $status->term_id, false );
+						$status_dropdown .= '<option value="' . esc_attr( $status->term_id ) . '" ' . $selected . '>' . esc_html( $status->name ) . '</option>';
+					}
+					$status_dropdown .= '</select>';
+					$status_dropdown .= '<div class="ptt-ajax-spinner" style="display:none;"></div>';
+					$status_dropdown .= '</div>';
+
 					echo '<tr>';
 					echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
 					echo '<td>' . esc_html( date( 'Y-m-d', strtotime( $task['date'] ) ) ) . '</td>';
 					echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
 					echo '<td ' . $budget_td_style . '>' . $budget_display . '</td>';
 					echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
-					echo '<td>' . esc_html( $task['status'] ) . '</td>';
+					echo '<td>' . $status_dropdown . '</td>';
 					echo '</tr>';
 				}
 

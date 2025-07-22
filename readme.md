@@ -123,6 +123,9 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ***
 
 ## 📋 Changelog
+### Version 1.7.8 (2025-07-22)
+* **Feature:** The Status column on the Reports page is now an editable dropdown menu, allowing for instant, auto-saving updates to a task's status.
+
 ### Version 1.7.7 (2025-07-22)
 * **Feature:** New tasks now default to the "Not Started" status in the admin editor.
 * **Improved:** Added "Not Started" to the list of default statuses created on plugin activation.
@@ -149,7 +152,7 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ### Version 1.7.1 (2025-07-21)
 * **Sessions Save:** Adding a new session now automatically saves the task.
 * **Totals:** Task duration is now calculated from the sum of all sessions.
-* **Validation:** New sessions cannot be created while previous ones are incomplete.
+* **Validation:** New-sessions cannot be created while previous ones are incomplete.
 ### Version 1.7.0 (2025-07-21)
 * **Sessions:** Tasks now support multiple work sessions via a repeater in the admin editor.
 * **Automatic Stop:** Starting a new session automatically stops any prior running session for that task.

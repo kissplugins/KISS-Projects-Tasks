@@ -932,6 +932,33 @@ jQuery(document).ready(function ($) {
         $('#end_date').val(formatDate(lastSaturday));
     });
 
+    // Handle status change on reports page
+    $(document).on('change', '.ptt-report-status-select', function() {
+        const $select = $(this);
+        const postId = $select.data('postid');
+        const statusId = $select.val();
+        const $container = $select.parent();
+
+        showSpinner($container);
+        $select.prop('disabled', true);
+
+        $.post(ptt_ajax_object.ajax_url, {
+            action: 'ptt_update_task_status',
+            nonce: ptt_ajax_object.nonce,
+            post_id: postId,
+            status_id: statusId
+        }).done(function(response) {
+            // Optional: Show a success indicator
+        }).fail(function() {
+            alert('Failed to update status.');
+            // Revert on failure if needed
+            $select.val($select.find('option[selected]').val());
+        }).always(function() {
+            hideSpinner($container);
+            $select.prop('disabled', false);
+        });
+    });
+
 
     /**
      * ---------------------------------------------------------------
