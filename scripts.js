@@ -101,6 +101,16 @@ jQuery(document).ready(function ($) {
      * ---------------------------------------------------------------
      */
 
+    // --- START DEBUGGING INFO ---
+    // This adds a debugging box to the top of the "Edit Task" page.
+    // To disable this, you can delete this entire block of code.
+    if ($('body').hasClass('post-type-project_task')) {
+        const debugBox = $('<div id="ptt-timer-debug-log" style="background: #fff; border: 2px dashed red; padding: 10px; margin-bottom: 15px; font-family: monospace;"><h3>Timer Debugging Info</h3></div>');
+        $('#poststuff').before(debugBox);
+    }
+    // --- END DEBUGGING INFO ---
+
+
     // Add "Use Today's Date" button next to the title input
     if ($('body').hasClass('post-type-project_task') && ($('body').hasClass('post-new-php') || $('body').hasClass('post-php'))) {
         const $titlewrap = $('#titlewrap');
@@ -137,22 +147,44 @@ jQuery(document).ready(function ($) {
             clearInterval($container.data('timerIntervalId'));
         }
 
-        const startTime = new Date(startTimeStr.replace(/-/g, '/'));
+        // FIX: Treat the incoming time string as UTC by appending 'Z'
+        const startTime = new Date(startTimeStr.replace(' ', 'T') + 'Z');
         const $timerDisplay = $container.find('.ptt-session-elapsed-time');
 
         const updateTimer = () => {
             const now = new Date();
             const diff = now - startTime; // in milliseconds
 
-            const hours = Math.floor(diff / 3600000);
-            const minutes = Math.floor((diff % 3600000) / 60000);
-            const seconds = Math.floor((diff % 60000) / 1000);
+            // --- START DEBUGGING INFO ---
+            const debugLog = $('#ptt-timer-debug-log');
+            if (debugLog.length) {
+                debugLog.html(
+                    '<h3>Timer Debugging Info</h3>' +
+                    '<b>Start Time String (from server/UTC):</b> ' + startTimeStr + '<br>' +
+                    '<b>Browser "Now" Time (local):</b> ' + now.toString() + '<br>' +
+                    '<b>Parsed Start Time (local):</b> ' + startTime.toString() + '<br>' +
+                    '<b>Difference (ms):</b> ' + diff
+                );
+            }
+            // --- END DEBUGGING INFO ---
+
+            // FIX: Correctly calculate and display negative time if it occurs
+            const isNegative = diff < 0;
+            const absDiff = Math.abs(diff);
+
+            const hours = Math.floor(absDiff / 3600000);
+            const minutes = Math.floor((absDiff % 3600000) / 60000);
+            const seconds = Math.floor((absDiff % 60000) / 1000);
 
             const formattedHours = ('0' + hours).slice(-2);
             const formattedMinutes = ('0' + minutes).slice(-2);
             const formattedSeconds = ('0' + seconds).slice(-2);
             
-            $timerDisplay.html(`${formattedHours}<span class="colon">:</span>${formattedMinutes}<span class="colon">:</span>${formattedSeconds}`);
+            let timeString = `${formattedHours}<span class="colon">:</span>${formattedMinutes}<span class="colon">:</span>${formattedSeconds}`;
+            if (isNegative) {
+                timeString = '-' + timeString;
+            }
+            $timerDisplay.html(timeString);
         };
 
         updateTimer(); // Initial call
@@ -194,7 +226,7 @@ jQuery(document).ready(function ($) {
                     <div class="ptt-session-message" style="display: none;"></div>
                     <div class="ptt-ajax-spinner" style="display: none; margin-left: 8px;"></div>
                 </div>`;
-            $container.find('.acf-input > p').html(controlsHtml);
+            $container.find('.acf-input').html(controlsHtml);
             
             const $controls = $container.find('.ptt-session-controls');
             const $startButton = $controls.find('.ptt-session-start');
@@ -407,7 +439,8 @@ jQuery(document).ready(function ($) {
         function startActiveTimer(startTimeStr) {
             if (activeTimerInterval) clearInterval(activeTimerInterval);
 
-            const startTime = new Date(startTimeStr.replace(/-/g, '/')); // Fix for cross-browser parsing
+            // FIX: Treat the incoming time string as UTC
+            const startTime = new Date(startTimeStr.replace(' ', 'T') + 'Z');
 
             const updateTimer = () => {
                 const now = new Date();
