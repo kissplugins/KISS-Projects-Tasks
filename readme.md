@@ -123,6 +123,10 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ***
 
 ## 📋 Changelog
+### Version 1.7.7 (2025-07-22)
+* **Feature:** New tasks now default to the "Not Started" status in the admin editor.
+* **Improved:** Added "Not Started" to the list of default statuses created on plugin activation.
+
 ### Version 1.7.6 (2025-07-22)
 * **Fix:** Reports page now correctly displays all tasks that match the date filter, including those not yet started.
 * **Improved:** Reports are now more reliable by using the task's publish date for filtering.

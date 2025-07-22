@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.6
+ * Version:           1.7.7
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.6' );
+define( 'PTT_VERSION', '1.7.7' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -59,7 +59,7 @@ function ptt_activate() {
     ptt_register_taxonomies();
 
     // Ensure default Task Status terms exist
-    $default_statuses = [ 'In Progress', 'Completed', 'Paused' ];
+    $default_statuses = [ 'Not Started', 'In Progress', 'Completed', 'Paused' ];
     foreach ( $default_statuses as $status ) {
         if ( ! term_exists( $status, 'task_status' ) ) {
             wp_insert_term( $status, 'task_status' );
@@ -251,6 +251,10 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'task_status' ],
+        'default_term'      => [
+            'name' => 'Not Started',
+            'slug' => 'not-started',
+        ],
     ];
     register_taxonomy( 'task_status', [ 'project_task' ], $status_args );
 }
