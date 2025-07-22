@@ -10,11 +10,11 @@
  * CHANGELOG (excerpt)
  * ------------------------------------------------------------------
  * 1.6.6 – 2025‑07‑20
- *   • Fixed: Manual time entries (manual_override = 1) were excluded
- *     from reports because they do not always have a stop_time.
- *   • Improved: When a task has no start_time (e.g. imported manual
- *     entries) we now fall back to the post’s publish date so the
- *     report never shows “1970‑01‑01”.
+ * • Fixed: Manual time entries (manual_override = 1) were excluded
+ * from reports because they do not always have a stop_time.
+ * • Improved: When a task has no start_time (e.g. imported manual
+ * entries) we now fall back to the post’s publish date so the
+ * report never shows “1970‑01‑01”.
  * ------------------------------------------------------------------
  */
 
@@ -397,23 +397,31 @@ function ptt_display_report_results() {
 
 				foreach ( $project['tasks'] as $task ) {
 
-					// Budget column display
-					if ( ! empty( $task['task_budget'] ) && $task['task_budget'] > 0 ) {
-						$budget_display = number_format( (float) $task['task_budget'], 2 ) . '&nbsp;(Task)';
-					} elseif ( ! empty( $task['project_budget'] ) && $task['project_budget'] > 0 ) {
-						$budget_display = number_format( (float) $task['project_budget'], 2 ) . '&nbsp;(Project)';
-					} else {
-						$budget_display = '–';
+					// --- Budget column display & color logic ---
+					$effective_budget = 0;
+					$budget_display   = '–';
+
+					if ( ! empty( $task['task_budget'] ) && (float) $task['task_budget'] > 0 ) {
+						$effective_budget = (float) $task['task_budget'];
+						$budget_display   = number_format( $effective_budget, 2 ) . '&nbsp;(Task)';
+					} elseif ( ! empty( $task['project_budget'] ) && (float) $task['project_budget'] > 0 ) {
+						$effective_budget = (float) $task['project_budget'];
+						$budget_display   = number_format( $effective_budget, 2 ) . '&nbsp;(Project)';
+					}
+
+					$budget_td_style = '';
+					if ( $effective_budget > 0 && (float) $task['duration'] > $effective_budget ) {
+						$budget_td_style = 'style="color: #f44336; font-weight: bold;"';
 					}
 
 					echo '<tr>';
 					echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
 					echo '<td>' . esc_html( date( 'Y-m-d', strtotime( $task['date'] ) ) ) . '</td>';
 					echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
-                                        echo '<td>' . $budget_display . '</td>';
-                                        echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
-                                        echo '<td>' . esc_html( $task['status'] ) . '</td>';
-                                        echo '</tr>';
+					echo '<td ' . $budget_td_style . '>' . $budget_display . '</td>';
+					echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
+					echo '<td>' . esc_html( $task['status'] ) . '</td>';
+					echo '</tr>';
 				}
 
 				echo '</tbody></table></div>'; // .project-group
