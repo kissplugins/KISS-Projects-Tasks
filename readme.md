@@ -33,6 +33,7 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 * **Custom Post Type:** A dedicated "Tasks" CPT (`project_task`) to manage all work items.
 * **Custom Taxonomies:** Organize tasks by "Clients" and "Projects".
 * **Budgeting & Deadlines:** Set a maximum hour budget and a deadline for both entire projects and individual tasks.
+* **Dated Titles:** A "Use Today's Date" button in the task editor prepends the current date to the title for quick entry.
 
 ### Time Tracking
 * **Start/Stop Timer:** Simple one-click Start/Stop buttons in the task editor.
@@ -49,6 +50,7 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 * **Reports Dashboard:** A dedicated "Reports" page in the admin area.
 * **Filterable Data:** Filter reports by user and custom date ranges.
 * **Grouped Results:** Data is logically grouped by User, Client, and Project, with subtotals for each.
+* **Over-Budget Highlighting:** The "Orig. Budget" column automatically highlights entries in red if the tracked time exceeds the allocated budget.
 * **Developer Self-Test:** A built-in testing module to verify core functionality.
 
 ***
@@ -58,7 +60,10 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 ### 1. Planning Projects and Tasks
 1.  Navigate to **Tasks → Projects** to create your projects. Here you can set a **Maximum Budget** and **Deadline** for the entire project.
 2.  Navigate to **Tasks → Clients** to create your clients.
-3.  Navigate to **Tasks → Add New Task** to create individual tasks for your team. Assign them to a Client and Project, and set the specific **Maximum Budget** and **Deadline** for that task.
+3.  Navigate to **Tasks → Add New Task** to create individual tasks.
+    * Click the **"Use Today's Date"** button to automatically add the current date to the title.
+    * Assign the task to a Client and Project.
+    * Set the specific **Maximum Budget** and **Deadline** for that task.
 
 ### 2. Tracking Time (Front-End)
 1.  Add the shortcode `[task-enter]` to any page.
@@ -76,11 +81,15 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 ### 4. Viewing Reports
 1.  Navigate to **Reports** from the main admin menu.
 2.  Select a user and/or date range.
-3.  Click **Run Report** to see a detailed breakdown of time tracked.
+3.  Click **Run Report** to see a detailed breakdown of time tracked. Note any items in red under the "Orig. Budget" column, as these have exceeded their budget.
 
 ***
 
 ## 📋 Changelog
+### Version 1.7.2 (2025-07-21)
+* **Feature:** Orig. Budget amount in reports now appears in red if the task duration exceeds the budget.
+* **Feature:** Added a "Use Today's Date" button next to the post title field on the Add/Edit Task screen to quickly prepend the current date.
+
 ### Version 1.7.1 (2025-07-22)
 * **Sessions Save:** Adding a new session now automatically saves the task.
 * **Totals:** Task duration is now calculated from the sum of all sessions.

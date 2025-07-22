@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.1
+ * Version:           1.7.2
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.1' );
+define( 'PTT_VERSION', '1.7.2' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -494,11 +494,12 @@ function ptt_enqueue_assets() {
     
     // Localize script to pass data like nonces and AJAX URL
     wp_localize_script( 'ptt-scripts', 'ptt_ajax_object', [
-        'ajax_url' => admin_url( 'admin-ajax.php' ),
-        'nonce'    => wp_create_nonce( 'ptt_ajax_nonce' ),
-        'confirm_stop' => __('Are you sure you want to stop the timer?', 'ptt'),
-        'concurrent_error' => __('You have another task running. Please stop it before starting a new one.', 'ptt'),
-        'edit_post_link' => admin_url('post.php?action=edit&post='), // Add this line
+        'ajax_url'              => admin_url( 'admin-ajax.php' ),
+        'nonce'                 => wp_create_nonce( 'ptt_ajax_nonce' ),
+        'confirm_stop'          => __('Are you sure you want to stop the timer?', 'ptt'),
+        'concurrent_error'      => __('You have another task running. Please stop it before starting a new one.', 'ptt'),
+        'edit_post_link'        => admin_url('post.php?action=edit&post='),
+        'todays_date_formatted' => date_i18n( get_option( 'date_format' ), current_time( 'timestamp' ) ),
     ]);
 }
 // Enqueue for admin screens
@@ -753,7 +754,8 @@ function ptt_add_start_stop_buttons() {
     $post_id = $post->ID;
     echo ptt_get_timer_controls_html( $post_id );
 }
-add_action( 'post_submitbox_misc_actions', 'ptt_add_start_stop_buttons' );
+//Disabled for now since there are multiple sessions
+//add_action( 'post_submitbox_misc_actions', 'ptt_add_start_stop_buttons' );
 
 /**
  * Adds a Status column to the Tasks list table.

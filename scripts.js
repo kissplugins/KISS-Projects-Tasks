@@ -105,6 +105,34 @@ function validateSessionRows() {
      * ADMIN UI (CPT EDITOR)
      * ---------------------------------------------------------------
      */
+
+    // Add "Use Today's Date" button next to the title input
+    if ($('body').hasClass('post-type-project_task') && ($('body').hasClass('post-new-php') || $('body').hasClass('post-php'))) {
+        const $titlewrap = $('#titlewrap');
+        if ($titlewrap.length) {
+            const dateButton = $('<button type="button" id="ptt-use-todays-date" class="button" style="margin-bottom: 10px;">Use Today\'s Date</button>');
+            $titlewrap.after(dateButton); // Place button after the title wrapper
+
+            dateButton.on('click', function(e) {
+                e.preventDefault();
+                const today = ptt_ajax_object.todays_date_formatted;
+                const $titleInput = $('#title');
+                const currentTitle = $titleInput.val();
+                let newTitle = today + ' - ' + currentTitle;
+                
+                if ( !currentTitle.trim() ) {
+                    newTitle = today + ' - ';
+                } else if (currentTitle.includes(today)) {
+                    // Don't add if date is already there
+                    return; 
+                }
+                
+                $titleInput.val(newTitle);
+                $('#title-prompt-text').addClass('screen-reader-text');
+            });
+        }
+    }
+    
     if ($('#ptt-timer-controls').length) {
         const $timerControls = $('#ptt-timer-controls');
         const postId = $timerControls.data('postid');
