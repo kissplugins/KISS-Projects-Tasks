@@ -110,7 +110,7 @@ function ptt_run_self_tests_callback() {
          $results[] = ['name' => 'Calculate Total Time', 'status' => 'Fail', 'message' => 'Could not create post for calculation test.'];
     }
 
-    // Test 4: Status Update via AJAX (Rewritten)
+    // Test 4: Status Update Logic
     $status_term = wp_insert_term('SELF TEST STATUS ' . wp_rand(), 'task_status');
     $status_post = wp_insert_post([
         'post_type'   => 'project_task',
@@ -118,12 +118,8 @@ function ptt_run_self_tests_callback() {
         'post_status' => 'publish'
     ]);
 
-    // Check if the post and term were created successfully before proceeding
     if ($status_post && !is_wp_error($status_post) && $status_term && !is_wp_error($status_term)) {
-        // Directly call the core WordPress function instead of the AJAX handler
         wp_set_object_terms($status_post, $status_term['term_id'], 'task_status', false);
-        
-        // Verify the term was assigned
         $assigned = has_term($status_term['term_id'], 'task_status', $status_post);
         if ($assigned) {
             $results[] = ['name' => 'Status Update Logic', 'status' => 'Pass', 'message' => 'Core status assignment successful.'];
@@ -134,14 +130,11 @@ function ptt_run_self_tests_callback() {
         $results[] = ['name' => 'Status Update Logic', 'status' => 'Fail', 'message' => 'Could not create test post or term for status update test.'];
     }
     
-    // Cleanup
-    if ($status_post) {
-        wp_delete_post($status_post, true);
-    }
+    // Cleanup for Test 4 - This is now unconditional to ensure deletion.
+    wp_delete_post($status_post, true);
     if ($status_term && !is_wp_error($status_term)) {
         wp_delete_term($status_term['term_id'], 'task_status');
     }
-
 
     // Test 5: Reporting Logic
     $report_client  = wp_insert_term('REPORT CLIENT ' . wp_rand(), 'client');
@@ -243,6 +236,37 @@ function ptt_run_self_tests_callback() {
     wp_delete_term($report_client['term_id'], 'client');
     wp_delete_term($report_project['term_id'], 'project');
     wp_delete_term($report_status['term_id'], 'task_status');
+
+    // Test 6: Multi-Session Duration Calculation
+    $session_post_id = wp_insert_post(['post_type' => 'project_task', 'post_title' => 'SESSION TEST POST', 'post_status' => 'publish']);
+    if ($session_post_id && !is_wp_error($session_post_id)) {
+        $sessions_data = [
+            [
+                'session_start_time' => '2025-07-22 10:00:00', // 1.5 hours
+                'session_stop_time'  => '2025-07-22 11:30:00',
+            ],
+            [
+                'session_manual_override' => true,
+                'session_manual_duration' => '0.5', // 0.5 hours
+            ],
+        ];
+        update_field('sessions', $sessions_data, $session_post_id);
+        
+        // Recalculate all durations
+        ptt_recalculate_on_save($session_post_id);
+
+        $total_duration = get_field('calculated_duration', $session_post_id);
+        
+        if ($total_duration == '2.00') {
+            $results[] = ['name' => 'Multi-Session Calculation', 'status' => 'Pass', 'message' => 'Correctly calculated total from mixed sessions (1.5 + 0.5 = 2.00).'];
+        } else {
+            $results[] = ['name' => 'Multi-Session Calculation', 'status' => 'Fail', 'message' => 'Calculation incorrect. Expected 2.00, got ' . $total_duration];
+        }
+
+        wp_delete_post($session_post_id, true);
+    } else {
+        $results[] = ['name' => 'Multi-Session Calculation', 'status' => 'Fail', 'message' => 'Could not create post for session test.'];
+    }
     
     $timestamp = current_time( 'timestamp' );
     update_option( 'ptt_tests_last_run', $timestamp );
