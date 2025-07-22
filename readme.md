@@ -125,6 +125,7 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ## 📋 Changelog
 ### Version 1.7.4 (2025-07-21)
 * **Docs:** Added detailed user instructions and an FAQ section to the Readme file.
+* **Feature:** On screen debugger code for  timer in scripts.js - comment out later
 
 ### Version 1.7.3 (2025-07-21)
 * **Feature:** Session rows in the admin editor now have a live, one-click timer.
