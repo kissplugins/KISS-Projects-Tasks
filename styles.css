@@ -24,7 +24,8 @@
     justify-content: center;
 }
 
-#ptt-active-task-timer .colon {
+#ptt-active-task-timer .colon,
+.ptt-session-elapsed-time .colon {
     animation: ptt-blink 1s step-end infinite;
 }
 
@@ -57,9 +58,41 @@
     color: #d94848;
 }
 
+/* --- Session Timer Styles --- */
 .ptt-session-controls {
     margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
+
+.ptt-session-active-timer {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ptt-session-elapsed-time {
+    font-family: monospace;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #f44336; /* Red for running timer */
+    background: #fdf2f2;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #fde0e0;
+}
+
+.ptt-session-elapsed-time .colon {
+    position: relative;
+    top: -1px;
+}
+
+.ptt-session-message {
+    font-style: italic;
+    color: #555;
+}
+
 
 /* --- Frontend Shortcode Styles --- */
 .ptt-frontend-container {
