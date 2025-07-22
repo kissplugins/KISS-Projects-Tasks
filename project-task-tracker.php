@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.0
+ * Version:           1.7.1
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.0' );
+define( 'PTT_VERSION', '1.7.1' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -518,42 +518,40 @@ add_action( 'wp_enqueue_scripts', 'ptt_enqueue_assets' );
  * @return float The calculated duration in decimal hours.
  */
 function ptt_calculate_and_save_duration( $post_id ) {
-    // Check if manual override is enabled
-    $manual_override = get_field( 'manual_override', $post_id );
-    
-    if ( $manual_override ) {
-        // Use manual duration if override is enabled
-        $manual_duration = get_field( 'manual_duration', $post_id );
-        $duration = $manual_duration ? (float) $manual_duration : 0.00;
+    $sessions = get_field( 'sessions', $post_id );
+    $duration = 0.00;
+
+    if ( ! empty( $sessions ) ) {
+        $duration = ptt_get_total_sessions_duration( $post_id );
     } else {
-        // Calculate duration from start/stop times
-        $start_time_str = get_field( 'start_time', $post_id );
-        $stop_time_str  = get_field( 'stop_time', $post_id );
-        $duration       = 0.00;
+        $manual_override = get_field( 'manual_override', $post_id );
 
-        if ( $start_time_str && $stop_time_str ) {
-            try {
-                $timezone   = wp_timezone();
-                $start_time = new DateTime( $start_time_str, $timezone );
-                $stop_time  = new DateTime( $stop_time_str, $timezone );
+        if ( $manual_override ) {
+            $manual_duration = get_field( 'manual_duration', $post_id );
+            $duration        = $manual_duration ? (float) $manual_duration : 0.00;
+        } else {
+            $start_time_str = get_field( 'start_time', $post_id );
+            $stop_time_str  = get_field( 'stop_time', $post_id );
 
-                if ( $stop_time > $start_time ) {
-                    $diff_seconds = $stop_time->getTimestamp() - $start_time->getTimestamp();
-                    $duration_hours = $diff_seconds / 3600;
-                    // Round up to two decimal places
-                    $duration = ceil( $duration_hours * 100 ) / 100;
+            if ( $start_time_str && $stop_time_str ) {
+                try {
+                    $timezone   = wp_timezone();
+                    $start_time = new DateTime( $start_time_str, $timezone );
+                    $stop_time  = new DateTime( $stop_time_str, $timezone );
+
+                    if ( $stop_time > $start_time ) {
+                        $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
+                        $duration_hours = $diff_seconds / 3600;
+                        $duration       = ceil( $duration_hours * 100 ) / 100;
+                    }
+                } catch ( Exception $e ) {
+                    $duration = 0.00;
                 }
-            } catch ( Exception $e ) {
-                // Handle potential DateTime errors silently
-                $duration = 0.00;
             }
         }
     }
-    
-    // Ensure format is always two decimal places
+
     $formatted_duration = number_format( (float) $duration, 2, '.', '' );
-    
-    // Update the custom field
     update_field( 'calculated_duration', $formatted_duration, $post_id );
 
     return $formatted_duration;
@@ -621,6 +619,48 @@ function ptt_calculate_session_duration( $post_id, $index ) {
     return $formatted;
 }
 
+/**
+ * Calculates the total duration of all sessions for a task.
+ *
+ * @param int $post_id Task ID.
+ * @return float Total hours rounded to two decimals.
+ */
+function ptt_get_total_sessions_duration( $post_id ) {
+    $sessions = get_field( 'sessions', $post_id );
+    $total    = 0.0;
+
+    if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+        foreach ( $sessions as $session ) {
+            if ( ! empty( $session['session_manual_override'] ) ) {
+                $dur = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
+            } else {
+                $start = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+                $stop  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
+                $dur   = 0.0;
+
+                if ( $start && $stop ) {
+                    try {
+                        $timezone   = wp_timezone();
+                        $start_time = new DateTime( $start, $timezone );
+                        $stop_time  = new DateTime( $stop, $timezone );
+                        if ( $stop_time > $start_time ) {
+                            $diff_seconds = $stop_time->getTimestamp() - $start_time->getTimestamp();
+                            $dur          = $diff_seconds / 3600;
+                        }
+                    } catch ( Exception $e ) {
+                        $dur = 0.0;
+                    }
+                }
+            }
+
+            $total += $dur;
+        }
+    }
+
+    $total = ceil( $total * 100 ) / 100;
+    return $total;
+}
+
 
 /**
  * Recalculates duration whenever a task post is saved.
@@ -630,13 +670,13 @@ function ptt_calculate_session_duration( $post_id, $index ) {
  */
 function ptt_recalculate_on_save( $post_id ) {
     if ( get_post_type( $post_id ) === 'project_task' ) {
-        ptt_calculate_and_save_duration( $post_id );
         $sessions = get_field( 'sessions', $post_id );
         if ( ! empty( $sessions ) ) {
             foreach ( array_keys( $sessions ) as $index ) {
                 ptt_calculate_session_duration( $post_id, $index );
             }
         }
+        ptt_calculate_and_save_duration( $post_id );
     }
 }
 add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
@@ -1078,7 +1118,9 @@ add_action( 'wp_ajax_ptt_start_session_timer', 'ptt_start_session_timer_callback
 function ptt_stop_session( $post_id, $index ) {
     $current_time = current_time( 'Y-m-d H:i:s' );
     update_sub_field( array( 'sessions', $index + 1, 'session_stop_time' ), $current_time, $post_id );
-    return ptt_calculate_session_duration( $post_id, $index );
+    $duration = ptt_calculate_session_duration( $post_id, $index );
+    ptt_calculate_and_save_duration( $post_id );
+    return $duration;
 }
 
 /**

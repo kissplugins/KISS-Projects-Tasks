@@ -56,13 +56,48 @@ jQuery(document).ready(function ($) {
             .fadeOut('slow');
     }
 
-    function showMessageWithHTML($container, html, isError) {
-        $container.find('.ptt-ajax-message')
-            .html(html)
-            .removeClass('success error')
-            .addClass(isError ? 'error' : 'success')
-            .show();
-    }
+function showMessageWithHTML($container, html, isError) {
+    $container.find('.ptt-ajax-message')
+        .html(html)
+        .removeClass('success error')
+        .addClass(isError ? 'error' : 'success')
+        .show();
+}
+
+function validateSessionRows() {
+    let valid = true;
+    $('.acf-field[data-key="field_ptt_sessions"] .acf-row').each(function(){
+        const $row = $(this);
+        const title = $row.find('[data-key="field_ptt_session_title"] input').val();
+        const notes = $row.find('[data-key="field_ptt_session_notes"] textarea').val();
+        const start = $row.find('[data-key="field_ptt_session_start_time"] input').val();
+        const stop = $row.find('[data-key="field_ptt_session_stop_time"] input').val();
+        const override = $row.find('[data-key="field_ptt_session_manual_override"] input').prop('checked');
+        const manual = $row.find('[data-key="field_ptt_session_manual_duration"] input').val();
+
+        if (!title || !notes) {
+            valid = false;
+            return false;
+        }
+
+        if (override) {
+            if (manual === '' || manual === null) {
+                valid = false;
+                return false;
+            }
+        } else {
+            if (!start || !stop) {
+                valid = false;
+                return false;
+            }
+            if (start && !stop) {
+                valid = false;
+                return false;
+            }
+        }
+    });
+    return valid;
+}
 
 
     /**
@@ -225,6 +260,18 @@ jQuery(document).ready(function ($) {
             initSessionRows($el);
         });
     }
+
+    $(document).on('click', '.acf-field[data-key="field_ptt_sessions"] [data-event="add-row"], .acf-field[data-key="field_ptt_sessions"] [data-name="add-row"]', function(e){
+        if (!validateSessionRows()) {
+            e.preventDefault();
+            alert('Please complete all session fields and stop running timers before adding another session.');
+            return false;
+        }
+        const $btn = $('#publish');
+        if ($btn.length) {
+            setTimeout(function(){ $btn.trigger('click'); }, 100);
+        }
+    });
 
     $(document).on('click', '.ptt-session-start', function(e){
         e.preventDefault();

@@ -81,6 +81,10 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 ***
 
 ## 📋 Changelog
+### Version 1.7.1 (2025-07-22)
+* **Sessions Save:** Adding a new session now automatically saves the task.
+* **Totals:** Task duration is now calculated from the sum of all sessions.
+* **Validation:** New sessions cannot be created while previous ones are incomplete.
 ### Version 1.7.0 (2025-07-22)
 * **Sessions:** Tasks now support multiple work sessions via a repeater in the admin editor.
 * **Automatic Stop:** Starting a new session automatically stops any prior running session for that task.
