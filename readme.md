@@ -123,6 +123,8 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ***
 
 ## 📋 Changelog
+### Version 1.7.9 (2025-07-23)
+* **Dev:** Expanded self-test coverage for AJAX handlers, concurrent tasks, sessions, shortcodes and reports.
 ### Version 1.7.8 (2025-07-22)
 * **Feature:** The Status column on the Reports page is now an editable dropdown menu, allowing for instant, auto-saving updates to a task's status.
 

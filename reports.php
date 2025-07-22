@@ -9,6 +9,9 @@
  *
  * CHANGELOG (excerpt)
  * ------------------------------------------------------------------
+ * 1.7.9 – 2025-07-23
+ * • Dev: Expanded self-tests with additional AJAX and reporting checks.
+ *
  * 1.7.8 – 2025-07-22
  * • Feature: Added an inline-editable dropdown to the Status column on the reports page, allowing for quick task status updates.
  * • Improved: The new status dropdown saves changes instantly via AJAX without a page reload.
