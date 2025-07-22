@@ -1,5 +1,3 @@
-<canvas>
-
 # 🚀 KISS Project & Task Time Tracker
 
 A robust WordPress plugin for tracking time spent on client projects and individual tasks. It integrates seamlessly with the WordPress admin area and provides a flexible front-end interface for users.
@@ -48,7 +46,7 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 * **Filterable Data:** Filter reports by user, client, project, status, and custom date ranges.
 * **Grouped Results:** Data is logically grouped by User, Client, and Project, with subtotals for each.
 * **Over-Budget Highlighting:** The "Orig. Budget" column automatically highlights entries in red if the tracked time exceeds the allocated budget.
-* **Developer Self-Test:** A built-in testing module to verify core functionality.
+* **Developer Self-Test:** A built-in testing module to verify core functionality, including multi-session calculations and reporting logic.
 
 ***
 
@@ -123,8 +121,14 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ***
 
 ## 📋 Changelog
+### Version 1.7.11 (2025-07-22)
+* **Fixed:** The 'Maximum Budget' fields now correctly accept decimal values like 0.25.
+* **Fixed:** Self-test 'STATUS TEST' posts are now correctly deleted after a test run.
+* **Dev:** Added a new self-test to verify multi-session duration calculations.
+
 ### Version 1.7.10 (2025-07-23)
 * **Dev:** Refined self-test module to cover status updates and reporting logic.
+
 ### Version 1.7.8 (2025-07-22)
 * **Feature:** The Status column on the Reports page is now an editable dropdown menu, allowing for instant, auto-saving updates to a task's status.
 
@@ -139,7 +143,7 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 
 ### Version 1.7.4 (2025-07-21)
 * **Docs:** Added detailed user instructions and an FAQ section to the Readme file.
-* **Feature:** On screen debugger code for  timer in scripts.js - comment out later
+* **Feature:** On screen debugger code for timer in scripts.js - comment out later
 
 ### Version 1.7.3 (2025-07-21)
 * **Feature:** Session rows in the admin editor now have a live, one-click timer.
@@ -155,66 +159,7 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 * **Sessions Save:** Adding a new session now automatically saves the task.
 * **Totals:** Task duration is now calculated from the sum of all sessions.
 * **Validation:** New-sessions cannot be created while previous ones are incomplete.
+
 ### Version 1.7.0 (2025-07-21)
 * **Sessions:** Tasks now support multiple work sessions via a repeater in the admin editor.
 * **Automatic Stop:** Starting a new session automatically stops any prior running session for that task.
-### Version 1.6.7 (2025-07-21)
-* **Status Taxonomy:** Tasks now include a Task Status with default terms.
-* **Reports/Tasks:** New Status column and filtering options.
-
-### Version 1.6.6 (2025-07-21)
-* **Permalinks:** Task links now include the post ID for easier reference.
-* **Template:** Added front-end task view with timer and manual entry (authors+ only).
-* **Shortcodes:** New `[daily-planner]` and `[weekly-planner]` shortcodes list upcoming tasks.
-### Version 1.6.4 (2025-07-20)
-**Bug Fixes**
-* **Fixed:** Reports page reloaded to task list after submitting query
-
-### Version 1.6.3 (2025-07-20)
-**Sharable Reports**
-* **Added:** URL parameters for reports (user, client, project, dates)
-* **Feature:** Reports auto-load based on incoming URL parameters
-
-
-### Version 1.6.2 (2025-07-20)
-**Budget Display in Reports**
-* **Added:** "Orig. Budget" column to reports showing allocated hours
-* **Feature:** Displays task-specific budget when available
-* **Feature:** Falls back to project budget if no task budget is set
-* **Display:** Shows "(Task)" or "(Project)" label to indicate budget source
-* **Improved:** Column width adjustments for better readability
-
-### Version 1.6.1 (2025-07-20)
-**Reports Enhancement**
-* **Added:** Notes column to reports table showing task content/body
-* **Added:** Automatic URL detection and rendering as clickable links in Notes
-* **Added:** Text truncation at 200 characters with ellipses for long notes
-* **Improved:** Report table layout with proper column widths
-* **Feature:** URLs anywhere in notes are automatically converted to clickable links
-
-### Version 1.6.0 (2025-07-20)
-**Manual Time Entry Feature**
-* **Added:** Manual time entry option in both admin post editor and frontend shortcode
-* **Added:** Manual override checkbox in ACF fields to switch between timer and manual modes
-* **Added:** Decimal hours input with helpful examples (1.5 = 1h 30m)
-* **Added:** Manual Entry button on frontend form for quick time logging
-* **Added:** Validation for manual time entries (must be positive, max 24 hours)
-* **Improved:** Time calculation logic now supports both timer-based and manual entries
-* **Feature:** Users can now log time retrospectively if they forgot to start the timer
-
-### Version 1.5.0 (2025-07-20)
-**Improved Error Handling & Recovery**
-* **Fixed:** Stop button lockout issue with comprehensive error recovery
-* **Added:** Force Stop button for emergency timer recovery
-* **Added:** Session recovery using localStorage - tasks persist across page refreshes
-* **Added:** Auto-detection of active tasks on page load
-* **Added:** Visual timer display showing elapsed time (HH:MM format)
-* **Improved:** Error messages now show specific causes and recovery options
-* **Improved:** Better handling of concurrent tasks with clear user guidance
-* **Enhanced:** Stop button validation to prevent invalid operations
-* **Security:** Added user ownership verification for timer operations
-
-### Version 1.4.7
-* Previous stable release
-
-</canvas>

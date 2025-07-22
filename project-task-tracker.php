@@ -284,7 +284,7 @@ function ptt_register_acf_fields() {
                 'name' => 'task_max_budget',
                 'type' => 'number',
                 'instructions' => 'Set a time budget for this specific task.',
-                'step' => '0.1',
+                'step' => '0.01',
             ),
              array(
                 'key' => 'field_ptt_task_deadline',
@@ -457,7 +457,7 @@ function ptt_register_acf_fields() {
                 'name' => 'project_max_budget',
                 'type' => 'number',
                 'instructions' => 'Set a total time budget for the entire project.',
-                'step' => '0.1',
+                'step' => '0.01',
             ),
             array(
                 'key' => 'field_ptt_project_deadline',
