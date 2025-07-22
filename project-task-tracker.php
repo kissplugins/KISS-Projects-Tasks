@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.7
+ * Version:           1.7.10
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.7' );
+define( 'PTT_VERSION', '1.7.10' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -1008,6 +1008,35 @@ function ptt_stop_session_timer_callback() {
     ] );
 }
 add_action( 'wp_ajax_ptt_stop_session_timer', 'ptt_stop_session_timer_callback' );
+
+
+/**
+ * AJAX handler to update a task's status from the reports page.
+ */
+function ptt_update_task_status_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $post_id   = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    $status_id = isset( $_POST['status_id'] ) ? intval( $_POST['status_id'] ) : 0;
+
+    if ( ! $post_id || ! $status_id ) {
+        wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+    }
+
+    $result = wp_set_object_terms( $post_id, $status_id, 'task_status', false );
+
+    if ( is_wp_error( $result ) ) {
+        wp_send_json_error( [ 'message' => 'Failed to update status.' ] );
+    }
+
+    wp_send_json_success( [ 'message' => 'Status updated successfully.' ] );
+}
+add_action( 'wp_ajax_ptt_update_task_status', 'ptt_update_task_status_callback' );
+
 
 /**
  * Adds a "Settings" link to the plugin's action links on the plugins page.
