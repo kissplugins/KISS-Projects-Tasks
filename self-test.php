@@ -16,7 +16,7 @@ function ptt_add_settings_submenu_page() {
     add_submenu_page(
         'edit.php?post_type=project_task', // Parent slug
         'Tracker Settings',                // Page title
-        'Settings',                        // Menu title
+        'Settings - v' . PTT_VERSION,      // Menu title - UPDATED
         'manage_options',                  // Capability
         'ptt-self-test',                   // Menu slug
         'ptt_self_test_page_html'          // Function

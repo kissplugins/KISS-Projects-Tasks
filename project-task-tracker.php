@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.4
+ * Version:           1.7.5
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.4' );
+define( 'PTT_VERSION', '1.7.5' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -234,7 +234,7 @@ function ptt_register_taxonomies() {
 
     // Task Status Taxonomy
     $status_labels = [
-        'name'              => _x( 'Statuses', 'taxonomy general name', 'ptt' ),
+        'name'              => _x( 'Status', 'taxonomy general name', 'ptt' ),
         'singular_name'     => _x( 'Status', 'taxonomy singular name', 'ptt' ),
         'search_items'      => __( 'Search Statuses', 'ptt' ),
         'all_items'         => __( 'All Statuses', 'ptt' ),
@@ -242,10 +242,10 @@ function ptt_register_taxonomies() {
         'update_item'       => __( 'Update Status', 'ptt' ),
         'add_new_item'      => __( 'Add New Status', 'ptt' ),
         'new_item_name'     => __( 'New Status Name', 'ptt' ),
-        'menu_name'         => __( 'Task Statuses', 'ptt' ),
+        'menu_name'         => __( 'Task Status', 'ptt' ),
     ];
     $status_args = [
-        'hierarchical'      => false,
+        'hierarchical'      => true, // This makes it a single-choice UI (radio buttons)
         'labels'            => $status_labels,
         'show_ui'           => true,
         'show_admin_column' => true,
@@ -536,9 +536,9 @@ function ptt_calculate_and_save_duration( $post_id ) {
 
             if ( $start_time_str && $stop_time_str ) {
                 try {
-                    $timezone   = wp_timezone();
-                    $start_time = new DateTime( $start_time_str, $timezone );
-                    $stop_time  = new DateTime( $stop_time_str, $timezone );
+                    // Always use UTC for calculations to avoid timezone issues.
+                    $start_time = new DateTime( $start_time_str, new DateTimeZone('UTC') );
+                    $stop_time  = new DateTime( $stop_time_str, new DateTimeZone('UTC') );
 
                     if ( $stop_time > $start_time ) {
                         $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
@@ -600,9 +600,9 @@ function ptt_calculate_session_duration( $post_id, $index ) {
 
         if ( $start_time_str && $stop_time_str ) {
             try {
-                $timezone   = wp_timezone();
-                $start_time = new DateTime( $start_time_str, $timezone );
-                $stop_time  = new DateTime( $stop_time_str, $timezone );
+                // Always use UTC for calculations
+                $start_time = new DateTime( $start_time_str, new DateTimeZone('UTC') );
+                $stop_time  = new DateTime( $stop_time_str, new DateTimeZone('UTC') );
 
                 if ( $stop_time > $start_time ) {
                     $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
@@ -641,9 +641,8 @@ function ptt_get_total_sessions_duration( $post_id ) {
 
                 if ( $start && $stop ) {
                     try {
-                        $timezone   = wp_timezone();
-                        $start_time = new DateTime( $start, $timezone );
-                        $stop_time  = new DateTime( $stop, $timezone );
+                        $start_time = new DateTime( $start, new DateTimeZone('UTC') );
+                        $stop_time  = new DateTime( $stop, new DateTimeZone('UTC') );
                         if ( $stop_time > $start_time ) {
                             $diff_seconds = $stop_time->getTimestamp() - $start_time->getTimestamp();
                             $dur          = $diff_seconds / 3600;
@@ -686,75 +685,6 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
 // =================================================================
 // 7.0 ADMIN UI (CPT EDITOR)
 // =================================================================
-
-/**
- * Returns the timer controls HTML for a given task ID.
- *
- * @param int $post_id The task ID.
- * @return string HTML markup for timer controls.
- */
-function ptt_get_timer_controls_html( $post_id ) {
-    $start_time = get_field( 'start_time', $post_id );
-    $stop_time  = get_field( 'stop_time', $post_id );
-
-    ob_start();
-    echo '<div id="ptt-timer-controls" class="misc-pub-section" data-postid="' . esc_attr( $post_id ) . '">';
-
-    if ( ! $start_time ) {
-        echo '<button type="button" id="ptt-start-timer" class="button button-primary button-large ptt-start-button">Start Timer</button>';
-    }
-
-    if ( $start_time && ! $stop_time ) {
-        echo '<button type="button" id="ptt-stop-timer" class="button button-large ptt-stop-button">Stop Timer</button>';
-    }
-
-    echo '<button type="button" id="ptt-manual-entry-toggle" class="button button-small" style="margin-top: 8px;">Manual Entry</button>';
-
-    echo '<div id="ptt-manual-entry-form" style="display: none; margin-top: 10px; padding: 10px; background: #f5f5f5; border: 1px solid #ddd; border-radius: 3px;">';
-    echo '<label for="ptt-manual-hours" style="display: block; margin-bottom: 5px;">Enter time in decimal hours:</label>';
-    echo '<input type="number" id="ptt-manual-hours" min="0" step="0.01" placeholder="e.g., 1.5" style="width: 100%; margin-bottom: 8px;">';
-    echo '<div style="font-size: 12px; color: #666; margin-bottom: 8px;">Examples: 1.5 = 1h 30m, 0.25 = 15m, 2.75 = 2h 45m</div>';
-    echo '<button type="button" id="ptt-save-manual-time" class="button button-primary">Save Manual Time</button>';
-    echo '<button type="button" id="ptt-cancel-manual-time" class="button" style="margin-left: 5px;">Cancel</button>';
-    echo '</div>';
-
-    echo '<div class="ptt-ajax-spinner"></div>';
-    echo '<div class="ptt-ajax-message"></div>';
-    echo '</div>';
-
-    return ob_get_clean();
-}
-
-/**
- * Forces the plugin's template for single Task views.
- *
- * @param string $template Path to the template.
- * @return string Modified template path when viewing a Task.
- */
-function ptt_task_single_template( $template ) {
-    if ( is_singular( 'project_task' ) ) {
-        $custom = PTT_PLUGIN_DIR . 'templates/single-project_task.php';
-        if ( file_exists( $custom ) ) {
-            return $custom;
-        }
-    }
-    return $template;
-}
-add_filter( 'template_include', 'ptt_task_single_template' );
-
-/**
- * Adds Start/Stop buttons to the 'Publish' meta box on the task editor screen.
- */
-function ptt_add_start_stop_buttons() {
-    global $post;
-    if ( get_post_type( $post ) !== 'project_task' ) {
-        return;
-    }
-
-    $post_id = $post->ID;
-    echo ptt_get_timer_controls_html( $post_id );
-}
-// add_action( 'post_submitbox_misc_actions', 'ptt_add_start_stop_buttons' );
 
 /**
  * Adds a Status column to the Tasks list table.
@@ -866,13 +796,11 @@ function ptt_start_timer_callback() {
         ] );
     }
 
-    $current_time = current_time( 'Y-m-d H:i:s' );
+    $current_time = current_time( 'mysql', 1 ); // Use UTC time
     update_field( 'start_time', $current_time, $post_id );
     update_field( 'stop_time', '', $post_id ); // Clear any previous stop time
     update_field( 'calculated_duration', '0.00', $post_id ); // Reset duration
     
-    // Associate the current user as the author if they aren't already
-    // This is useful if an admin creates a a task and a developer starts it
     wp_update_post( ['ID' => $post_id, 'post_author' => $user_id] );
 
     $status_terms = get_the_terms( $post_id, 'task_status' );
@@ -932,32 +860,8 @@ function ptt_stop_timer_callback() {
     if ( ! $post_id ) {
         wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
     }
-
-    // Verify the post exists and is a project_task
-    $post = get_post( $post_id );
-    if ( ! $post || $post->post_type !== 'project_task' ) {
-        wp_send_json_error( [ 'message' => 'Task not found.' ] );
-    }
-
-    // Check if the task is actually running
-    $start_time = get_field( 'start_time', $post_id );
-    $stop_time = get_field( 'stop_time', $post_id );
     
-    if ( ! $start_time ) {
-        wp_send_json_error( [ 'message' => 'This task has not been started.' ] );
-    }
-    
-    if ( $stop_time ) {
-        wp_send_json_error( [ 'message' => 'This task has already been stopped.' ] );
-    }
-
-    // Verify the current user is the one who started the task (or is an admin)
-    $user_id = get_current_user_id();
-    if ( $post->post_author != $user_id && ! current_user_can( 'manage_options' ) ) {
-        wp_send_json_error( [ 'message' => 'You can only stop tasks that you started.' ] );
-    }
-
-    $current_time = current_time( 'Y-m-d H:i:s' );
+    $current_time = current_time( 'mysql', 1 ); // Use UTC time
     update_field( 'stop_time', $current_time, $post_id );
 
     $duration = ptt_calculate_and_save_duration( $post_id );
@@ -985,20 +889,7 @@ function ptt_force_stop_timer_callback() {
         wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
     }
 
-    // Get the post
-    $post = get_post( $post_id );
-    if ( ! $post || $post->post_type !== 'project_task' ) {
-        wp_send_json_error( [ 'message' => 'Task not found.' ] );
-    }
-
-    // For force stop, we just need to ensure there's a start time
-    $start_time = get_field( 'start_time', $post_id );
-    if ( ! $start_time ) {
-        wp_send_json_error( [ 'message' => 'Cannot stop a task that was never started.' ] );
-    }
-
-    // Force stop the timer
-    $current_time = current_time( 'Y-m-d H:i:s' );
+    $current_time = current_time( 'mysql', 1 ); // Use UTC time
     update_field( 'stop_time', $current_time, $post_id );
     
     $duration = ptt_calculate_and_save_duration( $post_id );
@@ -1025,52 +916,19 @@ function ptt_save_manual_time_callback() {
     $post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
     $manual_hours = isset( $_POST['manual_hours'] ) ? floatval( $_POST['manual_hours'] ) : 0;
 
-    if ( ! $post_id ) {
-        wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
+    if ( ! $post_id || $manual_hours <= 0 ) {
+         wp_send_json_error( [ 'message' => 'Invalid data.' ] );
     }
-
-    if ( $manual_hours < 0 ) {
-        wp_send_json_error( [ 'message' => 'Duration cannot be negative.' ] );
-    }
-
-    if ( $manual_hours > 24 ) {
-        wp_send_json_error( [ 'message' => 'Duration cannot exceed 24 hours for a single entry.' ] );
-    }
-
-    // Get the post
-    $post = get_post( $post_id );
-    if ( ! $post || $post->post_type !== 'project_task' ) {
-        wp_send_json_error( [ 'message' => 'Task not found.' ] );
-    }
-
-    // Set manual override and duration
+    
     update_field( 'manual_override', true, $post_id );
     update_field( 'manual_duration', $manual_hours, $post_id );
 
     $start_time = get_field( 'start_time', $post_id );
-    $stop_time  = get_field( 'stop_time', $post_id );
-
-    // If no start time exists, use current time
     if ( ! $start_time ) {
-        $start_time = current_time( 'Y-m-d H:i:s' );
+        $start_time = current_time( 'mysql', 1 ); // Use UTC time
         update_field( 'start_time', $start_time, $post_id );
     }
-
-    // Ensure a stop time is recorded so the task appears in reports
-    if ( ! $stop_time ) {
-        try {
-            $timezone = wp_timezone();
-            $start_dt = new DateTime( $start_time, $timezone );
-            $seconds  = $manual_hours * 3600;
-            $start_dt->modify( '+' . $seconds . ' seconds' );
-            $stop_time = $start_dt->format( 'Y-m-d H:i:s' );
-        } catch ( Exception $e ) {
-            $stop_time = $start_time;
-        }
-        update_field( 'stop_time', $stop_time, $post_id );
-    }
     
-    // Calculate and save duration
     $duration = ptt_calculate_and_save_duration( $post_id );
 
     wp_send_json_success( [
@@ -1091,9 +949,9 @@ function ptt_start_session_timer_callback() {
     }
 
     $post_id   = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-    $row_index = isset( $_POST['row_index'] ) ? intval( $_POST['row_index'] ) : 0;
-    if ( ! $post_id ) {
-        wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
+    $row_index = isset( $_POST['row_index'] ) ? intval( $_POST['row_index'] ) : -1;
+    if ( ! $post_id || $row_index < 0 ) {
+        wp_send_json_error( [ 'message' => 'Invalid data.' ] );
     }
 
     $active = ptt_get_active_session_index( $post_id );
@@ -1101,7 +959,7 @@ function ptt_start_session_timer_callback() {
         ptt_stop_session( $post_id, $active );
     }
 
-    $current_time = current_time( 'Y-m-d H:i:s' );
+    $current_time = current_time( 'mysql', 1 ); // Use UTC time
     update_sub_field( array( 'sessions', $row_index + 1, 'session_start_time' ), $current_time, $post_id );
     update_sub_field( array( 'sessions', $row_index + 1, 'session_stop_time' ), '', $post_id );
     update_sub_field( array( 'sessions', $row_index + 1, 'session_calculated_duration' ), '0.00', $post_id );
@@ -1112,12 +970,9 @@ add_action( 'wp_ajax_ptt_start_session_timer', 'ptt_start_session_timer_callback
 
 /**
  * Stops a session timer and calculates duration.
- *
- * @param int $post_id Task ID.
- * @param int $index   Session index.
  */
 function ptt_stop_session( $post_id, $index ) {
-    $current_time = current_time( 'Y-m-d H:i:s' );
+    $current_time = current_time( 'mysql', 1 ); // Use UTC time
     update_sub_field( array( 'sessions', $index + 1, 'session_stop_time' ), $current_time, $post_id );
     $duration = ptt_calculate_session_duration( $post_id, $index );
     ptt_calculate_and_save_duration( $post_id );
@@ -1135,16 +990,16 @@ function ptt_stop_session_timer_callback() {
     }
 
     $post_id   = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-    $row_index = isset( $_POST['row_index'] ) ? intval( $_POST['row_index'] ) : 0;
-    if ( ! $post_id ) {
-        wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
+    $row_index = isset( $_POST['row_index'] ) ? intval( $_POST['row_index'] ) : -1;
+     if ( ! $post_id || $row_index < 0 ) {
+        wp_send_json_error( [ 'message' => 'Invalid data.' ] );
     }
 
     $duration = ptt_stop_session( $post_id, $row_index );
 
     wp_send_json_success( [
         'message'   => 'Session stopped! Duration: ' . $duration . ' hours.',
-        'stop_time' => current_time( 'Y-m-d H:i:s' ),
+        'stop_time' => current_time( 'mysql', 1 ),
         'duration'  => $duration,
     ] );
 }
