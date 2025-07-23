@@ -121,6 +121,9 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ***
 
 ## 📋 Changelog
+### Version 1.7.12 (2025-07-24)
+* **Feature:** Added a "Sort by Status" option on the Reports page with an optional cookie to remember user preference.
+
 ### Version 1.7.11 (2025-07-22)
 * **Fixed:** The 'Maximum Budget' fields now correctly accept decimal values like 0.25.
 * **Fixed:** Self-test 'STATUS TEST' posts are now correctly deleted after a test run.
