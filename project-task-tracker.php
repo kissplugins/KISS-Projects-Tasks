@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.10
+ * Version:           1.7.11
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.10' );
+define( 'PTT_VERSION', '1.7.11' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -690,35 +690,8 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
 // 7.0 ADMIN UI (CPT EDITOR)
 // =================================================================
 
-/**
- * Adds a Status column to the Tasks list table.
- *
- * @param array $columns Existing columns.
- * @return array Modified columns.
- */
-function ptt_add_status_column( $columns ) {
-    $columns['task_status'] = 'Status';
-    return $columns;
-}
-add_filter( 'manage_project_task_posts_columns', 'ptt_add_status_column' );
-
-/**
- * Renders the Status column content.
- *
- * @param string $column  Column name.
- * @param int    $post_id Post ID.
- */
-function ptt_render_status_column( $column, $post_id ) {
-    if ( 'task_status' === $column ) {
-        $terms = get_the_terms( $post_id, 'task_status' );
-        if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
-            echo esc_html( implode( ', ', wp_list_pluck( $terms, 'name' ) ) );
-        } else {
-            echo '&#8212;';
-        }
-    }
-}
-add_action( 'manage_project_task_posts_custom_column', 'ptt_render_status_column', 10, 2 );
+// This section is intentionally left blank. The automatic column from
+// register_taxonomy('task_status') is used instead of manual functions.
 
 
 // =================================================================
