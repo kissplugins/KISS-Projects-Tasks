@@ -121,6 +121,9 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ***
 
 ## 📋 Changelog
+### Version 1.7.18 (2025-07-23)
+* **Improved:** Moved core time calculation logic to a separate file for better organization.
+
 ### Version 1.7.17 (2025-07-23)
 * **Feature:** Added "Task Focused" list view mode to reports, with a custom toggle switch UI.
 * **Feature:** In Task Focused view, tasks with multiple statuses appear as a line item for each status.
