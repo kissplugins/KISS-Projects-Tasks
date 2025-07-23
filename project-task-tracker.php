@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.5
+ * Version:           1.7.11
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.5' );
+define( 'PTT_VERSION', '1.7.11' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -59,7 +59,7 @@ function ptt_activate() {
     ptt_register_taxonomies();
 
     // Ensure default Task Status terms exist
-    $default_statuses = [ 'In Progress', 'Completed', 'Paused' ];
+    $default_statuses = [ 'Not Started', 'In Progress', 'Completed', 'Paused' ];
     foreach ( $default_statuses as $status ) {
         if ( ! term_exists( $status, 'task_status' ) ) {
             wp_insert_term( $status, 'task_status' );
@@ -251,6 +251,10 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'task_status' ],
+        'default_term'      => [
+            'name' => 'Not Started',
+            'slug' => 'not-started',
+        ],
     ];
     register_taxonomy( 'task_status', [ 'project_task' ], $status_args );
 }
@@ -280,7 +284,7 @@ function ptt_register_acf_fields() {
                 'name' => 'task_max_budget',
                 'type' => 'number',
                 'instructions' => 'Set a time budget for this specific task.',
-                'step' => '0.1',
+                'step' => '0.01',
             ),
              array(
                 'key' => 'field_ptt_task_deadline',
@@ -453,7 +457,7 @@ function ptt_register_acf_fields() {
                 'name' => 'project_max_budget',
                 'type' => 'number',
                 'instructions' => 'Set a total time budget for the entire project.',
-                'step' => '0.1',
+                'step' => '0.01',
             ),
             array(
                 'key' => 'field_ptt_project_deadline',
@@ -686,35 +690,8 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
 // 7.0 ADMIN UI (CPT EDITOR)
 // =================================================================
 
-/**
- * Adds a Status column to the Tasks list table.
- *
- * @param array $columns Existing columns.
- * @return array Modified columns.
- */
-function ptt_add_status_column( $columns ) {
-    $columns['task_status'] = 'Status';
-    return $columns;
-}
-add_filter( 'manage_project_task_posts_columns', 'ptt_add_status_column' );
-
-/**
- * Renders the Status column content.
- *
- * @param string $column  Column name.
- * @param int    $post_id Post ID.
- */
-function ptt_render_status_column( $column, $post_id ) {
-    if ( 'task_status' === $column ) {
-        $terms = get_the_terms( $post_id, 'task_status' );
-        if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
-            echo esc_html( implode( ', ', wp_list_pluck( $terms, 'name' ) ) );
-        } else {
-            echo '&#8212;';
-        }
-    }
-}
-add_action( 'manage_project_task_posts_custom_column', 'ptt_render_status_column', 10, 2 );
+// This section is intentionally left blank. The automatic column from
+// register_taxonomy('task_status') is used instead of manual functions.
 
 
 // =================================================================
@@ -1004,6 +981,35 @@ function ptt_stop_session_timer_callback() {
     ] );
 }
 add_action( 'wp_ajax_ptt_stop_session_timer', 'ptt_stop_session_timer_callback' );
+
+
+/**
+ * AJAX handler to update a task's status from the reports page.
+ */
+function ptt_update_task_status_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $post_id   = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    $status_id = isset( $_POST['status_id'] ) ? intval( $_POST['status_id'] ) : 0;
+
+    if ( ! $post_id || ! $status_id ) {
+        wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+    }
+
+    $result = wp_set_object_terms( $post_id, $status_id, 'task_status', false );
+
+    if ( is_wp_error( $result ) ) {
+        wp_send_json_error( [ 'message' => 'Failed to update status.' ] );
+    }
+
+    wp_send_json_success( [ 'message' => 'Status updated successfully.' ] );
+}
+add_action( 'wp_ajax_ptt_update_task_status', 'ptt_update_task_status_callback' );
+
 
 /**
  * Adds a "Settings" link to the plugin's action links on the plugins page.
