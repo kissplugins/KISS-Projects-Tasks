@@ -9,6 +9,13 @@
  *
  * CHANGELOG (excerpt)
  * ------------------------------------------------------------------
+ * 1.7.16 – 2025-07-23
+ * • Fixed: A PHP syntax error on the reports page caused by a missing '$' in an unset() call.
+ * * 1.7.15 – 2025-07-23
+ * • Feature: Added a debug toggle to the reports screen to show query and sorting logic.
+ * • Improved: "Sort by Status" now correctly re-sorts all tasks based on the selection.
+ * • Improved: Clients and Projects within the report are now sorted alphabetically.
+ *
  * 1.7.10 – 2025-07-23
  * • Dev: Self tests now cover status update callbacks and reporting queries.
  *
@@ -225,6 +232,17 @@ function ptt_reports_page_html() {
 							<button type="button" id="set-last-week" class="button">Last Week</button>
 						</td>
 					</tr>
+
+					<tr>
+						<th scope="row"><label for="debug_mode">Debugging</label></th>
+						<td>
+							<label>
+								<input type="checkbox" name="debug_mode" id="debug_mode" value="1" <?php checked( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ); ?>>
+								Show sorting & query logic
+							</label>
+							<p class="description">If checked, this will display the raw query arguments and sorting arrays used to generate the report.</p>
+						</td>
+					</tr>
 				</tbody>
 			</table>
 
@@ -397,45 +415,84 @@ function ptt_display_report_results() {
 	}
        wp_reset_postdata();
 
-        // --------------------------------------------------------------
-        // Sort tasks by status preference
-        // --------------------------------------------------------------
-        $status_terms         = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
-        // Default status order used when no custom sort is selected.
-        $default_order_names  = [ 'In Progress', 'Not Started', 'Blocked', 'Paused', 'Deferred', 'Completed' ];
-        $status_order         = [];
-        $index                = 1;
-        foreach ( $default_order_names as $name ) {
-                foreach ( $status_terms as $term ) {
-                        if ( strcasecmp( $term->name, $name ) === 0 ) {
-                                $status_order[ $term->term_id ] = $index++;
-                        }
-                }
-        }
-        foreach ( $status_terms as $term ) {
-                if ( ! isset( $status_order[ $term->term_id ] ) ) {
-                        $status_order[ $term->term_id ] = $index++;
-                }
-        }
-        if ( 'default' !== $sort_status && isset( $status_order[ intval( $sort_status ) ] ) ) {
-                $status_order[ intval( $sort_status ) ] = 0;
-        }
+	// --------------------------------------------------------------
+	// Sort Clients, Projects, and Tasks
+	// --------------------------------------------------------------
+	$status_terms        = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
+	$default_order_names = [ 'In Progress', 'Not Started', 'Blocked', 'Paused', 'Deferred', 'Completed' ];
+	$status_order        = [];
+	$index               = 1;
 
-        foreach ( $report as &$author ) {
-                foreach ( $author['clients'] as &$client ) {
-                        foreach ( $client['projects'] as &$project ) {
-                                usort( $project['tasks'], function( $a, $b ) use ( $status_order ) {
-                                        $oa = isset( $status_order[ $a['status_id'] ] ) ? $status_order[ $a['status_id'] ] : PHP_INT_MAX;
-                                        $ob = isset( $status_order[ $b['status_id'] ] ) ? $status_order[ $b['status_id'] ] : PHP_INT_MAX;
-                                        if ( $oa === $ob ) {
-                                                return strcmp( $a['date'], $b['date'] );
-                                        }
-                                        return $oa <=> $ob;
-                                } );
-                        }
-                }
-        }
-        unset( $author, $client, $project );
+	// Build the status order map based on user preference
+	if ( 'default' !== $sort_status && term_exists( (int) $sort_status, 'task_status' ) ) {
+		$status_order[ intval( $sort_status ) ] = $index++;
+	}
+
+	// Add the default statuses to the map if they aren't already there
+	foreach ( $default_order_names as $name ) {
+		foreach ( $status_terms as $term ) {
+			if ( ! isset( $status_order[ $term->term_id ] ) && strcasecmp( $term->name, $name ) === 0 ) {
+				$status_order[ $term->term_id ] = $index++;
+			}
+		}
+	}
+	// Add any remaining statuses not in the default list
+	foreach ( $status_terms as $term ) {
+		if ( ! isset( $status_order[ $term->term_id ] ) ) {
+			$status_order[ $term->term_id ] = $index++;
+		}
+	}
+
+	// Sort clients alphabetically, then projects alphabetically, then tasks by status
+	foreach ( $report as &$author ) {
+		// Sort Clients by name
+		uasort( $author['clients'], function( $a, $b ) {
+			return strcasecmp( $a['name'], $b['name'] );
+		} );
+
+		foreach ( $author['clients'] as &$client ) {
+			// Sort Projects by name
+			uasort( $client['projects'], function( $a, $b ) {
+				return strcasecmp( $a['name'], $b['name'] );
+			} );
+
+			foreach ( $client['projects'] as &$project ) {
+				// Sort Tasks by status, then date
+				usort( $project['tasks'], function( $a, $b ) use ( $status_order ) {
+					$oa = isset( $status_order[ $a['status_id'] ] ) ? $status_order[ $a['status_id'] ] : PHP_INT_MAX;
+					$ob = isset( $status_order[ $b['status_id'] ] ) ? $status_order[ $b['status_id'] ] : PHP_INT_MAX;
+					if ( $oa === $ob ) {
+						return strcmp( $a['date'], $b['date'] ); // Secondary sort: chronological
+					}
+					return $oa <=> $ob; // Primary sort: by status order map
+				} );
+			}
+		}
+	}
+	unset( $author, $client, $project );
+
+	/*--------------------------------------------------------------
+	 * Render Debug Output (if enabled)
+	 *-------------------------------------------------------------*/
+	if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
+		echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
+		echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
+
+		echo '<h4>Initial WP_Query Arguments:</h4>';
+		echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
+		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
+
+		echo '<h4>Task Sorting Logic:</h4>';
+		echo '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>';
+		echo '<p><strong>Default Status Order (Hardcoded):</strong></p>';
+		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $default_order_names, true ) ) . '</pre>';
+
+		echo '<h4>Final Status Order Map (<code>$status_order</code>):</h4>';
+		echo '<p><em>Tasks are sorted based on the ascending value of their status ID in this map. The selected status (if any) is assigned a value of `1` to give it top priority.</em></p>';
+		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
+
+		echo '</div>';
+	}
 
 	/*--------------------------------------------------------------
 	 * Render HTML
