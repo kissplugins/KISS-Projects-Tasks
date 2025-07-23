@@ -88,12 +88,39 @@ function ptt_add_reports_page() {
 add_action( 'admin_menu', 'ptt_add_reports_page' );
 
 /*===================================================================
+ * Handle sort-by-status cookie early
+ *==================================================================*/
+function ptt_handle_sort_status_cookie() {
+       if ( ! isset( $_GET['page'] ) || 'ptt-reports' !== $_GET['page'] ) {
+               return;
+       }
+
+       if ( ! current_user_can( 'manage_options' ) ) {
+               return;
+       }
+
+       if ( isset( $_GET['run_report'] ) ) {
+               $sort_pref = isset( $_GET['sort_status'] ) ? sanitize_text_field( $_GET['sort_status'] ) : 'default';
+               if ( isset( $_GET['remember_sort'] ) && '1' === $_GET['remember_sort'] ) {
+                       setcookie( 'ptt_sort_status', $sort_pref, time() + YEAR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN );
+               } else {
+                       setcookie( 'ptt_sort_status', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
+               }
+       }
+}
+add_action( 'admin_init', 'ptt_handle_sort_status_cookie' );
+
+/*===================================================================
  * Reports page HTML (filter form + results container)
  *==================================================================*/
 function ptt_reports_page_html() {
-	?>
-	<div class="wrap">
-		<h1>Project &amp; Task Time Reports</h1>
+
+        $saved_sort = isset( $_GET['sort_status'] )
+                ? sanitize_text_field( $_GET['sort_status'] )
+                : ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
+        ?>
+        <div class="wrap">
+                <h1>Project &amp; Task Time Reports</h1>
 
 		<form method="get" action="">
 			<?php wp_nonce_field( 'ptt_run_report_nonce' ); ?>
@@ -115,22 +142,41 @@ function ptt_reports_page_html() {
 												</td>
 										</tr>
 
-										<tr>
-												<th scope="row"><label for="status_id">Select&nbsp;Status</label></th>
-												<td>
-														<?php
-														wp_dropdown_categories([
-																'taxonomy'        => 'task_status',
-																'name'            => 'status_id',
-																'show_option_all' => 'Show All',
-																'hide_empty'      => false,
-																'selected'        => isset( $_REQUEST['status_id'] ) ? intval( $_REQUEST['status_id'] ) : 0,
-																'hierarchical'    => false,
-																'class'           => '',
-														] );
-														?>
-												</td>
-										</tr>
+                                       <tr>
+                                               <th scope="row"><label for="status_id">Select&nbsp;Status</label></th>
+                                               <td>
+                                                       <?php
+                                                       wp_dropdown_categories([
+                                                               'taxonomy'        => 'task_status',
+                                                               'name'            => 'status_id',
+                                                               'show_option_all' => 'Show All',
+                                                               'hide_empty'      => false,
+                                                               'selected'        => isset( $_REQUEST['status_id'] ) ? intval( $_REQUEST['status_id'] ) : 0,
+                                                               'hierarchical'    => false,
+                                                               'class'           => '',
+                                                       ] );
+                                                       ?>
+                                               </td>
+                                       </tr>
+
+                                       <tr>
+                                               <th scope="row"><label for="sort_status">Sort&nbsp;by&nbsp;Status</label></th>
+                                               <td>
+                                                       <select name="sort_status" id="sort_status">
+                                                               <option value="default" <?php selected( $saved_sort, 'default' ); ?>>Default</option>
+                                                               <?php
+                                                               $sort_terms = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
+                                                               foreach ( $sort_terms as $term ) {
+                                                                       echo '<option value="' . esc_attr( $term->term_id ) . '" ' . selected( $saved_sort, (string) $term->term_id, false ) . '>' . esc_html( $term->name ) . '</option>';
+                                                               }
+                                                               ?>
+                                                       </select>
+                                                       <label style="margin-left:10px;">
+                                                               <input type="checkbox" name="remember_sort" id="remember_sort" value="1" <?php checked( isset( $_COOKIE['ptt_sort_status'] ) ); ?>>
+                                                               Remember this setting for me
+                                                       </label>
+                                               </td>
+                                       </tr>
 
 					<tr>
 						<th scope="row"><label for="client_id">Select Client</label></th>
@@ -206,8 +252,9 @@ function ptt_display_report_results() {
 	$client_id  = isset( $_REQUEST['client_id'] )  ? intval( $_REQUEST['client_id'] )  : 0;
 	$project_id = isset( $_REQUEST['project_id'] ) ? intval( $_REQUEST['project_id'] ) : 0;
 	$status_id  = isset( $_REQUEST['status_id'] )  ? intval( $_REQUEST['status_id'] )  : 0;
-	$start_date = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
-	$end_date   = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
+        $start_date = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
+        $end_date   = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
+        $sort_status = isset( $_REQUEST['sort_status'] ) ? sanitize_text_field( $_REQUEST['sort_status'] ) : ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
 
 	/*--------------------------------------------------------------
 	 * Build WP_Query arguments
@@ -275,7 +322,7 @@ function ptt_display_report_results() {
 	 * Transform into hierarchical array → User > Client > Project
 	 *-------------------------------------------------------------*/
 	$report      = [];
-	$grand_total = 0.0;
+       $grand_total = 0.0;
 
 	while ( $q->have_posts() ) {
 		$q->the_post();
@@ -348,7 +395,47 @@ function ptt_display_report_results() {
 
 		$grand_total += $duration;
 	}
-	wp_reset_postdata();
+       wp_reset_postdata();
+
+        // --------------------------------------------------------------
+        // Sort tasks by status preference
+        // --------------------------------------------------------------
+        $status_terms         = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
+        // Default status order used when no custom sort is selected.
+        $default_order_names  = [ 'In Progress', 'Not Started', 'Blocked', 'Paused', 'Deferred', 'Completed' ];
+        $status_order         = [];
+        $index                = 1;
+        foreach ( $default_order_names as $name ) {
+                foreach ( $status_terms as $term ) {
+                        if ( strcasecmp( $term->name, $name ) === 0 ) {
+                                $status_order[ $term->term_id ] = $index++;
+                        }
+                }
+        }
+        foreach ( $status_terms as $term ) {
+                if ( ! isset( $status_order[ $term->term_id ] ) ) {
+                        $status_order[ $term->term_id ] = $index++;
+                }
+        }
+        if ( 'default' !== $sort_status && isset( $status_order[ intval( $sort_status ) ] ) ) {
+                $status_order[ intval( $sort_status ) ] = 0;
+        }
+
+        foreach ( $report as &$author ) {
+                foreach ( $author['clients'] as &$client ) {
+                        foreach ( $client['projects'] as &$project ) {
+                                usort( $project['tasks'], function( $a, $b ) use ( $status_order ) {
+                                        $oa = isset( $status_order[ $a['status_id'] ] ) ? $status_order[ $a['status_id'] ] : PHP_INT_MAX;
+                                        $ob = isset( $status_order[ $b['status_id'] ] ) ? $status_order[ $b['status_id'] ] : PHP_INT_MAX;
+                                        if ( $oa === $ob ) {
+                                                return strcmp( $a['date'], $b['date'] );
+                                        }
+                                        return $oa <=> $ob;
+                                } );
+                        }
+                }
+        }
+        unset( $author, $client, $project );
 
 	/*--------------------------------------------------------------
 	 * Render HTML
