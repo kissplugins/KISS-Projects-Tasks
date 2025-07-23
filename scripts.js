@@ -955,8 +955,37 @@ jQuery(document).ready(function ($) {
             $select.val($select.find('option[selected]').val());
         }).always(function() {
             hideSpinner($container);
-            $select.prop('disabled', false);
+        $select.prop('disabled', false);
+    });
+
+    // Remember sort preference
+    const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return decodeURIComponent(parts.pop().split(';').shift());
+        return '';
+    };
+    const setCookie = (name, value, days) => {
+        const date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/`;
+    };
+    const $sortSelect = $('#sort_status');
+    const $rememberSort = $('#remember_sort');
+    if ($sortSelect.length) {
+        const saved = getCookie('ptt_sort_status');
+        if (saved) {
+            $sortSelect.val(saved);
+            $rememberSort.prop('checked', true);
+        }
+        $('#ptt-report-form').on('submit', function() {
+            if ($rememberSort.is(':checked')) {
+                setCookie('ptt_sort_status', $sortSelect.val(), 365);
+            } else {
+                setCookie('ptt_sort_status', '', -1);
+            }
         });
+    }
     });
 
 

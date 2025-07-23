@@ -69,7 +69,30 @@ function ptt_format_task_notes( $content, $max_length = 200 ) {
 		$content .= '…';
 	}
 
-	return $content;
+        return $content;
+}
+
+/*===================================================================
+ * Helper: Sort tasks array by status with optional promoted status
+ *==================================================================*/
+function ptt_sort_tasks_by_status( &$tasks, $promote_slug = '' ) {
+        $default_order = [ 'in-progress', 'not-started', 'blocked', 'paused', 'completed' ];
+        if ( $promote_slug ) {
+                array_unshift( $default_order, $promote_slug );
+                $default_order = array_values( array_unique( $default_order ) );
+        }
+        $map = array_flip( $default_order );
+        usort(
+                $tasks,
+                function ( $a, $b ) use ( $map ) {
+                        $a_order = isset( $map[ $a['status_slug'] ] ) ? $map[ $a['status_slug'] ] : PHP_INT_MAX;
+                        $b_order = isset( $map[ $b['status_slug'] ] ) ? $map[ $b['status_slug'] ] : PHP_INT_MAX;
+                        if ( $a_order === $b_order ) {
+                                return strcmp( $a['date'], $b['date'] );
+                        }
+                        return $a_order - $b_order;
+                }
+        );
 }
 
 /*===================================================================
@@ -95,7 +118,7 @@ function ptt_reports_page_html() {
 	<div class="wrap">
 		<h1>Project &amp; Task Time Reports</h1>
 
-		<form method="get" action="">
+                <form method="get" action="" id="ptt-report-form">
 			<?php wp_nonce_field( 'ptt_run_report_nonce' ); ?>
 			<input type="hidden" name="post_type" value="project_task">
 			<input type="hidden" name="page"      value="ptt-reports">
@@ -166,9 +189,9 @@ function ptt_reports_page_html() {
 						</td>
 					</tr>
 
-					<tr>
-						<th scope="row"><label for="start_date">Date Range</label></th>
-						<td>
+                                        <tr>
+                                                <th scope="row"><label for="start_date">Date Range</label></th>
+                                                <td>
 							<input type="date" id="start_date" name="start_date"
 								   value="<?php echo isset( $_REQUEST['start_date'] ) ? esc_attr( $_REQUEST['start_date'] ) : ''; ?>">
 							to
@@ -176,11 +199,27 @@ function ptt_reports_page_html() {
 								   value="<?php echo isset( $_REQUEST['end_date'] ) ? esc_attr( $_REQUEST['end_date'] ) : ''; ?>">
 
 							<button type="button" id="set-this-week" class="button">This Week (Sun‑Sat)</button>
-							<button type="button" id="set-last-week" class="button">Last Week</button>
-						</td>
-					</tr>
-				</tbody>
-			</table>
+                                                        <button type="button" id="set-last-week" class="button">Last Week</button>
+                                                </td>
+                                        </tr>
+                                        <tr>
+                                                <th scope="row"><label for="sort_status">Sort&nbsp;by&nbsp;Status</label></th>
+                                                <td>
+                                                        <select id="sort_status" name="sort_status">
+                                                                <option value="">Default</option>
+                                                                <?php
+                                                                $statuses    = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
+                                                                $sort_select = isset( $_REQUEST['sort_status'] ) ? intval( $_REQUEST['sort_status'] ) : 0;
+                                                                foreach ( $statuses as $st ) {
+                                                                        echo '<option value="' . esc_attr( $st->term_id ) . '"' . selected( $sort_select, $st->term_id, false ) . '>' . esc_html( $st->name ) . '</option>';
+                                                                }
+                                                                ?>
+                                                        </select>
+                                                        <label style="margin-left:10px;"><input type="checkbox" id="remember_sort" value="1"> Remember this setting for me</label>
+                                                </td>
+                                        </tr>
+                                </tbody>
+                        </table>
 
 			<p class="submit">
 				<input type="submit" name="run_report" class="button button-primary" value="Run Report">
@@ -202,12 +241,21 @@ function ptt_reports_page_html() {
  *==================================================================*/
 function ptt_display_report_results() {
 
-	$user_id    = isset( $_REQUEST['user_id'] )    ? intval( $_REQUEST['user_id'] )    : 0;
-	$client_id  = isset( $_REQUEST['client_id'] )  ? intval( $_REQUEST['client_id'] )  : 0;
-	$project_id = isset( $_REQUEST['project_id'] ) ? intval( $_REQUEST['project_id'] ) : 0;
-	$status_id  = isset( $_REQUEST['status_id'] )  ? intval( $_REQUEST['status_id'] )  : 0;
-	$start_date = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
-	$end_date   = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
+        $user_id    = isset( $_REQUEST['user_id'] )    ? intval( $_REQUEST['user_id'] )    : 0;
+        $client_id  = isset( $_REQUEST['client_id'] )  ? intval( $_REQUEST['client_id'] )  : 0;
+        $project_id = isset( $_REQUEST['project_id'] ) ? intval( $_REQUEST['project_id'] ) : 0;
+        $status_id  = isset( $_REQUEST['status_id'] )  ? intval( $_REQUEST['status_id'] )  : 0;
+        $sort_status = isset( $_REQUEST['sort_status'] ) ? intval( $_REQUEST['sort_status'] ) : 0;
+        $start_date = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
+        $end_date   = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
+
+        $sort_status_slug = '';
+        if ( $sort_status ) {
+                $term = get_term( $sort_status, 'task_status' );
+                if ( $term && ! is_wp_error( $term ) ) {
+                        $sort_status_slug = $term->slug;
+                }
+        }
 
 	/*--------------------------------------------------------------
 	 * Build WP_Query arguments
@@ -293,9 +341,10 @@ function ptt_display_report_results() {
 		$project_id_term = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->term_id : 0;
 		$project_name    = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : 'Uncategorized';
 
-		$status_terms = get_the_terms( $post_id, 'task_status' );
-		$status_id_term = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->term_id : 0;
-		$status_name  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
+                $status_terms = get_the_terms( $post_id, 'task_status' );
+                $status_id_term = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->term_id : 0;
+                $status_name  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
+                $status_slug  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->slug : '';
 
 		// -------- Duration / Budget --------
 		$duration       = (float) get_field( 'calculated_duration', $post_id );
@@ -334,25 +383,35 @@ function ptt_display_report_results() {
 		$report[ $author_id ]['total']                                                             += $duration;
 		$report[ $author_id ]['clients'][ $client_id_term ]['total']                               += $duration;
 		$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['total'] += $duration;
-		$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['tasks'][] = [
-			'id'             => $post_id,
-			'title'          => get_the_title(),
-			'date'           => $start_time,
-			'duration'       => $duration,
-			'content'        => get_the_content(),
-			'task_budget'    => $task_budget,
-			'project_budget' => $project_budget,
-			'status_id'      => $status_id_term,
-			'status_name'    => $status_name,
-		];
+                $report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['tasks'][] = [
+                        'id'             => $post_id,
+                        'title'          => get_the_title(),
+                        'date'           => $start_time,
+                        'duration'       => $duration,
+                        'content'        => get_the_content(),
+                        'task_budget'    => $task_budget,
+                        'project_budget' => $project_budget,
+                        'status_id'      => $status_id_term,
+                        'status_name'    => $status_name,
+                        'status_slug'    => $status_slug,
+                ];
 
 		$grand_total += $duration;
 	}
-	wp_reset_postdata();
+       wp_reset_postdata();
 
-	/*--------------------------------------------------------------
-	 * Render HTML
-	 *-------------------------------------------------------------*/
+        foreach ( $report as &$a ) {
+                foreach ( $a['clients'] as &$c ) {
+                        foreach ( $c['projects'] as &$p ) {
+                                ptt_sort_tasks_by_status( $p['tasks'], $sort_status_slug );
+                        }
+                }
+        }
+        unset( $a, $c, $p );
+
+       /*--------------------------------------------------------------
+        * Render HTML
+        *-------------------------------------------------------------*/
 	echo '<h2>Report Results</h2><div class="ptt-report-results">';
 
 	// Get all status terms once to build dropdowns
