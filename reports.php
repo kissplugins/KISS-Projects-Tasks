@@ -9,6 +9,10 @@
  *
  * CHANGELOG (excerpt)
  * ------------------------------------------------------------------
+ * 1.7.17 – 2025-07-23
+ * • Feature: Added "Task Focused" list view mode to reports, with a custom toggle switch UI.
+ * • Feature: In Task Focused view, tasks with multiple statuses appear as a line item for each status.
+ *
  * 1.7.16 – 2025-07-23
  * • Fixed: A PHP syntax error on the reports page caused by a missing '$' in an unset() call.
  * * 1.7.15 – 2025-07-23
@@ -122,12 +126,14 @@ add_action( 'admin_init', 'ptt_handle_sort_status_cookie' );
  *==================================================================*/
 function ptt_reports_page_html() {
 
-        $saved_sort = isset( $_GET['sort_status'] )
-                ? sanitize_text_field( $_GET['sort_status'] )
-                : ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
-        ?>
-        <div class="wrap">
-                <h1>Project &amp; Task Time Reports</h1>
+		$saved_sort = isset( $_REQUEST['sort_status'] )
+			? sanitize_text_field( $_REQUEST['sort_status'] )
+			: ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
+
+		$view_mode = isset( $_REQUEST['view_mode'] ) ? sanitize_text_field( $_REQUEST['view_mode'] ) : 'classic';
+		?>
+		<div class="wrap">
+				<h1>Project &amp; Task Time Reports</h1>
 
 		<form method="get" action="">
 			<?php wp_nonce_field( 'ptt_run_report_nonce' ); ?>
@@ -136,6 +142,20 @@ function ptt_reports_page_html() {
 
 			<table class="form-table">
 				<tbody>
+					<tr>
+						<th scope="row">View Mode</th>
+						<td>
+							<div class="ptt-toggle-control">
+								<input type="radio" id="view_mode_classic" name="view_mode" value="classic" <?php checked( $view_mode, 'classic' ); ?>>
+								<label for="view_mode_classic">Classic</label>
+
+								<input type="radio" id="view_mode_task_focused" name="view_mode" value="task_focused" <?php checked( $view_mode, 'task_focused' ); ?>>
+								<label for="view_mode_task_focused">Task Focused</label>
+							</div>
+							<p class="description">"Classic" groups tasks by Client/Project. "Task Focused" shows a flat list of all tasks.</p>
+						</td>
+					</tr>
+
 					<tr>
 						<th scope="row"><label for="user_id">Select User</label></th>
 						<td>
@@ -149,41 +169,41 @@ function ptt_reports_page_html() {
 												</td>
 										</tr>
 
-                                       <tr>
-                                               <th scope="row"><label for="status_id">Select&nbsp;Status</label></th>
-                                               <td>
-                                                       <?php
-                                                       wp_dropdown_categories([
-                                                               'taxonomy'        => 'task_status',
-                                                               'name'            => 'status_id',
-                                                               'show_option_all' => 'Show All',
-                                                               'hide_empty'      => false,
-                                                               'selected'        => isset( $_REQUEST['status_id'] ) ? intval( $_REQUEST['status_id'] ) : 0,
-                                                               'hierarchical'    => false,
-                                                               'class'           => '',
-                                                       ] );
-                                                       ?>
-                                               </td>
-                                       </tr>
+									   <tr>
+											   <th scope="row"><label for="status_id">Select&nbsp;Status</label></th>
+											   <td>
+													   <?php
+													   wp_dropdown_categories([
+															   'taxonomy'        => 'task_status',
+															   'name'            => 'status_id',
+															   'show_option_all' => 'Show All',
+															   'hide_empty'      => false,
+															   'selected'        => isset( $_REQUEST['status_id'] ) ? intval( $_REQUEST['status_id'] ) : 0,
+															   'hierarchical'    => false,
+															   'class'           => '',
+													   ] );
+													   ?>
+											   </td>
+									   </tr>
 
-                                       <tr>
-                                               <th scope="row"><label for="sort_status">Sort&nbsp;by&nbsp;Status</label></th>
-                                               <td>
-                                                       <select name="sort_status" id="sort_status">
-                                                               <option value="default" <?php selected( $saved_sort, 'default' ); ?>>Default</option>
-                                                               <?php
-                                                               $sort_terms = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
-                                                               foreach ( $sort_terms as $term ) {
-                                                                       echo '<option value="' . esc_attr( $term->term_id ) . '" ' . selected( $saved_sort, (string) $term->term_id, false ) . '>' . esc_html( $term->name ) . '</option>';
-                                                               }
-                                                               ?>
-                                                       </select>
-                                                       <label style="margin-left:10px;">
-                                                               <input type="checkbox" name="remember_sort" id="remember_sort" value="1" <?php checked( isset( $_COOKIE['ptt_sort_status'] ) ); ?>>
-                                                               Remember this setting for me
-                                                       </label>
-                                               </td>
-                                       </tr>
+									   <tr>
+											   <th scope="row"><label for="sort_status">Sort&nbsp;by&nbsp;Status</label></th>
+											   <td>
+													   <select name="sort_status" id="sort_status">
+															   <option value="default" <?php selected( $saved_sort, 'default' ); ?>>Default</option>
+															   <?php
+															   $sort_terms = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
+															   foreach ( $sort_terms as $term ) {
+																	   echo '<option value="' . esc_attr( $term->term_id ) . '" ' . selected( $saved_sort, (string) $term->term_id, false ) . '>' . esc_html( $term->name ) . '</option>';
+															   }
+															   ?>
+													   </select>
+													   <label style="margin-left:10px;">
+															   <input type="checkbox" name="remember_sort" id="remember_sort" value="1" <?php checked( isset( $_COOKIE['ptt_sort_status'] ) ); ?>>
+															   Remember this setting for me
+													   </label>
+											   </td>
+									   </tr>
 
 					<tr>
 						<th scope="row"><label for="client_id">Select Client</label></th>
@@ -266,13 +286,14 @@ function ptt_reports_page_html() {
  *==================================================================*/
 function ptt_display_report_results() {
 
-	$user_id    = isset( $_REQUEST['user_id'] )    ? intval( $_REQUEST['user_id'] )    : 0;
-	$client_id  = isset( $_REQUEST['client_id'] )  ? intval( $_REQUEST['client_id'] )  : 0;
-	$project_id = isset( $_REQUEST['project_id'] ) ? intval( $_REQUEST['project_id'] ) : 0;
-	$status_id  = isset( $_REQUEST['status_id'] )  ? intval( $_REQUEST['status_id'] )  : 0;
-        $start_date = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
-        $end_date   = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
-        $sort_status = isset( $_REQUEST['sort_status'] ) ? sanitize_text_field( $_REQUEST['sort_status'] ) : ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
+	$user_id     = isset( $_REQUEST['user_id'] )    ? intval( $_REQUEST['user_id'] )    : 0;
+	$client_id   = isset( $_REQUEST['client_id'] )  ? intval( $_REQUEST['client_id'] )  : 0;
+	$project_id  = isset( $_REQUEST['project_id'] ) ? intval( $_REQUEST['project_id'] ) : 0;
+	$status_id   = isset( $_REQUEST['status_id'] )  ? intval( $_REQUEST['status_id'] )  : 0;
+	$start_date  = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
+	$end_date    = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
+	$sort_status = isset( $_REQUEST['sort_status'] ) ? sanitize_text_field( $_REQUEST['sort_status'] ) : ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
+	$view_mode   = isset( $_REQUEST['view_mode'] )   ? sanitize_text_field( $_REQUEST['view_mode'] )   : 'classic';
 
 	/*--------------------------------------------------------------
 	 * Build WP_Query arguments
@@ -336,92 +357,13 @@ function ptt_display_report_results() {
 		return;
 	}
 
-	/*--------------------------------------------------------------
-	 * Transform into hierarchical array → User > Client > Project
-	 *-------------------------------------------------------------*/
-	$report      = [];
-       $grand_total = 0.0;
-
-	while ( $q->have_posts() ) {
-		$q->the_post();
-		$post_id = get_the_ID();
-
-		// -------- Meta & taxonomy look‑ups --------
-		$author_id   = get_the_author_meta( 'ID' );
-		$author_name = get_the_author_meta( 'display_name' );
-
-		$client_terms   = get_the_terms( $post_id, 'client' );
-		$client_id_term = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->term_id : 0;
-		$client_name    = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : 'Uncategorized';
-
-		$project_terms   = get_the_terms( $post_id, 'project' );
-		$project_id_term = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->term_id : 0;
-		$project_name    = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : 'Uncategorized';
-
-		$status_terms = get_the_terms( $post_id, 'task_status' );
-		$status_id_term = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->term_id : 0;
-		$status_name  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
-
-		// -------- Duration / Budget --------
-		$duration       = (float) get_field( 'calculated_duration', $post_id );
-		$task_budget    = get_field( 'task_max_budget', $post_id );
-		$project_budget = $project_id_term ? get_field( 'project_max_budget', 'project_' . $project_id_term ) : 0;
-
-		// -------- Start date (fallback) --------
-		$start_time = get_field( 'start_time', $post_id );
-		if ( ! $start_time ) {
-			$start_time = get_the_date( 'Y-m-d H:i:s', $post_id );
-		}
-
-		// -------- Build array --------
-		if ( ! isset( $report[ $author_id ] ) ) {
-			$report[ $author_id ] = [
-				'name'    => $author_name,
-				'total'   => 0,
-				'clients' => [],
-			];
-		}
-		if ( ! isset( $report[ $author_id ]['clients'][ $client_id_term ] ) ) {
-			$report[ $author_id ]['clients'][ $client_id_term ] = [
-				'name'     => $client_name,
-				'total'    => 0,
-				'projects' => [],
-			];
-		}
-		if ( ! isset( $report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] ) ) {
-			$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] = [
-				'name'  => $project_name,
-				'total' => 0,
-				'tasks' => [],
-			];
-		}
-
-		$report[ $author_id ]['total']                                                             += $duration;
-		$report[ $author_id ]['clients'][ $client_id_term ]['total']                               += $duration;
-		$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['total'] += $duration;
-		$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['tasks'][] = [
-			'id'             => $post_id,
-			'title'          => get_the_title(),
-			'date'           => $start_time,
-			'duration'       => $duration,
-			'content'        => get_the_content(),
-			'task_budget'    => $task_budget,
-			'project_budget' => $project_budget,
-			'status_id'      => $status_id_term,
-			'status_name'    => $status_name,
-		];
-
-		$grand_total += $duration;
-	}
-       wp_reset_postdata();
-
 	// --------------------------------------------------------------
-	// Sort Clients, Projects, and Tasks
+	// Build Status Sorting Map
 	// --------------------------------------------------------------
-	$status_terms        = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
-	$default_order_names = [ 'In Progress', 'Not Started', 'Blocked', 'Paused', 'Deferred', 'Completed' ];
-	$status_order        = [];
-	$index               = 1;
+	$status_terms          = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
+	$default_order_names   = [ 'In Progress', 'Not Started', 'Blocked', 'Paused', 'Completed' ]; // 'Deferred' was removed for task-focused view
+	$status_order          = [];
+	$index                 = 1;
 
 	// Build the status order map based on user preference
 	if ( 'default' !== $sort_status && term_exists( (int) $sort_status, 'task_status' ) ) {
@@ -443,33 +385,8 @@ function ptt_display_report_results() {
 		}
 	}
 
-	// Sort clients alphabetically, then projects alphabetically, then tasks by status
-	foreach ( $report as &$author ) {
-		// Sort Clients by name
-		uasort( $author['clients'], function( $a, $b ) {
-			return strcasecmp( $a['name'], $b['name'] );
-		} );
-
-		foreach ( $author['clients'] as &$client ) {
-			// Sort Projects by name
-			uasort( $client['projects'], function( $a, $b ) {
-				return strcasecmp( $a['name'], $b['name'] );
-			} );
-
-			foreach ( $client['projects'] as &$project ) {
-				// Sort Tasks by status, then date
-				usort( $project['tasks'], function( $a, $b ) use ( $status_order ) {
-					$oa = isset( $status_order[ $a['status_id'] ] ) ? $status_order[ $a['status_id'] ] : PHP_INT_MAX;
-					$ob = isset( $status_order[ $b['status_id'] ] ) ? $status_order[ $b['status_id'] ] : PHP_INT_MAX;
-					if ( $oa === $ob ) {
-						return strcmp( $a['date'], $b['date'] ); // Secondary sort: chronological
-					}
-					return $oa <=> $ob; // Primary sort: by status order map
-				} );
-			}
-		}
-	}
-	unset( $author, $client, $project );
+	$all_statuses = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
+	$grand_total  = 0.0;
 
 	/*--------------------------------------------------------------
 	 * Render Debug Output (if enabled)
@@ -483,6 +400,7 @@ function ptt_display_report_results() {
 		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
 
 		echo '<h4>Task Sorting Logic:</h4>';
+		echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
 		echo '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>';
 		echo '<p><strong>Default Status Order (Hardcoded):</strong></p>';
 		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $default_order_names, true ) ) . '</pre>';
@@ -494,85 +412,232 @@ function ptt_display_report_results() {
 		echo '</div>';
 	}
 
-	/*--------------------------------------------------------------
-	 * Render HTML
-	 *-------------------------------------------------------------*/
-	echo '<h2>Report Results</h2><div class="ptt-report-results">';
+	echo '<h2>Report Results</h2>';
 
-	// Get all status terms once to build dropdowns
-	$all_statuses = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
+	// =================================================================
+	// VIEW MODE ROUTER
+	// =================================================================
+	if ( 'task_focused' === $view_mode ) {
 
-	foreach ( $report as $author ) {
+		/*----------------------------------------------------------
+		 * TASK FOCUSED VIEW
+		 *---------------------------------------------------------*/
+		$task_list = [];
+		while ( $q->have_posts() ) {
+			$q->the_post();
+			$post_id     = get_the_ID();
+			$duration    = (float) get_field( 'calculated_duration', $post_id );
+			$grand_total += $duration;
 
-		echo '<h3>User: ' . esc_html( $author['name'] ) .
-			 ' <span class="subtotal">(User&nbsp;Total: ' . number_format( $author['total'], 2 ) . '&nbsp;hrs)</span></h3>';
+			$client_terms = get_the_terms( $post_id, 'client' );
+			$project_terms = get_the_terms( $post_id, 'project' );
+			$start_time = get_field( 'start_time', $post_id ) ?: get_the_date( 'Y-m-d H:i:s', $post_id );
 
-		foreach ( $author['clients'] as $client ) {
+			$task_base = [
+				'id'             => $post_id,
+				'title'          => get_the_title(),
+				'client_name'    => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
+				'project_name'   => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
+				'date'           => $start_time,
+				'duration'       => $duration,
+				'content'        => get_the_content(),
+			];
 
-			echo '<div class="client-group">';
-			echo '<h4>Client: ' . esc_html( $client['name'] ) .
-				 ' <span class="subtotal">(Client&nbsp;Total: ' . number_format( $client['total'], 2 ) . '&nbsp;hrs)</span></h4>';
-
-			foreach ( $client['projects'] as $project ) {
-
-				echo '<div class="project-group">';
-				echo '<h5>Project: ' . esc_html( $project['name'] ) .
-					 ' <span class="subtotal">(Project&nbsp;Total: ' . number_format( $project['total'], 2 ) . '&nbsp;hrs)</span></h5>';
-
-				echo '<table class="wp-list-table widefat fixed striped">';
-				echo '<thead><tr>
-						<th>Task Name</th><th>Date</th><th>Duration (Hours)</th>
-						<th>Orig.&nbsp;Budget</th><th>Notes</th><th>Status</th>
-					  </tr></thead><tbody>';
-
-				foreach ( $project['tasks'] as $task ) {
-
-					// --- Budget column display & color logic ---
-					$effective_budget = 0;
-					$budget_display   = '–';
-
-					if ( ! empty( $task['task_budget'] ) && (float) $task['task_budget'] > 0 ) {
-						$effective_budget = (float) $task['task_budget'];
-						$budget_display   = number_format( $effective_budget, 2 ) . '&nbsp;(Task)';
-					} elseif ( ! empty( $task['project_budget'] ) && (float) $task['project_budget'] > 0 ) {
-						$effective_budget = (float) $task['project_budget'];
-						$budget_display   = number_format( $effective_budget, 2 ) . '&nbsp;(Project)';
-					}
-
-					$budget_td_style = '';
-					if ( $effective_budget > 0 && (float) $task['duration'] > $effective_budget ) {
-						$budget_td_style = 'style="color: #f44336; font-weight: bold;"';
-					}
-
-					// --- Status column dropdown ---
-					$status_dropdown  = '<div class="ptt-status-control">';
-					$status_dropdown .= '<select class="ptt-report-status-select" data-postid="' . esc_attr( $task['id'] ) . '">';
-					foreach ( $all_statuses as $status ) {
-						$selected = selected( $task['status_id'], $status->term_id, false );
-						$status_dropdown .= '<option value="' . esc_attr( $status->term_id ) . '" ' . $selected . '>' . esc_html( $status->name ) . '</option>';
-					}
-					$status_dropdown .= '</select>';
-					$status_dropdown .= '<div class="ptt-ajax-spinner" style="display:none;"></div>';
-					$status_dropdown .= '</div>';
-
-					echo '<tr>';
-					echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
-					echo '<td>' . esc_html( date( 'Y-m-d', strtotime( $task['date'] ) ) ) . '</td>';
-					echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
-					echo '<td ' . $budget_td_style . '>' . $budget_display . '</td>';
-					echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
-					echo '<td>' . $status_dropdown . '</td>';
-					echo '</tr>';
+			$current_statuses = get_the_terms( $post_id, 'task_status' );
+			if ( ! is_wp_error( $current_statuses ) && ! empty( $current_statuses ) ) {
+				foreach ( $current_statuses as $status ) {
+					$task_list[] = array_merge( $task_base, [
+						'status_id'   => $status->term_id,
+						'status_name' => $status->name,
+					] );
 				}
+			} else {
+				$task_list[] = array_merge( $task_base, [
+					'status_id'   => 0,
+					'status_name' => '',
+				] );
+			}
+		}
+		wp_reset_postdata();
 
-				echo '</tbody></table></div>'; // .project-group
+		// Sort the final flat list
+		usort( $task_list, function( $a, $b ) use ( $status_order ) {
+			$oa = isset( $status_order[ $a['status_id'] ] ) ? $status_order[ $a['status_id'] ] : PHP_INT_MAX;
+			$ob = isset( $status_order[ $b['status_id'] ] ) ? $status_order[ $b['status_id'] ] : PHP_INT_MAX;
+			if ( $oa === $ob ) {
+				return strcmp( $a['date'], $b['date'] ); // Secondary sort: chronological
+			}
+			return $oa <=> $ob; // Primary sort: by status order map
+		} );
+
+		// Render the flat table
+		echo '<div class="ptt-report-results">';
+		echo '<table class="wp-list-table widefat fixed striped">';
+		echo '<thead><tr>
+				<th style="width:25%">Task Name</th>
+				<th style="width:15%">Client</th>
+				<th style="width:15%">Project</th>
+				<th style="width:8%">Date</th>
+				<th style="width:8%">Duration (Hrs)</th>
+				<th style="width:21%">Notes</th>
+				<th style="width:8%">Status</th>
+			  </tr></thead><tbody>';
+
+		foreach ( $task_list as $task ) {
+			// Status column dropdown
+			$status_dropdown  = '<div class="ptt-status-control">';
+			$status_dropdown .= '<select class="ptt-report-status-select" data-postid="' . esc_attr( $task['id'] ) . '">';
+			foreach ( $all_statuses as $status ) {
+				$selected         = selected( $task['status_id'], $status->term_id, false );
+				$status_dropdown .= '<option value="' . esc_attr( $status->term_id ) . '" ' . $selected . '>' . esc_html( $status->name ) . '</option>';
+			}
+			$status_dropdown .= '</select>';
+			$status_dropdown .= '<div class="ptt-ajax-spinner" style="display:none;"></div>';
+			$status_dropdown .= '</div>';
+
+			echo '<tr>';
+			echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
+			echo '<td>' . esc_html( $task['client_name'] ) . '</td>';
+			echo '<td>' . esc_html( $task['project_name'] ) . '</td>';
+			echo '<td>' . esc_html( date( 'Y-m-d', strtotime( $task['date'] ) ) ) . '</td>';
+			echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
+			echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
+			echo '<td>' . $status_dropdown . '</td>';
+			echo '</tr>';
+		}
+		echo '</tbody></table>';
+		echo '<div class="grand-total"><strong>Grand Total: ' . number_format( $grand_total, 2 ) . '&nbsp;hours</strong></div>';
+		echo '</div>'; // .ptt-report-results
+
+	} else {
+
+		/*----------------------------------------------------------
+		 * CLASSIC (HIERARCHICAL) VIEW
+		 *---------------------------------------------------------*/
+		$report = [];
+		while ( $q->have_posts() ) {
+			$q->the_post();
+			$post_id = get_the_ID();
+			$duration = (float) get_field( 'calculated_duration', $post_id );
+			$grand_total += $duration;
+
+			$author_id   = get_the_author_meta( 'ID' );
+			$author_name = get_the_author_meta( 'display_name' );
+
+			$client_terms   = get_the_terms( $post_id, 'client' );
+			$client_id_term = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->term_id : 0;
+			$client_name    = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : 'Uncategorized';
+
+			$project_terms   = get_the_terms( $post_id, 'project' );
+			$project_id_term = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->term_id : 0;
+			$project_name    = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : 'Uncategorized';
+
+			$status_terms_obj = get_the_terms( $post_id, 'task_status' );
+			$status_id_term = ! is_wp_error( $status_terms_obj ) && $status_terms_obj ? $status_terms_obj[0]->term_id : 0;
+
+			$task_budget    = get_field( 'task_max_budget', $post_id );
+			$project_budget = $project_id_term ? get_field( 'project_max_budget', 'project_' . $project_id_term ) : 0;
+			$start_time = get_field( 'start_time', $post_id ) ?: get_the_date( 'Y-m-d H:i:s', $post_id );
+
+			if ( ! isset( $report[ $author_id ] ) ) {
+				$report[ $author_id ] = [ 'name' => $author_name, 'total' => 0, 'clients' => [] ];
+			}
+			if ( ! isset( $report[ $author_id ]['clients'][ $client_id_term ] ) ) {
+				$report[ $author_id ]['clients'][ $client_id_term ] = [ 'name' => $client_name, 'total' => 0, 'projects' => [] ];
+			}
+			if ( ! isset( $report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] ) ) {
+				$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] = [ 'name' => $project_name, 'total' => 0, 'tasks' => [] ];
 			}
 
-			echo '</div>'; // .client-group
+			$report[ $author_id ]['total'] += $duration;
+			$report[ $author_id ]['clients'][ $client_id_term ]['total'] += $duration;
+			$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['total'] += $duration;
+			$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['tasks'][] = [
+				'id'             => $post_id,
+				'title'          => get_the_title(),
+				'date'           => $start_time,
+				'duration'       => $duration,
+				'content'        => get_the_content(),
+				'task_budget'    => $task_budget,
+				'project_budget' => $project_budget,
+				'status_id'      => $status_id_term,
+			];
 		}
-	}
+		wp_reset_postdata();
 
-	echo '<div class="grand-total"><strong>Grand Total: ' .
-		 number_format( $grand_total, 2 ) . '&nbsp;hours</strong></div>';
-	echo '</div>'; // .ptt-report-results
+		// Sort clients alphabetically, then projects alphabetically, then tasks by status
+		foreach ( $report as &$author ) {
+			uasort( $author['clients'], function( $a, $b ) { return strcasecmp( $a['name'], $b['name'] ); } );
+			foreach ( $author['clients'] as &$client ) {
+				uasort( $client['projects'], function( $a, $b ) { return strcasecmp( $a['name'], $b['name'] ); } );
+				foreach ( $client['projects'] as &$project ) {
+					usort( $project['tasks'], function( $a, $b ) use ( $status_order ) {
+						$oa = isset( $status_order[ $a['status_id'] ] ) ? $status_order[ $a['status_id'] ] : PHP_INT_MAX;
+						$ob = isset( $status_order[ $b['status_id'] ] ) ? $status_order[ $b['status_id'] ] : PHP_INT_MAX;
+						if ( $oa === $ob ) { return strcmp( $a['date'], $b['date'] ); }
+						return $oa <=> $ob;
+					} );
+				}
+			}
+		}
+		unset( $author, $client, $project );
+
+		// Render the hierarchical table
+		echo '<div class="ptt-report-results">';
+		foreach ( $report as $author ) {
+			echo '<h3>User: ' . esc_html( $author['name'] ) . ' <span class="subtotal">(User&nbsp;Total: ' . number_format( $author['total'], 2 ) . '&nbsp;hrs)</span></h3>';
+			foreach ( $author['clients'] as $client ) {
+				echo '<div class="client-group">';
+				echo '<h4>Client: ' . esc_html( $client['name'] ) . ' <span class="subtotal">(Client&nbsp;Total: ' . number_format( $client['total'], 2 ) . '&nbsp;hrs)</span></h4>';
+				foreach ( $client['projects'] as $project ) {
+					echo '<div class="project-group">';
+					echo '<h5>Project: ' . esc_html( $project['name'] ) . ' <span class="subtotal">(Project&nbsp;Total: ' . number_format( $project['total'], 2 ) . '&nbsp;hrs)</span></h5>';
+					echo '<table class="wp-list-table widefat fixed striped">';
+					echo '<thead><tr>
+							<th>Task Name</th><th>Date</th><th>Duration (Hours)</th>
+							<th>Orig.&nbsp;Budget</th><th>Notes</th><th>Status</th>
+						  </tr></thead><tbody>';
+
+					foreach ( $project['tasks'] as $task ) {
+						$effective_budget = 0;
+						$budget_display = '–';
+						if ( ! empty( $task['task_budget'] ) && (float) $task['task_budget'] > 0 ) {
+							$effective_budget = (float) $task['task_budget'];
+							$budget_display = number_format( $effective_budget, 2 ) . '&nbsp;(Task)';
+						} elseif ( ! empty( $task['project_budget'] ) && (float) $task['project_budget'] > 0 ) {
+							$effective_budget = (float) $task['project_budget'];
+							$budget_display = number_format( $effective_budget, 2 ) . '&nbsp;(Project)';
+						}
+						$budget_td_style = '';
+						if ( $effective_budget > 0 && (float) $task['duration'] > $effective_budget ) {
+							$budget_td_style = 'style="color: #f44336; font-weight: bold;"';
+						}
+
+						$status_dropdown = '<div class="ptt-status-control">';
+						$status_dropdown .= '<select class="ptt-report-status-select" data-postid="' . esc_attr( $task['id'] ) . '">';
+						foreach ( $all_statuses as $status ) {
+							$selected = selected( $task['status_id'], $status->term_id, false );
+							$status_dropdown .= '<option value="' . esc_attr( $status->term_id ) . '" ' . $selected . '>' . esc_html( $status->name ) . '</option>';
+						}
+						$status_dropdown .= '</select>';
+						$status_dropdown .= '<div class="ptt-ajax-spinner" style="display:none;"></div>';
+						$status_dropdown .= '</div>';
+
+						echo '<tr>';
+						echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
+						echo '<td>' . esc_html( date( 'Y-m-d', strtotime( $task['date'] ) ) ) . '</td>';
+						echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
+						echo '<td ' . $budget_td_style . '>' . $budget_display . '</td>';
+						echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
+						echo '<td>' . $status_dropdown . '</td>';
+						echo '</tr>';
+					}
+					echo '</tbody></table></div>';
+				}
+				echo '</div>';
+			}
+		}
+		echo '<div class="grand-total"><strong>Grand Total: ' . number_format( $grand_total, 2 ) . '&nbsp;hours</strong></div>';
+		echo '</div>'; // .ptt-report-results
+	}
 }
