@@ -121,7 +121,7 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ***
 
 ## 📋 Changelog
-### Version 1.7.15 (2025-07-23)
+### Version 1.7.16 (2025-07-23)
 * **Feature:** Added a debug toggle to the reports screen to show query and sorting logic.
 * **Improved:** "Sort by Status" now correctly re-sorts all tasks based on the selection.
 * **Improved:** Clients and Projects within the report are now sorted alphabetically.
