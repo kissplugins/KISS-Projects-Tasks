@@ -121,7 +121,12 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ***
 
 ## 📋 Changelog
+### Version 1.7.17 (2025-07-23)
+* **Feature:** Added "Task Focused" list view mode to reports, with a custom toggle switch UI.
+* **Feature:** In Task Focused view, tasks with multiple statuses appear as a line item for each status.
 ### Version 1.7.16 (2025-07-23)
+* **Fixed:** A PHP syntax error on the reports page caused by a missing '$' in an unset() call.
+### Version 1.7.15 (2025-07-23)
 * **Feature:** Added a debug toggle to the reports screen to show query and sorting logic.
 * **Improved:** "Sort by Status" now correctly re-sorts all tasks based on the selection.
 * **Improved:** Clients and Projects within the report are now sorted alphabetically.
