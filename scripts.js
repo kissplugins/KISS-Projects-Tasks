@@ -895,6 +895,36 @@ jQuery(document).ready(function ($) {
      * ADMIN REPORTS PAGE
      * ---------------------------------------------------------------
      */
+    function handleReportViewModeChange() {
+        const viewMode = $('input[name="view_mode"]:checked').val();
+        const $dateRow = $('.form-table tr:has(#start_date)');
+        const $endDate = $('#end_date');
+        const $separator = $dateRow.find('.date-range-separator');
+        const $dateLabel = $dateRow.find('th label');
+        const $weekButtons = $('#set-this-week, #set-last-week');
+
+        if (viewMode === 'single_day') {
+            $endDate.hide();
+            $separator.hide();
+            $weekButtons.hide();
+            $dateLabel.text('Select Day');
+        } else {
+            $endDate.show();
+            $separator.show();
+            $weekButtons.show();
+            $dateLabel.text('Date Range');
+        }
+    }
+
+    // Handle view mode change
+    $('input[name="view_mode"]').on('change', handleReportViewModeChange);
+
+    // Run on page load to set initial state
+    if ($('input[name="view_mode"]').length) {
+        handleReportViewModeChange();
+    }
+
+
     const formatDate = (date) => {
         const y = date.getFullYear();
         const m = ('0' + (date.getMonth() + 1)).slice(-2);

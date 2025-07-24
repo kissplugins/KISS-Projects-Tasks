@@ -7,37 +7,6 @@
  * This file registers the **Reports** sub‑page that appears under the
  * Tasks CPT and renders all report‑related markup/logic.
  *
- * CHANGELOG (excerpt)
- * ------------------------------------------------------------------
- * 1.7.17 – 2025-07-23
- * • Feature: Added "Task Focused" list view mode to reports, with a custom toggle switch UI.
- * • Feature: In Task Focused view, tasks with multiple statuses appear as a line item for each status.
- *
- * 1.7.16 – 2025-07-23
- * • Fixed: A PHP syntax error on the reports page caused by a missing '$' in an unset() call.
- * * 1.7.15 – 2025-07-23
- * • Feature: Added a debug toggle to the reports screen to show query and sorting logic.
- * • Improved: "Sort by Status" now correctly re-sorts all tasks based on the selection.
- * • Improved: Clients and Projects within the report are now sorted alphabetically.
- *
- * 1.7.10 – 2025-07-23
- * • Dev: Self tests now cover status update callbacks and reporting queries.
- *
- * 1.7.8 – 2025-07-22
- * • Feature: Added an inline-editable dropdown to the Status column on the reports page, allowing for quick task status updates.
- * • Improved: The new status dropdown saves changes instantly via AJAX without a page reload.
- *
- * 1.6.7 – 2025-07-22
- * • Fixed: Reports now include all tasks (including "Not Started") that match the filters, not just those with logged time.
- * • Improved: Report query now uses the task's publish date for date-range filtering, making it more reliable.
- * • Improved: Tasks within the report are now sorted chronologically by author, then date.
- *
- * 1.6.6 – 2025‑07‑20
- * • Fixed: Manual time entries (manual_override = 1) were excluded
- * from reports because they do not always have a stop_time.
- * • Improved: When a task has no start_time (e.g. imported manual
- * entries) we now fall back to the post’s publish date so the
- * report never shows “1970‑01‑01”.
  * ------------------------------------------------------------------
  */
 
@@ -151,8 +120,11 @@ function ptt_reports_page_html() {
 
 								<input type="radio" id="view_mode_task_focused" name="view_mode" value="task_focused" <?php checked( $view_mode, 'task_focused' ); ?>>
 								<label for="view_mode_task_focused">Task Focused</label>
+
+								<input type="radio" id="view_mode_single_day" name="view_mode" value="single_day" <?php checked( $view_mode, 'single_day' ); ?>>
+								<label for="view_mode_single_day">Single Day</label>
 							</div>
-							<p class="description">"Classic" groups tasks by Client/Project. "Task Focused" shows a flat list of all tasks.</p>
+							<p class="description">"Classic" groups tasks by Client/Project. "Task Focused" shows a flat list of all tasks. "Single Day" shows all work for one day.</p>
 						</td>
 					</tr>
 
@@ -243,8 +215,8 @@ function ptt_reports_page_html() {
 						<th scope="row"><label for="start_date">Date Range</label></th>
 						<td>
 							<input type="date" id="start_date" name="start_date"
-								   value="<?php echo isset( $_REQUEST['start_date'] ) ? esc_attr( $_REQUEST['start_date'] ) : ''; ?>">
-							to
+								   value="<?php echo isset( $_REQUEST['start_date'] ) ? esc_attr( $_REQUEST['start_date'] ) : date('Y-m-d'); ?>">
+							<span class="date-range-separator"> to </span>
 							<input type="date" id="end_date" name="end_date"
 								   value="<?php echo isset( $_REQUEST['end_date'] ) ? esc_attr( $_REQUEST['end_date'] ) : ''; ?>">
 
@@ -347,16 +319,6 @@ function ptt_display_report_results() {
 		];
 	}
 
-	/*--------------------------------------------------------------
-	 * Execute query
-	 *-------------------------------------------------------------*/
-	$q = new WP_Query( $args );
-
-	if ( ! $q->have_posts() ) {
-		echo '<p>No matching tasks found for the selected criteria.</p>';
-		return;
-	}
-
 	// --------------------------------------------------------------
 	// Build Status Sorting Map
 	// --------------------------------------------------------------
@@ -388,36 +350,36 @@ function ptt_display_report_results() {
 	$all_statuses = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
 	$grand_total  = 0.0;
 
-	/*--------------------------------------------------------------
-	 * Render Debug Output (if enabled)
-	 *-------------------------------------------------------------*/
-	if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
-		echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
-		echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
-
-		echo '<h4>Initial WP_Query Arguments:</h4>';
-		echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
-		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
-
-		echo '<h4>Task Sorting Logic:</h4>';
-		echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
-		echo '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>';
-		echo '<p><strong>Default Status Order (Hardcoded):</strong></p>';
-		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $default_order_names, true ) ) . '</pre>';
-
-		echo '<h4>Final Status Order Map (<code>$status_order</code>):</h4>';
-		echo '<p><em>Tasks are sorted based on the ascending value of their status ID in this map. The selected status (if any) is assigned a value of `1` to give it top priority.</em></p>';
-		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
-
-		echo '</div>';
-	}
-
 	echo '<h2>Report Results</h2>';
 
 	// =================================================================
 	// VIEW MODE ROUTER
 	// =================================================================
 	if ( 'task_focused' === $view_mode ) {
+		
+		$q = new WP_Query( $args );
+		if ( ! $q->have_posts() ) {
+			echo '<p>No matching tasks found for the selected criteria.</p>';
+			return;
+		}
+
+		/*--------------------------------------------------------------
+		 * Render Debug Output (if enabled)
+		 *-------------------------------------------------------------*/
+		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
+			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
+			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
+			echo '<h4>Initial WP_Query Arguments:</h4>';
+			echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
+			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
+			echo '<h4>Task Sorting Logic:</h4>';
+			echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
+			echo '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>';
+			echo '<h4>Final Status Order Map (<code>$status_order</code>):</h4>';
+			echo '<p><em>Tasks are sorted based on the ascending value of their status ID in this map.</em></p>';
+			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
+			echo '</div>';
+		}
 
 		/*----------------------------------------------------------
 		 * TASK FOCUSED VIEW
@@ -509,7 +471,227 @@ function ptt_display_report_results() {
 		echo '<div class="grand-total"><strong>Grand Total: ' . number_format( $grand_total, 2 ) . '&nbsp;hours</strong></div>';
 		echo '</div>'; // .ptt-report-results
 
+	} elseif ( 'single_day' === $view_mode ) {
+
+		$target_date_str = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : date( 'Y-m-d' );
+		unset( $args['date_query'] ); // Unset original date query
+		$q = new WP_Query( $args );
+
+		/*--------------------------------------------------------------
+		 * Render Debug Output (if enabled)
+		 *-------------------------------------------------------------*/
+		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
+			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
+			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information (Single Day View)</h3>';
+			echo '<h4>Query & Filtering Logic:</h4>';
+			echo '<p><strong>Target Date (<code>$target_date_str</code>):</strong> ' . esc_html( $target_date_str ) . '</p>';
+			echo '<p><em>The query below fetches all candidate tasks based on non-date filters (User, Client, etc.). PHP logic then loops through these results to find tasks that were either created on the target date or had a time session on that date.</em></p>';
+			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
+			echo '</div>';
+		}
+
+		/*----------------------------------------------------------
+		 * SINGLE DAY VIEW
+		 *---------------------------------------------------------*/
+		$daily_tasks       = [];
+		$grand_total_today = 0.0;
+
+		if ( $q->have_posts() ) {
+			while ( $q->have_posts() ) {
+				$q->the_post();
+				$post_id          = get_the_ID();
+				$sort_timestamp   = PHP_INT_MAX;
+				$is_relevant      = false;
+				$daily_duration   = 0.0;
+				$sessions         = get_field( 'sessions', $post_id );
+
+				// Determine relevance from creation date first
+				if ( date( 'Y-m-d', get_the_date( 'U' ) ) === $target_date_str ) {
+					$is_relevant    = true;
+					$sort_timestamp = get_the_date( 'U' );
+				}
+
+				// If sessions exist, they are the primary source of truth for duration and can also determine relevance.
+				if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+					$session_duration_today = 0.0;
+					$has_session_today      = false;
+					foreach ( $sessions as $session ) {
+						$session_start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+						if ( $session_start_str && date( 'Y-m-d', strtotime( $session_start_str ) ) === $target_date_str ) {
+							$has_session_today = true;
+							$sort_timestamp = min( $sort_timestamp, strtotime( $session_start_str ) );
+
+							// Calculate duration for this specific session.
+							$session_duration = 0.0;
+							if ( ! empty( $session['session_manual_override'] ) ) {
+								$session_duration = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
+							} else {
+								$start = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+								$stop  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
+								if ( $start && $stop ) {
+									try {
+										$start_time = new DateTime( $start, new DateTimeZone('UTC') );
+										$stop_time  = new DateTime( $stop, new DateTimeZone('UTC') );
+										if ( $stop_time > $start_time ) {
+											$diff_seconds     = $stop_time->getTimestamp() - $start_time->getTimestamp();
+											$duration_hours   = $diff_seconds / 3600;
+											$session_duration = ceil( $duration_hours * 100 ) / 100;
+										}
+									} catch ( Exception $e ) {
+										$session_duration = 0.0;
+									}
+								}
+							}
+							$session_duration_today += $session_duration;
+						}
+					}
+
+					if ( $has_session_today ) {
+						$is_relevant    = true;
+						$daily_duration = $session_duration_today;
+					}
+				} elseif ( $is_relevant ) {
+					// No sessions, but relevant by post_date (for legacy manual entries).
+					$daily_duration = (float) get_field( 'calculated_duration', $post_id );
+				}
+
+
+				if ( $is_relevant ) {
+					$client_terms  = get_the_terms( $post_id, 'client' );
+					$project_terms = get_the_terms( $post_id, 'project' );
+
+					$daily_tasks[] = [
+						'id'             => $post_id,
+						'title'          => get_the_title(),
+						'client_name'    => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
+						'project_name'   => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
+						'sort_timestamp' => $sort_timestamp,
+						'daily_duration' => $daily_duration,
+						'content'        => get_the_content(),
+						'date_display'   => date( 'h:i A', $sort_timestamp ),
+					];
+					$grand_total_today += $daily_duration;
+				}
+			}
+			wp_reset_postdata();
+		}
+
+		// Sort the final list chronologically by the earliest event of the day.
+		usort( $daily_tasks, function( $a, $b ) {
+			return $a['sort_timestamp'] <=> $b['sort_timestamp'];
+		} );
+
+		// Prepare date navigation links.
+		$current_url_args = $_GET;
+		$target_date_obj  = new DateTime( $target_date_str );
+		
+		$prev_date_obj                    = ( clone $target_date_obj )->modify( '-1 day' );
+		$current_url_args['start_date']   = $prev_date_obj->format( 'Y-m-d' );
+		$prev_link                        = add_query_arg( $current_url_args, admin_url( 'edit.php' ) );
+
+		$next_date_obj                    = ( clone $target_date_obj )->modify( '+1 day' );
+		$current_url_args['start_date']   = $next_date_obj->format( 'Y-m-d' );
+		$next_link                        = add_query_arg( $current_url_args, admin_url( 'edit.php' ) );
+		
+		$today_str = current_time('Y-m-d');
+
+
+		// Render the "Single Day" table.
+		echo '<div class="ptt-report-results">';
+		echo '<h3>';
+		echo '<a href="' . esc_url( $prev_link ) . '" class="ptt-date-nav-arrow" title="Previous Day">&lt;</a> ';
+		echo 'Report for ' . esc_html( date( 'F j, Y', strtotime( $target_date_str ) ) );
+		if ( $target_date_str < $today_str ) {
+			echo ' <a href="' . esc_url( $next_link ) . '" class="ptt-date-nav-arrow" title="Next Day">&gt;</a>';
+		}
+		echo '</h3>';
+
+		if ( empty( $daily_tasks ) ) {
+			echo '<p>No tasks were created or had time tracked on this day.</p>';
+		} else {
+			echo '<table class="wp-list-table widefat fixed striped">';
+			echo '<thead><tr>
+					<th style="width:10%">Time</th>
+					<th style="width:25%">Task Name</th>
+					<th style="width:15%">Client</th>
+					<th style="width:15%">Project</th>
+					<th style="width:10%">Duration (Hrs)</th>
+					<th style="width:25%">Notes</th>
+				  </tr></thead><tbody>';
+
+			$deductible_keywords = [ 'break', 'personal time' ];
+			foreach ( $daily_tasks as $task ) {
+				// Check if the task is deductible to apply strikethrough formatting.
+				$is_deductible = false;
+				foreach ( $deductible_keywords as $keyword ) {
+					if ( stripos( $task['title'], $keyword ) !== false || stripos( $task['project_name'], $keyword ) !== false ) {
+						$is_deductible = true;
+						break;
+					}
+				}
+				$duration_cell_style = $is_deductible ? 'style="text-decoration: line-through;"' : '';
+
+				echo '<tr>';
+				echo '<td>' . esc_html( $task['date_display'] ) . '</td>';
+				echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
+				echo '<td>' . esc_html( $task['client_name'] ) . '</td>';
+				echo '<td>' . esc_html( $task['project_name'] ) . '</td>';
+				echo '<td ' . $duration_cell_style . '>' . ( $task['daily_duration'] > 0 ? number_format( $task['daily_duration'], 2 ) : '–' ) . '</td>';
+				echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
+				echo '</tr>';
+			}
+			echo '</tbody></table>';
+
+			// Calculate deductible time.
+			$deductible_time = 0.0;
+			foreach ( $daily_tasks as $task ) {
+				$is_deductible = false;
+				foreach ( $deductible_keywords as $keyword ) {
+					if ( stripos( $task['title'], $keyword ) !== false || stripos( $task['project_name'], $keyword ) !== false ) {
+						$is_deductible = true;
+						break;
+					}
+				}
+				if ( $is_deductible ) {
+					$deductible_time += $task['daily_duration'];
+				}
+			}
+			$net_total_today = $grand_total_today - $deductible_time;
+
+			// Display the grand total.
+			$total_display_text = '<strong>Total for Day: ' . number_format( $net_total_today, 2 ) . '&nbsp;hours</strong>';
+			if ( $deductible_time > 0 ) {
+				$total_display_text .= ' <span class="subtotal" style="font-weight:normal;">(Exc. any "Breaks" or "Personal Time")</span>';
+			}
+			echo '<div class="grand-total">' . $total_display_text . '</div>';
+		}
+		echo '</div>'; // .ptt-report-results
+
 	} else {
+
+		$q = new WP_Query( $args );
+		if ( ! $q->have_posts() ) {
+			echo '<p>No matching tasks found for the selected criteria.</p>';
+			return;
+		}
+
+		/*--------------------------------------------------------------
+		 * Render Debug Output (if enabled)
+		 *-------------------------------------------------------------*/
+		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
+			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
+			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
+			echo '<h4>Initial WP_Query Arguments:</h4>';
+			echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
+			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
+			echo '<h4>Task Sorting Logic:</h4>';
+			echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
+			echo '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>';
+			echo '<h4>Final Status Order Map (<code>$status_order</code>):</h4>';
+			echo '<p><em>Tasks are sorted based on the ascending value of their status ID in this map.</em></p>';
+			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
+			echo '</div>';
+		}
 
 		/*----------------------------------------------------------
 		 * CLASSIC (HIERARCHICAL) VIEW
@@ -521,8 +703,15 @@ function ptt_display_report_results() {
 			$duration = (float) get_field( 'calculated_duration', $post_id );
 			$grand_total += $duration;
 
-			$author_id   = get_the_author_meta( 'ID' );
-			$author_name = get_the_author_meta( 'display_name' );
+			$author_id    = get_the_author_meta( 'ID' );
+			$display_name = get_the_author_meta( 'display_name', $author_id );
+			$slack_user   = get_user_meta( $author_id, 'slack_username', true );
+			$slack_id     = get_user_meta( $author_id, 'slack_user_id', true );
+
+			$author_name = $display_name;
+			if ( ! empty( $slack_user ) && ! empty( $slack_id ) ) {
+				$author_name .= ' (@' . $slack_user . ' - ' . $slack_id . ')';
+			}
 
 			$client_terms   = get_the_terms( $post_id, 'client' );
 			$client_id_term = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->term_id : 0;
