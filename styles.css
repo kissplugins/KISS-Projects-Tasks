@@ -280,6 +280,17 @@
     text-align: right;
 }
 
+/* --- Single Day Navigation --- */
+.ptt-day-heading {
+    text-align: center;
+    margin-bottom: 10px;
+}
+.ptt-day-heading a {
+    padding: 0 8px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
 /* --- Self Test Styles --- */
 #ptt-test-results-container {
     font-size: 14px;

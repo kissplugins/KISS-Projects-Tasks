@@ -7,43 +7,6 @@
  * This file registers the **Reports** sub‑page that appears under the
  * Tasks CPT and renders all report‑related markup/logic.
  *
- * CHANGELOG (excerpt)
- * ------------------------------------------------------------------
- * 1.7.18 – 2025-07-23
- * • Feature: Added "Single Day" view mode to reports to show all tasks created or modified on a specific day.
- * • Feature: In Single Day view, the report only calculates and displays session durations for the selected day.
- * • Improved: Date picker on reports page now switches to a single date selector when "Single Day" view is active.
- *
- * 1.7.17 – 2025-07-23
- * • Feature: Added "Task Focused" list view mode to reports, with a custom toggle switch UI.
- * • Feature: In Task Focused view, tasks with multiple statuses appear as a line item for each status.
- *
- * 1.7.16 – 2025-07-23
- * • Fixed: A PHP syntax error on the reports page caused by a missing '$' in an unset() call.
- * * 1.7.15 – 2025-07-23
- * • Feature: Added a debug toggle to the reports screen to show query and sorting logic.
- * • Improved: "Sort by Status" now correctly re-sorts all tasks based on the selection.
- * • Improved: Clients and Projects within the report are now sorted alphabetically.
- *
- * 1.7.10 – 2025-07-23
- * • Dev: Self tests now cover status update callbacks and reporting queries.
- *
- * 1.7.8 – 2025-07-22
- * • Feature: Added an inline-editable dropdown to the Status column on the reports page, allowing for quick task status updates.
- * • Improved: The new status dropdown saves changes instantly via AJAX without a page reload.
- *
- * 1.6.7 – 2025-07-22
- * • Fixed: Reports now include all tasks (including "Not Started") that match the filters, not just those with logged time.
- * • Improved: Report query now uses the task's publish date for date-range filtering, making it more reliable.
- * • Improved: Tasks within the report are now sorted chronologically by author, then date.
- *
- * 1.6.6 – 2025‑07‑20
- * • Fixed: Manual time entries (manual_override = 1) were excluded
- * from reports because they do not always have a stop_time.
- * • Improved: When a task has no start_time (e.g. imported manual
- * entries) we now fall back to the post’s publish date so the
- * report never shows “1970‑01‑01”.
- * ------------------------------------------------------------------
  */
 
 // Block direct access.
@@ -580,22 +543,43 @@ function ptt_display_report_results() {
 					}
 				}
 
-				if ( $is_relevant ) {
-					$client_terms  = get_the_terms( $post_id, 'client' );
-					$project_terms = get_the_terms( $post_id, 'project' );
+                                if ( $is_relevant ) {
+                                        $client_terms  = get_the_terms( $post_id, 'client' );
+                                        $project_terms = get_the_terms( $post_id, 'project' );
 
-					$daily_tasks[] = [
-						'id'             => $post_id,
-						'title'          => get_the_title(),
-						'client_name'    => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
-						'project_name'   => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
-						'sort_timestamp' => $sort_timestamp,
-						'daily_duration' => $daily_duration,
-						'content'        => get_the_content(),
-						'date_display'   => date( 'h:i A', $sort_timestamp ),
-					];
-					$grand_total_today += $daily_duration;
-				}
+                                        $task_title   = get_the_title();
+                                        $project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
+                                        $exclude      = false;
+
+                                        if ( stripos( $task_title, 'break' ) !== false || stripos( $task_title, 'personal time' ) !== false ) {
+                                                $exclude = true;
+                                        }
+                                        if ( stripos( $project_name, 'break' ) !== false || stripos( $project_name, 'personal time' ) !== false ) {
+                                                $exclude = true;
+                                        }
+                                        if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+                                                foreach ( $sessions as $session ) {
+                                                        if ( ! empty( $session['session_title'] ) && ( stripos( $session['session_title'], 'break' ) !== false || stripos( $session['session_title'], 'personal time' ) !== false ) ) {
+                                                                $exclude = true;
+                                                                break;
+                                                        }
+                                                }
+                                        }
+
+                                        $daily_tasks[] = [
+                                                'id'             => $post_id,
+                                                'title'          => $task_title,
+                                                'client_name'    => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
+                                                'project_name'   => $project_name,
+                                                'sort_timestamp' => $sort_timestamp,
+                                                'daily_duration' => $daily_duration,
+                                                'content'        => get_the_content(),
+                                                'date_display'   => date( 'h:i A', $sort_timestamp ),
+                                        ];
+                                        if ( ! $exclude ) {
+                                                $grand_total_today += $daily_duration;
+                                        }
+                                }
 			}
 			wp_reset_postdata();
 		}
@@ -606,8 +590,22 @@ function ptt_display_report_results() {
 		} );
 
 		// Render the "Single Day" table.
-		echo '<div class="ptt-report-results">';
-		echo '<h3>Report for ' . esc_html( date( 'F j, Y', strtotime( $target_date_str ) ) ) . '</h3>';
+                echo '<div class="ptt-report-results">';
+                $prev_date = date( 'Y-m-d', strtotime( $target_date_str . ' -1 day' ) );
+                $next_date = date( 'Y-m-d', strtotime( $target_date_str . ' +1 day' ) );
+                $base_args = $_GET;
+                $base_args['view_mode'] = 'single_day';
+
+                $prev_url = add_query_arg( array_merge( $base_args, [ 'start_date' => $prev_date, 'end_date' => '' ] ), admin_url( 'edit.php' ) );
+                $next_url = add_query_arg( array_merge( $base_args, [ 'start_date' => $next_date, 'end_date' => '' ] ), admin_url( 'edit.php' ) );
+
+                echo '<h3 class="ptt-day-heading">';
+                echo '<a class="ptt-prev-day" href="' . esc_url( $prev_url ) . '">&lt;</a> ';
+                echo 'Report for ' . esc_html( date( 'F j, Y', strtotime( $target_date_str ) ) ) . ' ';
+                if ( $target_date_str !== date( 'Y-m-d' ) ) {
+                        echo '<a class="ptt-next-day" href="' . esc_url( $next_url ) . '">&gt;</a>';
+                }
+                echo '</h3>';
 
 		if ( empty( $daily_tasks ) ) {
 			echo '<p>No tasks were created or had time tracked on this day.</p>';
@@ -633,7 +631,7 @@ function ptt_display_report_results() {
 				echo '</tr>';
 			}
 			echo '</tbody></table>';
-			echo '<div class="grand-total"><strong>Total for Day: ' . number_format( $grand_total_today, 2 ) . '&nbsp;hours</strong></div>';
+                        echo '<div class="grand-total"><strong>Total for Day: ' . number_format( $grand_total_today, 2 ) . '&nbsp;hours (Exc. any \"Breaks\" or \"Personal Time\")</strong></div>';
 		}
 		echo '</div>'; // .ptt-report-results
 

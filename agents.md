@@ -54,6 +54,8 @@ Table of Contents (TOC) & Numbered Modules: The main plugin file includes a numb
 Do NOT modify the TOC or module numbering/titles unless a significant new module is added, or an existing module is fundamentally restructured, requiring an update to reflect the new organization.
 Maintain the existing structure for consistency.
 
+Changelog Maintenance: Keep all version history in changelog.md. Remove outdated changelog notes from other files.
+
 2.3. Adhere to WordPress Standards & DRY Principles
 WordPress Coding Standards: Always ensure new or modified code strictly follows the WordPress PHP, CSS, and JavaScript coding standards. This includes naming conventions, indentation, spacing, and comment styles.
 WordPress API Usage: Prioritize the use of existing WordPress APIs and functions (e.g., register_post_type, register_taxonomy, add_meta_box, wp_insert_post, update_post_meta, wp_localize_script, add_shortcode, add_menu_page, wp_date, current_time, etc.). Avoid reinventing the wheel.
