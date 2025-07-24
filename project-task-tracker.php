@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.23
+ * Version:           1.7.26
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.23' );
+define( 'PTT_VERSION', '1.7.26' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -38,6 +38,7 @@ define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
  * 9.0  FRONT-END SHORTCODE [task-enter] (see shortcodes.php)
  * 10.0 ADMIN PAGES & LINKS (see reports.php)
  * 11.0 SELF-TEST MODULE (see self-test.php)
+ * 12.0 ADMIN PAGES & LINKS (see reports-tailwind.php)
  * CHANGELOG - LLM maintainers/Developes please update changelog.md for every update
  * =================================================================
  */
@@ -46,6 +47,7 @@ define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 require_once PTT_PLUGIN_DIR . 'shortcodes.php';
 require_once PTT_PLUGIN_DIR . 'self-test.php';
 require_once PTT_PLUGIN_DIR . 'reports.php';
+require_once PTT_PLUGIN_DIR . 'reports-tailwind.php';
 
 // =================================================================
 // 1.0 PLUGIN ACTIVATION & DEACTIVATION

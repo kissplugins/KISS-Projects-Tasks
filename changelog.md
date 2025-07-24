@@ -3,6 +3,13 @@
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
 ---
+### Version 1.7.25 (2025-07-24)
+* **Fixed:** Resolved "The link you followed has expired" error on the Tailwind Reports page by adding a missing nonce field to the form.
+* **Improved:** Removed the hardcoded Tailwind CSS CDN link from the template file. The page now relies on a plugin like WindPress to provide styles, preventing production warnings.
+
+### Version 1.7.24 (2025-07-24)
+* **Feature:** Added a new "Tailwind Reports" page with a modern, Tailwind CSS-styled data table for the "Single Day View".
+
 ### Version 1.7.23 (2025-07-23)
 * **Feature:** Added "Slack Username" and "Slack User ID" fields to user profiles under a new "KISS PTT - Sleuth Integration" section.
 * **Improved:** Reports in "Classic" view now display the user's Slack information next to their name (e.g., Noel Saw (@noelsaw - U1234567890)).
