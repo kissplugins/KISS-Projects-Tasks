@@ -9,6 +9,14 @@
  *
  * CHANGELOG (excerpt)
  * ------------------------------------------------------------------
+ * 1.7.20 – 2025-07-23
+ * • Fixed: Single Day report now correctly calculates and displays durations for tasks using the legacy/single manual time entry fields.
+ *
+ * 1.7.19 – 2025-07-23
+ * • Feature: Added date navigation arrows to the Single Day report view.
+ * • Feature: Single Day view now calculates a net total, deducting time for "Break" or "Personal Time" tasks/projects.
+ * • Improved: "This Week" and "Last Week" buttons are now hidden in Single Day view.
+ *
  * 1.7.18 – 2025-07-23
  * • Feature: Added "Single Day" view mode to reports to show all tasks created or modified on a specific day.
  * • Feature: In Single Day view, the report only calculates and displays session durations for the selected day.
@@ -537,24 +545,17 @@ function ptt_display_report_results() {
 				$sort_timestamp   = PHP_INT_MAX;
 				$is_relevant      = false;
 				$daily_duration   = 0.0;
+				$sessions         = get_field( 'sessions', $post_id );
 
-				// Condition 1: Check if the post was created on the target day.
-				if ( date( 'Y-m-d', get_the_date( 'U' ) ) === $target_date_str ) {
-					$is_relevant    = true;
-					$sort_timestamp = min( $sort_timestamp, get_the_date( 'U' ) );
-				}
-
-				// Condition 2: Check if any session was tracked on the target day.
-				$sessions = get_field( 'sessions', $post_id );
+				// Check for multi-session tasks first
 				if ( ! empty( $sessions ) && is_array( $sessions ) ) {
 					foreach ( $sessions as $session ) {
 						$session_start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
-
 						if ( $session_start_str && date( 'Y-m-d', strtotime( $session_start_str ) ) === $target_date_str ) {
 							$is_relevant = true;
 							$sort_timestamp = min( $sort_timestamp, strtotime( $session_start_str ) );
 
-							// Calculate duration for this specific session.
+							// Calculate duration for this specific session
 							$session_duration = 0.0;
 							if ( ! empty( $session['session_manual_override'] ) ) {
 								$session_duration = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
@@ -578,6 +579,20 @@ function ptt_display_report_results() {
 							$daily_duration += $session_duration;
 						}
 					}
+				} else {
+					// Fallback for legacy/single-session tasks
+					$start_time_str = get_field( 'start_time', $post_id );
+					if ( $start_time_str && date( 'Y-m-d', strtotime( $start_time_str ) ) === $target_date_str ) {
+						$is_relevant      = true;
+						$sort_timestamp   = min( $sort_timestamp, strtotime( $start_time_str ) );
+						$daily_duration = (float) get_field( 'calculated_duration', $post_id );
+					}
+				}
+
+				// Also check post creation date for tasks created on the day with no time yet
+				if ( date( 'Y-m-d', get_the_date( 'U' ) ) === $target_date_str ) {
+					$is_relevant    = true;
+					$sort_timestamp = min( $sort_timestamp, get_the_date( 'U' ) );
 				}
 
 				if ( $is_relevant ) {
@@ -605,9 +620,30 @@ function ptt_display_report_results() {
 			return $a['sort_timestamp'] <=> $b['sort_timestamp'];
 		} );
 
+		// Prepare date navigation links.
+		$current_url_args = $_GET;
+		$target_date_obj  = new DateTime( $target_date_str );
+
+		$prev_date_obj                    = ( clone $target_date_obj )->modify( '-1 day' );
+		$current_url_args['start_date']   = $prev_date_obj->format( 'Y-m-d' );
+		$prev_link                        = add_query_arg( $current_url_args, admin_url( 'edit.php' ) );
+
+		$next_date_obj                    = ( clone $target_date_obj )->modify( '+1 day' );
+		$current_url_args['start_date']   = $next_date_obj->format( 'Y-m-d' );
+		$next_link                        = add_query_arg( $current_url_args, admin_url( 'edit.php' ) );
+
+		$today_str = current_time('Y-m-d');
+
+
 		// Render the "Single Day" table.
 		echo '<div class="ptt-report-results">';
-		echo '<h3>Report for ' . esc_html( date( 'F j, Y', strtotime( $target_date_str ) ) ) . '</h3>';
+		echo '<h3>';
+		echo '<a href="' . esc_url( $prev_link ) . '" class="ptt-date-nav-arrow" title="Previous Day">&lt;</a> ';
+		echo 'Report for ' . esc_html( date( 'F j, Y', strtotime( $target_date_str ) ) );
+		if ( $target_date_str < $today_str ) {
+			echo ' <a href="' . esc_url( $next_link ) . '" class="ptt-date-nav-arrow" title="Next Day">&gt;</a>';
+		}
+		echo '</h3>';
 
 		if ( empty( $daily_tasks ) ) {
 			echo '<p>No tasks were created or had time tracked on this day.</p>';
@@ -633,7 +669,30 @@ function ptt_display_report_results() {
 				echo '</tr>';
 			}
 			echo '</tbody></table>';
-			echo '<div class="grand-total"><strong>Total for Day: ' . number_format( $grand_total_today, 2 ) . '&nbsp;hours</strong></div>';
+
+			// Calculate deductible time.
+			$deductible_time     = 0.0;
+			$deductible_keywords = [ 'break', 'personal time' ];
+			foreach ( $daily_tasks as $task ) {
+				$is_deductible = false;
+				foreach ( $deductible_keywords as $keyword ) {
+					if ( stripos( $task['title'], $keyword ) !== false || stripos( $task['project_name'], $keyword ) !== false ) {
+						$is_deductible = true;
+						break;
+					}
+				}
+				if ( $is_deductible ) {
+					$deductible_time += $task['daily_duration'];
+				}
+			}
+			$net_total_today = $grand_total_today - $deductible_time;
+
+			// Display the grand total.
+			$total_display_text = '<strong>Total for Day: ' . number_format( $net_total_today, 2 ) . '&nbsp;hours</strong>';
+			if ( $deductible_time > 0 ) {
+				$total_display_text .= ' <span class="subtotal" style="font-weight:normal;">(Exc. any "Breaks" or "Personal Time")</span>';
+			}
+			echo '<div class="grand-total">' . $total_display_text . '</div>';
 		}
 		echo '</div>'; // .ptt-report-results
 

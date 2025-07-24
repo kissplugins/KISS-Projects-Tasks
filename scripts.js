@@ -901,14 +901,17 @@ jQuery(document).ready(function ($) {
         const $endDate = $('#end_date');
         const $separator = $dateRow.find('.date-range-separator');
         const $dateLabel = $dateRow.find('th label');
+        const $weekButtons = $('#set-this-week, #set-last-week');
 
         if (viewMode === 'single_day') {
             $endDate.hide();
             $separator.hide();
+            $weekButtons.hide();
             $dateLabel.text('Select Day');
         } else {
             $endDate.show();
             $separator.show();
+            $weekButtons.show();
             $dateLabel.text('Date Range');
         }
     }
