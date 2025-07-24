@@ -7,53 +7,6 @@
  * This file registers the **Reports** sub‑page that appears under the
  * Tasks CPT and renders all report‑related markup/logic.
  *
- * CHANGELOG (excerpt)
- * ------------------------------------------------------------------
- * 1.7.21 – 2025-07-23
- * • Improved: In Single Day view, durations for "Break" or "Personal Time" tasks now have a strikethrough to indicate they are excluded from the net total.
- *
- * 1.7.20 – 2025-07-23
- * • Fixed: Single Day report now correctly calculates and displays durations for tasks using the legacy/single manual time entry fields.
- *
- * 1.7.19 – 2025-07-23
- * • Feature: Added date navigation arrows to the Single Day report view.
- * • Feature: Single Day view now calculates a net total, deducting time for "Break" or "Personal Time" tasks/projects.
- * • Improved: "This Week" and "Last Week" buttons are now hidden in Single Day view.
- *
- * 1.7.18 – 2025-07-23
- * • Feature: Added "Single Day" view mode to reports to show all tasks created or modified on a specific day.
- * • Feature: In Single Day view, the report only calculates and displays session durations for the selected day.
- * • Improved: Date picker on reports page now switches to a single date selector when "Single Day" view is active.
- *
- * 1.7.17 – 2025-07-23
- * • Feature: Added "Task Focused" list view mode to reports, with a custom toggle switch UI.
- * • Feature: In Task Focused view, tasks with multiple statuses appear as a line item for each status.
- *
- * 1.7.16 – 2025-07-23
- * • Fixed: A PHP syntax error on the reports page caused by a missing '$' in an unset() call.
- * * 1.7.15 – 2025-07-23
- * • Feature: Added a debug toggle to the reports screen to show query and sorting logic.
- * • Improved: "Sort by Status" now correctly re-sorts all tasks based on the selection.
- * • Improved: Clients and Projects within the report are now sorted alphabetically.
- *
- * 1.7.10 – 2025-07-23
- * • Dev: Self tests now cover status update callbacks and reporting queries.
- *
- * 1.7.8 – 2025-07-22
- * • Feature: Added an inline-editable dropdown to the Status column on the reports page, allowing for quick task status updates.
- * • Improved: The new status dropdown saves changes instantly via AJAX without a page reload.
- *
- * 1.6.7 – 2025-07-22
- * • Fixed: Reports now include all tasks (including "Not Started") that match the filters, not just those with logged time.
- * • Improved: Report query now uses the task's publish date for date-range filtering, making it more reliable.
- * • Improved: Tasks within the report are now sorted chronologically by author, then date.
- *
- * 1.6.6 – 2025‑07‑20
- * • Fixed: Manual time entries (manual_override = 1) were excluded
- * from reports because they do not always have a stop_time.
- * • Improved: When a task has no start_time (e.g. imported manual
- * entries) we now fall back to the post’s publish date so the
- * report never shows “1970‑01‑01”.
  * ------------------------------------------------------------------
  */
 
@@ -366,16 +319,6 @@ function ptt_display_report_results() {
 		];
 	}
 
-	/*--------------------------------------------------------------
-	 * Execute query
-	 *-------------------------------------------------------------*/
-	$q = new WP_Query( $args );
-
-	if ( ! $q->have_posts() && 'single_day' !== $view_mode ) {
-		echo '<p>No matching tasks found for the selected criteria.</p>';
-		return;
-	}
-
 	// --------------------------------------------------------------
 	// Build Status Sorting Map
 	// --------------------------------------------------------------
@@ -407,36 +350,36 @@ function ptt_display_report_results() {
 	$all_statuses = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
 	$grand_total  = 0.0;
 
-	/*--------------------------------------------------------------
-	 * Render Debug Output (if enabled)
-	 *-------------------------------------------------------------*/
-	if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
-		echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
-		echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
-
-		echo '<h4>Initial WP_Query Arguments:</h4>';
-		echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
-		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
-
-		echo '<h4>Task Sorting Logic:</h4>';
-		echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
-		echo '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>';
-		echo '<p><strong>Default Status Order (Hardcoded):</strong></p>';
-		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $default_order_names, true ) ) . '</pre>';
-
-		echo '<h4>Final Status Order Map (<code>$status_order</code>):</h4>';
-		echo '<p><em>Tasks are sorted based on the ascending value of their status ID in this map. The selected status (if any) is assigned a value of `1` to give it top priority.</em></p>';
-		echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
-
-		echo '</div>';
-	}
-
 	echo '<h2>Report Results</h2>';
 
 	// =================================================================
 	// VIEW MODE ROUTER
 	// =================================================================
 	if ( 'task_focused' === $view_mode ) {
+		
+		$q = new WP_Query( $args );
+		if ( ! $q->have_posts() ) {
+			echo '<p>No matching tasks found for the selected criteria.</p>';
+			return;
+		}
+
+		/*--------------------------------------------------------------
+		 * Render Debug Output (if enabled)
+		 *-------------------------------------------------------------*/
+		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
+			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
+			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
+			echo '<h4>Initial WP_Query Arguments:</h4>';
+			echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
+			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
+			echo '<h4>Task Sorting Logic:</h4>';
+			echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
+			echo '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>';
+			echo '<h4>Final Status Order Map (<code>$status_order</code>):</h4>';
+			echo '<p><em>Tasks are sorted based on the ascending value of their status ID in this map.</em></p>';
+			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
+			echo '</div>';
+		}
 
 		/*----------------------------------------------------------
 		 * TASK FOCUSED VIEW
@@ -530,14 +473,26 @@ function ptt_display_report_results() {
 
 	} elseif ( 'single_day' === $view_mode ) {
 
+		$target_date_str = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : date( 'Y-m-d' );
+		unset( $args['date_query'] ); // Unset original date query
+		$q = new WP_Query( $args );
+
+		/*--------------------------------------------------------------
+		 * Render Debug Output (if enabled)
+		 *-------------------------------------------------------------*/
+		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
+			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
+			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information (Single Day View)</h3>';
+			echo '<h4>Query & Filtering Logic:</h4>';
+			echo '<p><strong>Target Date (<code>$target_date_str</code>):</strong> ' . esc_html( $target_date_str ) . '</p>';
+			echo '<p><em>The query below fetches all candidate tasks based on non-date filters (User, Client, etc.). PHP logic then loops through these results to find tasks that were either created on the target date or had a time session on that date.</em></p>';
+			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
+			echo '</div>';
+		}
+
 		/*----------------------------------------------------------
 		 * SINGLE DAY VIEW
 		 *---------------------------------------------------------*/
-		$target_date_str = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : date( 'Y-m-d' );
-		unset( $args['date_query'] ); // Unset original date query
-
-		$q = new WP_Query( $args );
-
 		$daily_tasks       = [];
 		$grand_total_today = 0.0;
 
@@ -713,6 +668,30 @@ function ptt_display_report_results() {
 		echo '</div>'; // .ptt-report-results
 
 	} else {
+
+		$q = new WP_Query( $args );
+		if ( ! $q->have_posts() ) {
+			echo '<p>No matching tasks found for the selected criteria.</p>';
+			return;
+		}
+
+		/*--------------------------------------------------------------
+		 * Render Debug Output (if enabled)
+		 *-------------------------------------------------------------*/
+		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
+			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
+			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
+			echo '<h4>Initial WP_Query Arguments:</h4>';
+			echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
+			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
+			echo '<h4>Task Sorting Logic:</h4>';
+			echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
+			echo '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>';
+			echo '<h4>Final Status Order Map (<code>$status_order</code>):</h4>';
+			echo '<p><em>Tasks are sorted based on the ascending value of their status ID in this map.</em></p>';
+			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
+			echo '</div>';
+		}
 
 		/*----------------------------------------------------------
 		 * CLASSIC (HIERARCHICAL) VIEW

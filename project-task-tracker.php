@@ -37,7 +37,7 @@ define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
  * 9.0  FRONT-END SHORTCODE [task-enter] (see shortcodes.php)
  * 10.0 ADMIN PAGES & LINKS (see reports.php)
  * 11.0 SELF-TEST MODULE (see self-test.php)
- *
+ * CHANGELOG - LLM maintainers/Developes please update changelog.md for every update
  * =================================================================
  */
 
