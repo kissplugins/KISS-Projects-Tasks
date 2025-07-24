@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.17
+ * Version:           1.7.23
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.17' );
+define( 'PTT_VERSION', '1.7.23' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -33,6 +33,7 @@ define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
  * 5.0  ENQUEUE SCRIPTS & STYLES
  * 6.0  CORE TIME CALCULATION LOGIC
  * 7.0  ADMIN UI (CPT EDITOR)
+ * 7.5  USER PROFILE INTEGRATION
  * 8.0  AJAX HANDLERS
  * 9.0  FRONT-END SHORTCODE [task-enter] (see shortcodes.php)
  * 10.0 ADMIN PAGES & LINKS (see reports.php)
@@ -692,6 +693,64 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
 
 // This section is intentionally left blank. The automatic column from
 // register_taxonomy('task_status') is used instead of manual functions.
+
+
+// =================================================================
+// 7.5 USER PROFILE INTEGRATION
+// =================================================================
+
+/**
+ * Displays custom user profile fields for Slack integration.
+ *
+ * @param WP_User $user The current user object.
+ */
+function ptt_add_user_profile_fields( $user ) {
+    ?>
+    <h3>KISS PTT - Sleuth Integration</h3>
+    <table class="form-table">
+        <tr>
+            <th><label for="slack_username">Slack Username</label></th>
+            <td>
+                <input type="text" name="slack_username" id="slack_username" value="<?php echo esc_attr( get_the_author_meta( 'slack_username', $user->ID ) ); ?>" class="regular-text" /><br />
+                <span class="description">Enter the user's Slack username (e.g., noelsaw).</span>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="slack_user_id">Slack User ID</label></th>
+            <td>
+                <input type="text" name="slack_user_id" id="slack_user_id" value="<?php echo esc_attr( get_the_author_meta( 'slack_user_id', $user->ID ) ); ?>" class="regular-text" /><br />
+                <span class="description">Enter the user's Slack User ID (e.g., U1234567890).</span>
+            </td>
+        </tr>
+    </table>
+    <?php
+}
+add_action( 'show_user_profile', 'ptt_add_user_profile_fields' );
+add_action( 'edit_user_profile', 'ptt_add_user_profile_fields' );
+
+
+/**
+ * Saves the custom user profile fields.
+ *
+ * @param int $user_id The ID of the user being saved.
+ * @return bool
+ */
+function ptt_save_user_profile_fields( $user_id ) {
+    if ( ! current_user_can( 'edit_user', $user_id ) ) {
+        return false;
+    }
+
+    if ( isset( $_POST['slack_username'] ) ) {
+        update_user_meta( $user_id, 'slack_username', sanitize_text_field( $_POST['slack_username'] ) );
+    }
+
+    if ( isset( $_POST['slack_user_id'] ) ) {
+        update_user_meta( $user_id, 'slack_user_id', sanitize_text_field( $_POST['slack_user_id'] ) );
+    }
+    return true;
+}
+add_action( 'personal_options_update', 'ptt_save_user_profile_fields' );
+add_action( 'edit_user_profile_update', 'ptt_save_user_profile_fields' );
 
 
 // =================================================================

@@ -703,8 +703,15 @@ function ptt_display_report_results() {
 			$duration = (float) get_field( 'calculated_duration', $post_id );
 			$grand_total += $duration;
 
-			$author_id   = get_the_author_meta( 'ID' );
-			$author_name = get_the_author_meta( 'display_name' );
+			$author_id    = get_the_author_meta( 'ID' );
+			$display_name = get_the_author_meta( 'display_name', $author_id );
+			$slack_user   = get_user_meta( $author_id, 'slack_username', true );
+			$slack_id     = get_user_meta( $author_id, 'slack_user_id', true );
+
+			$author_name = $display_name;
+			if ( ! empty( $slack_user ) && ! empty( $slack_id ) ) {
+				$author_name .= ' (@' . $slack_user . ' - ' . $slack_id . ')';
+			}
 
 			$client_terms   = get_the_terms( $post_id, 'client' );
 			$client_id_term = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->term_id : 0;
