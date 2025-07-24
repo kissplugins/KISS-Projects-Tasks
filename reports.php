@@ -9,6 +9,11 @@
  *
  * CHANGELOG (excerpt)
  * ------------------------------------------------------------------
+ * 1.7.18 – 2025-07-23
+ * • Feature: Added "Single Day" view mode to reports to show all tasks created or modified on a specific day.
+ * • Feature: In Single Day view, the report only calculates and displays session durations for the selected day.
+ * • Improved: Date picker on reports page now switches to a single date selector when "Single Day" view is active.
+ *
  * 1.7.17 – 2025-07-23
  * • Feature: Added "Task Focused" list view mode to reports, with a custom toggle switch UI.
  * • Feature: In Task Focused view, tasks with multiple statuses appear as a line item for each status.
@@ -151,8 +156,11 @@ function ptt_reports_page_html() {
 
 								<input type="radio" id="view_mode_task_focused" name="view_mode" value="task_focused" <?php checked( $view_mode, 'task_focused' ); ?>>
 								<label for="view_mode_task_focused">Task Focused</label>
+
+								<input type="radio" id="view_mode_single_day" name="view_mode" value="single_day" <?php checked( $view_mode, 'single_day' ); ?>>
+								<label for="view_mode_single_day">Single Day</label>
 							</div>
-							<p class="description">"Classic" groups tasks by Client/Project. "Task Focused" shows a flat list of all tasks.</p>
+							<p class="description">"Classic" groups tasks by Client/Project. "Task Focused" shows a flat list of all tasks. "Single Day" shows all work for one day.</p>
 						</td>
 					</tr>
 
@@ -243,8 +251,8 @@ function ptt_reports_page_html() {
 						<th scope="row"><label for="start_date">Date Range</label></th>
 						<td>
 							<input type="date" id="start_date" name="start_date"
-								   value="<?php echo isset( $_REQUEST['start_date'] ) ? esc_attr( $_REQUEST['start_date'] ) : ''; ?>">
-							to
+								   value="<?php echo isset( $_REQUEST['start_date'] ) ? esc_attr( $_REQUEST['start_date'] ) : date('Y-m-d'); ?>">
+							<span class="date-range-separator"> to </span>
 							<input type="date" id="end_date" name="end_date"
 								   value="<?php echo isset( $_REQUEST['end_date'] ) ? esc_attr( $_REQUEST['end_date'] ) : ''; ?>">
 
@@ -352,7 +360,7 @@ function ptt_display_report_results() {
 	 *-------------------------------------------------------------*/
 	$q = new WP_Query( $args );
 
-	if ( ! $q->have_posts() ) {
+	if ( ! $q->have_posts() && 'single_day' !== $view_mode ) {
 		echo '<p>No matching tasks found for the selected criteria.</p>';
 		return;
 	}
@@ -507,6 +515,126 @@ function ptt_display_report_results() {
 		}
 		echo '</tbody></table>';
 		echo '<div class="grand-total"><strong>Grand Total: ' . number_format( $grand_total, 2 ) . '&nbsp;hours</strong></div>';
+		echo '</div>'; // .ptt-report-results
+
+	} elseif ( 'single_day' === $view_mode ) {
+
+		/*----------------------------------------------------------
+		 * SINGLE DAY VIEW
+		 *---------------------------------------------------------*/
+		$target_date_str = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : date( 'Y-m-d' );
+		unset( $args['date_query'] ); // Unset original date query
+
+		$q = new WP_Query( $args );
+
+		$daily_tasks       = [];
+		$grand_total_today = 0.0;
+
+		if ( $q->have_posts() ) {
+			while ( $q->have_posts() ) {
+				$q->the_post();
+				$post_id          = get_the_ID();
+				$sort_timestamp   = PHP_INT_MAX;
+				$is_relevant      = false;
+				$daily_duration   = 0.0;
+
+				// Condition 1: Check if the post was created on the target day.
+				if ( date( 'Y-m-d', get_the_date( 'U' ) ) === $target_date_str ) {
+					$is_relevant    = true;
+					$sort_timestamp = min( $sort_timestamp, get_the_date( 'U' ) );
+				}
+
+				// Condition 2: Check if any session was tracked on the target day.
+				$sessions = get_field( 'sessions', $post_id );
+				if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+					foreach ( $sessions as $session ) {
+						$session_start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+
+						if ( $session_start_str && date( 'Y-m-d', strtotime( $session_start_str ) ) === $target_date_str ) {
+							$is_relevant = true;
+							$sort_timestamp = min( $sort_timestamp, strtotime( $session_start_str ) );
+
+							// Calculate duration for this specific session.
+							$session_duration = 0.0;
+							if ( ! empty( $session['session_manual_override'] ) ) {
+								$session_duration = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
+							} else {
+								$start = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+								$stop  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
+								if ( $start && $stop ) {
+									try {
+										$start_time = new DateTime( $start, new DateTimeZone('UTC') );
+										$stop_time  = new DateTime( $stop, new DateTimeZone('UTC') );
+										if ( $stop_time > $start_time ) {
+											$diff_seconds     = $stop_time->getTimestamp() - $start_time->getTimestamp();
+											$duration_hours   = $diff_seconds / 3600;
+											$session_duration = ceil( $duration_hours * 100 ) / 100;
+										}
+									} catch ( Exception $e ) {
+										$session_duration = 0.0;
+									}
+								}
+							}
+							$daily_duration += $session_duration;
+						}
+					}
+				}
+
+				if ( $is_relevant ) {
+					$client_terms  = get_the_terms( $post_id, 'client' );
+					$project_terms = get_the_terms( $post_id, 'project' );
+
+					$daily_tasks[] = [
+						'id'             => $post_id,
+						'title'          => get_the_title(),
+						'client_name'    => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
+						'project_name'   => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
+						'sort_timestamp' => $sort_timestamp,
+						'daily_duration' => $daily_duration,
+						'content'        => get_the_content(),
+						'date_display'   => date( 'h:i A', $sort_timestamp ),
+					];
+					$grand_total_today += $daily_duration;
+				}
+			}
+			wp_reset_postdata();
+		}
+
+		// Sort the final list chronologically by the earliest event of the day.
+		usort( $daily_tasks, function( $a, $b ) {
+			return $a['sort_timestamp'] <=> $b['sort_timestamp'];
+		} );
+
+		// Render the "Single Day" table.
+		echo '<div class="ptt-report-results">';
+		echo '<h3>Report for ' . esc_html( date( 'F j, Y', strtotime( $target_date_str ) ) ) . '</h3>';
+
+		if ( empty( $daily_tasks ) ) {
+			echo '<p>No tasks were created or had time tracked on this day.</p>';
+		} else {
+			echo '<table class="wp-list-table widefat fixed striped">';
+			echo '<thead><tr>
+					<th style="width:10%">Time</th>
+					<th style="width:25%">Task Name</th>
+					<th style="width:15%">Client</th>
+					<th style="width:15%">Project</th>
+					<th style="width:10%">Duration (Hrs)</th>
+					<th style="width:25%">Notes</th>
+				  </tr></thead><tbody>';
+
+			foreach ( $daily_tasks as $task ) {
+				echo '<tr>';
+				echo '<td>' . esc_html( $task['date_display'] ) . '</td>';
+				echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
+				echo '<td>' . esc_html( $task['client_name'] ) . '</td>';
+				echo '<td>' . esc_html( $task['project_name'] ) . '</td>';
+				echo '<td>' . ( $task['daily_duration'] > 0 ? number_format( $task['daily_duration'], 2 ) : '–' ) . '</td>';
+				echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
+				echo '</tr>';
+			}
+			echo '</tbody></table>';
+			echo '<div class="grand-total"><strong>Total for Day: ' . number_format( $grand_total_today, 2 ) . '&nbsp;hours</strong></div>';
+		}
 		echo '</div>'; // .ptt-report-results
 
 	} else {

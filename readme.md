@@ -44,7 +44,10 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 ### Reporting & Admin Tools
 * **Reports Dashboard:** A dedicated "Reports" page in the admin area.
 * **Filterable Data:** Filter reports by user, client, project, status, and custom date ranges.
-* **Grouped Results:** Data is logically grouped by User, Client, and Project, with subtotals for each.
+* **Multiple View Modes:** Use the toggle switch to select a view:
+    * **Classic:** Data is logically grouped by User, Client, and Project, with subtotals for each.
+    * **Task Focused:** A flat list of all tasks.
+    * **Single Day:** A chronological list of all tasks created or worked on during a single day.
 * **Over-Budget Highlighting:** The "Orig. Budget" column automatically highlights entries in red if the tracked time exceeds the allocated budget.
 * **Developer Self-Test:** A built-in testing module to verify core functionality, including multi-session calculations and reporting logic.
 
@@ -95,9 +98,10 @@ This is useful if you forgot to start a timer and need to log time after the fac
 ### 3. Viewing Reports
 
 1.  Navigate to **Tasks → Reports** from the admin menu.
-2.  Use the filters at the top to select a user, client, project, status, or date range.
-3.  Click **"Run Report"**.
-4.  The results will be grouped by user, then client, then project. Note any items in red under the "Orig. Budget" column, as these have exceeded their budget.
+2.  Use the view mode toggle to select between "Classic", "Task Focused", or "Single Day".
+3.  Use the filters at the top to select a user, client, project, or status. For "Classic" and "Task Focused" views, select a date range. For the "Single Day" view, select a single day.
+4.  Click **"Run Report"**.
+5.  The results will be displayed based on your selections. Note any items in red under the "Orig. Budget" column, as these have exceeded their budget.
 
 ***
 
@@ -108,6 +112,9 @@ A: This plugin is built on Advanced Custom Fields Pro. It handles all the custom
 
 **Q: Can I run two timers at once?**
 A: No. To ensure data integrity, the plugin prevents a user from starting a timer if another task is already running for them. You must stop your active task before starting a new one.
+
+**Q: How does the "Single Day" report view work?**
+A: This view shows a chronological list of all tasks that were either created on the selected day or had a time session on that day. If a task has sessions from multiple days, only the time from the selected day will be calculated and shown in the duration column.
 
 **Q: Why can't I add a new session?**
 A: You must complete any open sessions first. Make sure that every existing session row has either been stopped (with a start and stop time) or has a manual duration entered. You cannot add a new session if a previous one is still running.
@@ -121,6 +128,10 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ***
 
 ## 📋 Changelog
+### Version 1.7.18 (2025-07-23)
+* **Feature:** Added "Single Day" view mode to reports to show all tasks created or modified on a specific day.
+* **Feature:** In Single Day view, the report only calculates and displays session durations for the selected day.
+* **Improved:** The date picker on the reports page now switches to a single date selector when "Single Day" view is active.
 ### Version 1.7.17 (2025-07-23)
 * **Feature:** Added "Task Focused" list view mode to reports, with a custom toggle switch UI.
 * **Feature:** In Task Focused view, tasks with multiple statuses appear as a line item for each status.
