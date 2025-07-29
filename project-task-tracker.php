@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.5
+ * Version:           1.7.6
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.5' );
+define( 'PTT_VERSION', '1.7.6' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -699,6 +699,20 @@ function ptt_add_status_column( $columns ) {
 add_filter( 'manage_project_task_posts_columns', 'ptt_add_status_column' );
 
 /**
+ * Renames the Author column to "Assignee" for the Tasks list table.
+ *
+ * @param array $columns Existing columns.
+ * @return array Modified columns.
+ */
+function ptt_rename_author_column( $columns ) {
+    if ( isset( $columns['author'] ) ) {
+        $columns['author'] = 'Assignee';
+    }
+    return $columns;
+}
+add_filter( 'manage_project_task_posts_columns', 'ptt_rename_author_column', 20 );
+
+/**
  * Renders the Status column content.
  *
  * @param string $column  Column name.
@@ -715,6 +729,36 @@ function ptt_render_status_column( $column, $post_id ) {
     }
 }
 add_action( 'manage_project_task_posts_custom_column', 'ptt_render_status_column', 10, 2 );
+
+/**
+ * Replaces the Author meta box with an "Assignee" meta box.
+ */
+function ptt_replace_author_metabox() {
+    remove_meta_box( 'authordiv', 'project_task', 'core' );
+    add_meta_box( 'authordiv', 'Assignee', 'post_author_meta_box', 'project_task', 'side', 'core' );
+}
+add_action( 'add_meta_boxes_project_task', 'ptt_replace_author_metabox' );
+
+/**
+ * Swaps occurrences of "Author" with "Assignee" for the Tasks CPT.
+ *
+ * @param string $translated Translated text.
+ * @param string $text       Original text.
+ * @param string $domain     Text domain.
+ * @return string Modified text.
+ */
+function ptt_swap_author_text( $translated, $text, $domain ) {
+    global $pagenow, $typenow;
+
+    if ( 'project_task' === $typenow && in_array( $pagenow, [ 'edit.php', 'post.php', 'post-new.php' ], true ) ) {
+        if ( 'Author' === $text ) {
+            return 'Assignee';
+        }
+    }
+
+    return $translated;
+}
+add_filter( 'gettext', 'ptt_swap_author_text', 10, 3 );
 
 
 // =================================================================

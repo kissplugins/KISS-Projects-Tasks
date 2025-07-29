@@ -123,6 +123,9 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 ***
 
 ## 📋 Changelog
+### Version 1.7.6 (2025-07-21)
+* **Admin:** Author column and meta box now labeled "Assignee" for Tasks.
+
 ### Version 1.7.4 (2025-07-21)
 * **Docs:** Added detailed user instructions and an FAQ section to the Readme file.
 * **Feature:** On screen debugger code for  timer in scripts.js - comment out later
