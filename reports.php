@@ -129,7 +129,7 @@ function ptt_reports_page_html() {
 					</tr>
 
 					<tr>
-						<th scope="row"><label for="user_id">Select User</label></th>
+						<th scope="row"><label for="user_id">Select Assignee</label></th>
 						<td>
 							<?php
 							wp_dropdown_users( [

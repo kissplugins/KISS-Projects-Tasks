@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.23
+ * Version:           1.7.24
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.23' );
+define( 'PTT_VERSION', '1.7.24' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -691,8 +691,36 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
 // 7.0 ADMIN UI (CPT EDITOR)
 // =================================================================
 
-// This section is intentionally left blank. The automatic column from
-// register_taxonomy('task_status') is used instead of manual functions.
+/**
+ * Renames the default Author column to "Assignee" on the Tasks list table.
+ *
+ * @param array $columns Existing column labels.
+ * @return array Modified column labels.
+ */
+function ptt_rename_author_column( $columns ) {
+    if ( isset( $columns['author'] ) ) {
+        $columns['author'] = __( 'Assignee', 'ptt' );
+    }
+    return $columns;
+}
+add_filter( 'manage_project_task_posts_columns', 'ptt_rename_author_column' );
+
+/**
+ * Replaces the Author meta box with an "Assignee" meta box on the Task editor.
+ */
+function ptt_assignee_meta_box() {
+    remove_meta_box( 'authordiv', 'project_task', 'core' );
+    add_meta_box(
+        'assigneediv',
+        __( 'Assignee', 'ptt' ),
+        'post_author_meta_box',
+        'project_task',
+        'side',
+        'core',
+        [ '__back_compat_meta_box' => true ]
+    );
+}
+add_action( 'add_meta_boxes_project_task', 'ptt_assignee_meta_box' );
 
 
 // =================================================================

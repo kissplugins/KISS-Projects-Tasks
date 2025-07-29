@@ -3,6 +3,9 @@
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
 ---
+### Version 1.7.24 (2025-07-24)
+* **Improved:** Author labels now read "Assignee" in the Tasks admin screens and reports.
+
 ### Version 1.7.23 (2025-07-23)
 * **Feature:** Added "Slack Username" and "Slack User ID" fields to user profiles under a new "KISS PTT - Sleuth Integration" section.
 * **Improved:** Reports in "Classic" view now display the user's Slack information next to their name (e.g., Noel Saw (@noelsaw - U1234567890)).
