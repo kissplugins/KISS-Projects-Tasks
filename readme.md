@@ -1,3 +1,5 @@
+Of course. Here is the updated `readme.md` file with the requested section added to the FAQ.
+
 # 🚀 KISS Project & Task Time Tracker
 
 A robust WordPress plugin for tracking time spent on client projects and individual tasks. It integrates seamlessly with the WordPress admin area and provides a flexible front-end interface for users.
@@ -113,8 +115,10 @@ A: This plugin is built on Advanced Custom Fields Pro. It handles all the custom
 **Q: Can I run two timers at once?**
 A: No. To ensure data integrity, the plugin prevents a user from starting a timer if another task is already running for them. You must stop your active task before starting a new one.
 
-**Q: How does the "Single Day" report view work?**
-A: This view provides a detailed daily log. It lists, in chronological order, all tasks that were either created or had time tracked on the selected day. The duration shown for each task is only the time logged on that specific day. The total at the bottom excludes time from any task or project named "Break" or "Personal Time", and those durations will appear with a strikethrough in the list.
+**Q: How does the date input field work on the Reports page?**
+A: The behavior of the date filter changes based on the selected "View Mode":
+* **Classic & Task Focused Views:** These modes use a **date range** (start and end date). The report will only show tasks that were **created** within that specific range.
+* **Single Day View:** This mode uses a **single date picker**. It shows all tasks that were either **created** on that day OR had a **work session** that started on that day, making it a true daily log.
 
 **Q: Why can't I add a new session?**
 A: You must complete any open sessions first. Make sure that every existing session row has either been stopped (with a start and stop time) or has a manual duration entered. You cannot add a new session if a previous one is still running.
