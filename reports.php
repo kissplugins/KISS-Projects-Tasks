@@ -104,6 +104,14 @@ function ptt_reports_page_html() {
 		<div class="wrap">
 				<h1>Project &amp; Task Time Reports</h1>
 
+		<div class="notice notice-info inline">
+			<p><strong>How the Date Filter Works:</strong></p>
+			<ul style="list-style: disc; padding-left: 20px;">
+				<li><strong>Classic &amp; Task Focused Views:</strong> The date range shows tasks that were either created or had work sessions logged within that period.</li>
+				<li><strong>Single Day View:</strong> The single date picker shows all tasks that were created or had work sessions logged on that specific day.</li>
+			</ul>
+		</div>
+
 		<form method="get" action="">
 			<?php wp_nonce_field( 'ptt_run_report_nonce' ); ?>
 			<input type="hidden" name="post_type" value="project_task">
@@ -308,17 +316,6 @@ function ptt_display_report_results() {
 		$args['tax_query'] = $tax_query;
 	}
 
-	/* Date-range filtering (now using post_date via date_query to include all tasks) */
-	if ( $start_date && $end_date ) {
-		$args['date_query'] = [
-			[
-				'after'     => $start_date . ' 00:00:00',
-				'before'    => $end_date . ' 23:59:59',
-				'inclusive' => true,
-			],
-		];
-	}
-
 	// --------------------------------------------------------------
 	// Build Status Sorting Map
 	// --------------------------------------------------------------
@@ -358,11 +355,7 @@ function ptt_display_report_results() {
 	if ( 'task_focused' === $view_mode ) {
 		
 		$q = new WP_Query( $args );
-		if ( ! $q->have_posts() ) {
-			echo '<p>No matching tasks found for the selected criteria.</p>';
-			return;
-		}
-
+		
 		/*--------------------------------------------------------------
 		 * Render Debug Output (if enabled)
 		 *-------------------------------------------------------------*/
@@ -385,49 +378,103 @@ function ptt_display_report_results() {
 		 * TASK FOCUSED VIEW
 		 *---------------------------------------------------------*/
 		$task_list = [];
-		while ( $q->have_posts() ) {
-			$q->the_post();
-			$post_id     = get_the_ID();
-			$duration    = (float) get_field( 'calculated_duration', $post_id );
-			$grand_total += $duration;
+		if ( $q->have_posts() ) {
+			$start_timestamp = $start_date ? strtotime( $start_date . ' 00:00:00' ) : 0;
+			$end_timestamp   = $end_date ? strtotime( $end_date . ' 23:59:59' ) : PHP_INT_MAX;
 
-			$client_terms = get_the_terms( $post_id, 'client' );
-			$project_terms = get_the_terms( $post_id, 'project' );
-			$start_time = get_field( 'start_time', $post_id ) ?: get_the_date( 'Y-m-d H:i:s', $post_id );
+			while ( $q->have_posts() ) {
+				$q->the_post();
+				$post_id     = get_the_ID();
+				$is_relevant = false;
 
-			$task_base = [
-				'id'             => $post_id,
-				'title'          => get_the_title(),
-				'client_name'    => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
-				'project_name'   => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
-				'date'           => $start_time,
-				'duration'       => $duration,
-				'content'        => get_the_content(),
-			];
+				// Check 1: Creation date is within range
+				$creation_timestamp = get_the_date( 'U', $post_id );
+				if ( $creation_timestamp >= $start_timestamp && $creation_timestamp <= $end_timestamp ) {
+					$is_relevant = true;
+				}
 
-			$current_statuses = get_the_terms( $post_id, 'task_status' );
-			if ( ! is_wp_error( $current_statuses ) && ! empty( $current_statuses ) ) {
-				foreach ( $current_statuses as $status ) {
+				// Check 2: At least one session date is within range
+				if ( ! $is_relevant ) {
+					$sessions = get_field( 'sessions', $post_id );
+					if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+						foreach ( $sessions as $session ) {
+							if ( ! empty( $session['session_start_time'] ) ) {
+								$session_timestamp = strtotime( $session['session_start_time'] );
+								if ( $session_timestamp >= $start_timestamp && $session_timestamp <= $end_timestamp ) {
+									$is_relevant = true;
+									break;
+								}
+							}
+						}
+					}
+				}
+
+				if ( ! $is_relevant ) {
+					continue;
+				}
+
+				// Get Last Entry Date
+				$latest_session_timestamp = 0;
+				$sessions                 = get_field( 'sessions', $post_id );
+				if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+					foreach ( $sessions as $session ) {
+						if ( ! empty( $session['session_start_time'] ) ) {
+							$ts = strtotime( $session['session_start_time'] );
+							if ( $ts > $latest_session_timestamp ) {
+								$latest_session_timestamp = $ts;
+							}
+						}
+					}
+				}
+				$last_entry_date = ( $latest_session_timestamp > 0 ) ? date( 'Y-m-d', $latest_session_timestamp ) : '–';
+
+				$duration    = (float) get_field( 'calculated_duration', $post_id );
+				$grand_total += $duration;
+
+				$client_terms = get_the_terms( $post_id, 'client' );
+				$project_terms = get_the_terms( $post_id, 'project' );
+
+				$task_base = [
+					'id'              => $post_id,
+					'title'           => get_the_title(),
+					'assignee_name'   => get_the_author_meta( 'display_name' ),
+					'client_name'     => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
+					'project_name'    => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
+					'creation_date'   => get_the_date( 'Y-m-d', $post_id ),
+					'last_entry_date' => $last_entry_date,
+					'duration'        => $duration,
+					'content'         => get_the_content(),
+				];
+
+				$current_statuses = get_the_terms( $post_id, 'task_status' );
+				if ( ! is_wp_error( $current_statuses ) && ! empty( $current_statuses ) ) {
+					foreach ( $current_statuses as $status ) {
+						$task_list[] = array_merge( $task_base, [
+							'status_id'   => $status->term_id,
+							'status_name' => $status->name,
+						] );
+					}
+				} else {
 					$task_list[] = array_merge( $task_base, [
-						'status_id'   => $status->term_id,
-						'status_name' => $status->name,
+						'status_id'   => 0,
+						'status_name' => '',
 					] );
 				}
-			} else {
-				$task_list[] = array_merge( $task_base, [
-					'status_id'   => 0,
-					'status_name' => '',
-				] );
 			}
+			wp_reset_postdata();
 		}
-		wp_reset_postdata();
+
+		if ( empty( $task_list ) ) {
+			echo '<p>No matching tasks found for the selected criteria.</p>';
+			return;
+		}
 
 		// Sort the final flat list
 		usort( $task_list, function( $a, $b ) use ( $status_order ) {
 			$oa = isset( $status_order[ $a['status_id'] ] ) ? $status_order[ $a['status_id'] ] : PHP_INT_MAX;
 			$ob = isset( $status_order[ $b['status_id'] ] ) ? $status_order[ $b['status_id'] ] : PHP_INT_MAX;
 			if ( $oa === $ob ) {
-				return strcmp( $a['date'], $b['date'] ); // Secondary sort: chronological
+				return strcmp( $b['last_entry_date'], $a['last_entry_date'] ); // Secondary sort: reverse chronological last entry
 			}
 			return $oa <=> $ob; // Primary sort: by status order map
 		} );
@@ -436,12 +483,14 @@ function ptt_display_report_results() {
 		echo '<div class="ptt-report-results">';
 		echo '<table class="wp-list-table widefat fixed striped">';
 		echo '<thead><tr>
-				<th style="width:25%">Task Name</th>
-				<th style="width:15%">Client</th>
-				<th style="width:15%">Project</th>
-				<th style="width:8%">Date</th>
+				<th style="width:20%">Task Name</th>
+				<th style="width:12%">Assignee</th>
+				<th style="width:10%">Client</th>
+				<th style="width:10%">Project</th>
+				<th style="width:8%">Creation&nbsp;Date</th>
+				<th style="width:8%">Last&nbsp;Entry</th>
 				<th style="width:8%">Duration (Hrs)</th>
-				<th style="width:21%">Notes</th>
+				<th style="width:16%">Notes</th>
 				<th style="width:8%">Status</th>
 			  </tr></thead><tbody>';
 
@@ -459,9 +508,11 @@ function ptt_display_report_results() {
 
 			echo '<tr>';
 			echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
+			echo '<td>' . esc_html( $task['assignee_name'] ) . '</td>';
 			echo '<td>' . esc_html( $task['client_name'] ) . '</td>';
 			echo '<td>' . esc_html( $task['project_name'] ) . '</td>';
-			echo '<td>' . esc_html( date( 'Y-m-d', strtotime( $task['date'] ) ) ) . '</td>';
+			echo '<td>' . esc_html( $task['creation_date'] ) . '</td>';
+			echo '<td>' . esc_html( $task['last_entry_date'] ) . '</td>';
 			echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
 			echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
 			echo '<td>' . $status_dropdown . '</td>';
@@ -563,6 +614,7 @@ function ptt_display_report_results() {
 					$daily_tasks[] = [
 						'id'             => $post_id,
 						'title'          => get_the_title(),
+						'assignee_name'  => get_the_author_meta( 'display_name' ),
 						'client_name'    => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
 						'project_name'   => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
 						'sort_timestamp' => $sort_timestamp,
@@ -612,11 +664,12 @@ function ptt_display_report_results() {
 			echo '<table class="wp-list-table widefat fixed striped">';
 			echo '<thead><tr>
 					<th style="width:10%">Time</th>
-					<th style="width:25%">Task Name</th>
+					<th style="width:20%">Task Name</th>
+					<th style="width:15%">Assignee</th>
 					<th style="width:15%">Client</th>
 					<th style="width:15%">Project</th>
 					<th style="width:10%">Duration (Hrs)</th>
-					<th style="width:25%">Notes</th>
+					<th style="width:15%">Notes</th>
 				  </tr></thead><tbody>';
 
 			$deductible_keywords = [ 'break', 'personal time' ];
@@ -634,6 +687,7 @@ function ptt_display_report_results() {
 				echo '<tr>';
 				echo '<td>' . esc_html( $task['date_display'] ) . '</td>';
 				echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
+				echo '<td>' . esc_html( $task['assignee_name'] ) . '</td>';
 				echo '<td>' . esc_html( $task['client_name'] ) . '</td>';
 				echo '<td>' . esc_html( $task['project_name'] ) . '</td>';
 				echo '<td ' . $duration_cell_style . '>' . ( $task['daily_duration'] > 0 ? number_format( $task['daily_duration'], 2 ) : '–' ) . '</td>';
@@ -670,11 +724,7 @@ function ptt_display_report_results() {
 	} else {
 
 		$q = new WP_Query( $args );
-		if ( ! $q->have_posts() ) {
-			echo '<p>No matching tasks found for the selected criteria.</p>';
-			return;
-		}
-
+		
 		/*--------------------------------------------------------------
 		 * Render Debug Output (if enabled)
 		 *-------------------------------------------------------------*/
@@ -697,62 +747,116 @@ function ptt_display_report_results() {
 		 * CLASSIC (HIERARCHICAL) VIEW
 		 *---------------------------------------------------------*/
 		$report = [];
-		while ( $q->have_posts() ) {
-			$q->the_post();
-			$post_id = get_the_ID();
-			$duration = (float) get_field( 'calculated_duration', $post_id );
-			$grand_total += $duration;
+		if ( $q->have_posts() ) {
+			$start_timestamp = $start_date ? strtotime( $start_date . ' 00:00:00' ) : 0;
+			$end_timestamp   = $end_date ? strtotime( $end_date . ' 23:59:59' ) : PHP_INT_MAX;
 
-			$author_id    = get_the_author_meta( 'ID' );
-			$display_name = get_the_author_meta( 'display_name', $author_id );
-			$slack_user   = get_user_meta( $author_id, 'slack_username', true );
-			$slack_id     = get_user_meta( $author_id, 'slack_user_id', true );
+			while ( $q->have_posts() ) {
+				$q->the_post();
+				$post_id     = get_the_ID();
+				$is_relevant = false;
 
-			$author_name = $display_name;
-			if ( ! empty( $slack_user ) && ! empty( $slack_id ) ) {
-				$author_name .= ' (@' . $slack_user . ' - ' . $slack_id . ')';
+				// Check 1: Creation date is within range
+				$creation_timestamp = get_the_date( 'U', $post_id );
+				if ( $creation_timestamp >= $start_timestamp && $creation_timestamp <= $end_timestamp ) {
+					$is_relevant = true;
+				}
+
+				// Check 2: At least one session date is within range
+				if ( ! $is_relevant ) {
+					$sessions = get_field( 'sessions', $post_id );
+					if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+						foreach ( $sessions as $session ) {
+							if ( ! empty( $session['session_start_time'] ) ) {
+								$session_timestamp = strtotime( $session['session_start_time'] );
+								if ( $session_timestamp >= $start_timestamp && $session_timestamp <= $end_timestamp ) {
+									$is_relevant = true;
+									break;
+								}
+							}
+						}
+					}
+				}
+
+				if ( ! $is_relevant ) {
+					continue;
+				}
+
+				// Get Last Entry Date
+				$latest_session_timestamp = 0;
+				$sessions                 = get_field( 'sessions', $post_id );
+				if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+					foreach ( $sessions as $session ) {
+						if ( ! empty( $session['session_start_time'] ) ) {
+							$ts = strtotime( $session['session_start_time'] );
+							if ( $ts > $latest_session_timestamp ) {
+								$latest_session_timestamp = $ts;
+							}
+						}
+					}
+				}
+				$last_entry_date = ( $latest_session_timestamp > 0 ) ? date( 'Y-m-d', $latest_session_timestamp ) : '–';
+
+				$duration = (float) get_field( 'calculated_duration', $post_id );
+				$grand_total += $duration;
+
+				$author_id    = get_the_author_meta( 'ID' );
+				$display_name = get_the_author_meta( 'display_name', $author_id );
+				$slack_user   = get_user_meta( $author_id, 'slack_username', true );
+				$slack_id     = get_user_meta( $author_id, 'slack_user_id', true );
+
+				$author_name = $display_name;
+				if ( ! empty( $slack_user ) && ! empty( $slack_id ) ) {
+					$author_name .= ' (@' . $slack_user . ' - ' . $slack_id . ')';
+				}
+
+				$client_terms   = get_the_terms( $post_id, 'client' );
+				$client_id_term = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->term_id : 0;
+				$client_name    = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : 'Uncategorized';
+
+				$project_terms   = get_the_terms( $post_id, 'project' );
+				$project_id_term = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->term_id : 0;
+				$project_name    = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : 'Uncategorized';
+
+				$status_terms_obj = get_the_terms( $post_id, 'task_status' );
+				$status_id_term = ! is_wp_error( $status_terms_obj ) && $status_terms_obj ? $status_terms_obj[0]->term_id : 0;
+
+				$task_budget    = get_field( 'task_max_budget', $post_id );
+				$project_budget = $project_id_term ? get_field( 'project_max_budget', 'project_' . $project_id_term ) : 0;
+				
+				if ( ! isset( $report[ $author_id ] ) ) {
+					$report[ $author_id ] = [ 'name' => $author_name, 'total' => 0, 'clients' => [] ];
+				}
+				if ( ! isset( $report[ $author_id ]['clients'][ $client_id_term ] ) ) {
+					$report[ $author_id ]['clients'][ $client_id_term ] = [ 'name' => $client_name, 'total' => 0, 'projects' => [] ];
+				}
+				if ( ! isset( $report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] ) ) {
+					$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] = [ 'name' => $project_name, 'total' => 0, 'tasks' => [] ];
+				}
+
+				$report[ $author_id ]['total'] += $duration;
+				$report[ $author_id ]['clients'][ $client_id_term ]['total'] += $duration;
+				$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['total'] += $duration;
+				$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['tasks'][] = [
+					'id'              => $post_id,
+					'title'           => get_the_title(),
+					'assignee_name'   => get_the_author_meta( 'display_name' ),
+					'creation_date'   => get_the_date( 'Y-m-d', $post_id ),
+					'last_entry_date' => $last_entry_date,
+					'duration'        => $duration,
+					'content'         => get_the_content(),
+					'task_budget'     => $task_budget,
+					'project_budget'  => $project_budget,
+					'status_id'       => $status_id_term,
+				];
 			}
-
-			$client_terms   = get_the_terms( $post_id, 'client' );
-			$client_id_term = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->term_id : 0;
-			$client_name    = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : 'Uncategorized';
-
-			$project_terms   = get_the_terms( $post_id, 'project' );
-			$project_id_term = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->term_id : 0;
-			$project_name    = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : 'Uncategorized';
-
-			$status_terms_obj = get_the_terms( $post_id, 'task_status' );
-			$status_id_term = ! is_wp_error( $status_terms_obj ) && $status_terms_obj ? $status_terms_obj[0]->term_id : 0;
-
-			$task_budget    = get_field( 'task_max_budget', $post_id );
-			$project_budget = $project_id_term ? get_field( 'project_max_budget', 'project_' . $project_id_term ) : 0;
-			$start_time = get_field( 'start_time', $post_id ) ?: get_the_date( 'Y-m-d H:i:s', $post_id );
-
-			if ( ! isset( $report[ $author_id ] ) ) {
-				$report[ $author_id ] = [ 'name' => $author_name, 'total' => 0, 'clients' => [] ];
-			}
-			if ( ! isset( $report[ $author_id ]['clients'][ $client_id_term ] ) ) {
-				$report[ $author_id ]['clients'][ $client_id_term ] = [ 'name' => $client_name, 'total' => 0, 'projects' => [] ];
-			}
-			if ( ! isset( $report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] ) ) {
-				$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] = [ 'name' => $project_name, 'total' => 0, 'tasks' => [] ];
-			}
-
-			$report[ $author_id ]['total'] += $duration;
-			$report[ $author_id ]['clients'][ $client_id_term ]['total'] += $duration;
-			$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['total'] += $duration;
-			$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['tasks'][] = [
-				'id'             => $post_id,
-				'title'          => get_the_title(),
-				'date'           => $start_time,
-				'duration'       => $duration,
-				'content'        => get_the_content(),
-				'task_budget'    => $task_budget,
-				'project_budget' => $project_budget,
-				'status_id'      => $status_id_term,
-			];
+			wp_reset_postdata();
 		}
-		wp_reset_postdata();
+		
+		if ( empty( $report ) ) {
+			echo '<p>No matching tasks found for the selected criteria.</p>';
+			return;
+		}
 
 		// Sort clients alphabetically, then projects alphabetically, then tasks by status
 		foreach ( $report as &$author ) {
@@ -763,7 +867,7 @@ function ptt_display_report_results() {
 					usort( $project['tasks'], function( $a, $b ) use ( $status_order ) {
 						$oa = isset( $status_order[ $a['status_id'] ] ) ? $status_order[ $a['status_id'] ] : PHP_INT_MAX;
 						$ob = isset( $status_order[ $b['status_id'] ] ) ? $status_order[ $b['status_id'] ] : PHP_INT_MAX;
-						if ( $oa === $ob ) { return strcmp( $a['date'], $b['date'] ); }
+						if ( $oa === $ob ) { return strcmp( $b['last_entry_date'], $a['last_entry_date'] ); }
 						return $oa <=> $ob;
 					} );
 				}
@@ -783,8 +887,14 @@ function ptt_display_report_results() {
 					echo '<h5>Project: ' . esc_html( $project['name'] ) . ' <span class="subtotal">(Project&nbsp;Total: ' . number_format( $project['total'], 2 ) . '&nbsp;hrs)</span></h5>';
 					echo '<table class="wp-list-table widefat fixed striped">';
 					echo '<thead><tr>
-							<th>Task Name</th><th>Date</th><th>Duration (Hours)</th>
-							<th>Orig.&nbsp;Budget</th><th>Notes</th><th>Status</th>
+							<th style="width:22%">Task Name</th>
+							<th style="width:12%">Assignee</th>
+							<th style="width:8%">Creation&nbsp;Date</th>
+							<th style="width:8%">Last&nbsp;Entry</th>
+							<th style="width:8%">Duration (Hrs)</th>
+							<th style="width:8%">Orig.&nbsp;Budget</th>
+							<th style="width:26%">Notes</th>
+							<th style="width:8%">Status</th>
 						  </tr></thead><tbody>';
 
 					foreach ( $project['tasks'] as $task ) {
@@ -814,7 +924,9 @@ function ptt_display_report_results() {
 
 						echo '<tr>';
 						echo '<td><a href="' . get_edit_post_link( $task['id'] ) . '">' . esc_html( $task['title'] ) . '</a></td>';
-						echo '<td>' . esc_html( date( 'Y-m-d', strtotime( $task['date'] ) ) ) . '</td>';
+						echo '<td>' . esc_html( $task['assignee_name'] ) . '</td>';
+						echo '<td>' . esc_html( $task['creation_date'] ) . '</td>';
+						echo '<td>' . esc_html( $task['last_entry_date'] ) . '</td>';
 						echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
 						echo '<td ' . $budget_td_style . '>' . $budget_display . '</td>';
 						echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
