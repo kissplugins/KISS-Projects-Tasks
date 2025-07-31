@@ -16,13 +16,86 @@ function ptt_add_settings_submenu_page() {
     add_submenu_page(
         'edit.php?post_type=project_task', // Parent slug
         'Tracker Settings',                // Page title
-        'Settings - v' . PTT_VERSION,      // Menu title - UPDATED
+        'Settings',                        // Menu title
         'manage_options',                  // Capability
         'ptt-self-test',                   // Menu slug
         'ptt_self_test_page_html'          // Function
     );
 }
-add_action('admin_menu', 'ptt_add_settings_submenu_page');
+add_action( 'admin_menu', 'ptt_add_settings_submenu_page' );
+
+/**
+ * Adds the "Changelog" link under the Tasks CPT menu.
+ */
+function ptt_add_changelog_submenu_page() {
+    add_submenu_page(
+        'edit.php?post_type=project_task', // Parent slug
+        'Plugin Changelog',               // Page title
+        'Changelog - v' . PTT_VERSION,    // Menu title
+        'manage_options',                 // Capability
+        'ptt-changelog',                  // Menu slug
+        'ptt_changelog_page_html'         // Function
+    );
+}
+add_action( 'admin_menu', 'ptt_add_changelog_submenu_page' );
+
+/**
+ * Renders the Changelog page HTML.
+ */
+function ptt_changelog_page_html() {
+    $file_path = PTT_PLUGIN_DIR . 'changelog.md';
+    $content   = '';
+
+    if ( file_exists( $file_path ) ) {
+        $lines   = file( $file_path );
+        $preview = array_slice( $lines, 0, 500 );
+        $content = implode( '', $preview );
+    } else {
+        $content = 'changelog.md not found.';
+    }
+
+    echo '<div class="wrap">';
+    echo '<h1>Plugin Changelog</h1>';
+    echo '<pre>' . esc_html( $content ) . '</pre>';
+    echo '<p><em>To view entire changelog, please open the changelog.md file in a text viewer.</em></p>';
+    echo '</div>';
+}
+
+/**
+ * Reorders the Tasks menu items.
+ */
+function ptt_reorder_tasks_menu() {
+    global $submenu;
+
+    if ( ! isset( $submenu['edit.php?post_type=project_task'] ) ) {
+        return;
+    }
+
+    $ordered = [
+        'edit.php?post_type=project_task',
+        'post-new.php?post_type=project_task',
+        'edit-tags.php?taxonomy=post_tag&post_type=project_task',
+        'edit-tags.php?taxonomy=client&post_type=project_task',
+        'edit-tags.php?taxonomy=project&post_type=project_task',
+        'edit-tags.php?taxonomy=task_status&post_type=project_task',
+        'ptt-reports',
+        'ptt-self-test',
+        'ptt-changelog',
+    ];
+
+    $lookup = [];
+    foreach ( $submenu['edit.php?post_type=project_task'] as $item ) {
+        $lookup[ $item[2] ] = $item;
+    }
+
+    $submenu['edit.php?post_type=project_task'] = [];
+    foreach ( $ordered as $slug ) {
+        if ( isset( $lookup[ $slug ] ) ) {
+            $submenu['edit.php?post_type=project_task'][] = $lookup[ $slug ];
+        }
+    }
+}
+add_action( 'admin_menu', 'ptt_reorder_tasks_menu', 999 );
 
 /**
  * Renders the Self Test page HTML.

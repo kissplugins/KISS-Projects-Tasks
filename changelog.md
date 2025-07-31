@@ -3,6 +3,11 @@
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
 ---
+### Version 1.7.30 (2025-07-30)
+* **Feature**: Added in-dashboard changelog viewer and reorganized Tasks menu order.
+* **Change**: Moved dynamic version number display from Settings to Changelog menu item.
+
+---
 ### Version 1.7.29 (2025-07-30)
 * **Dev**: Improved date range self-test to limit scope to test posts and show missing or unexpected tasks with actionable messages.
 
