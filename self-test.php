@@ -319,28 +319,31 @@ function ptt_run_self_tests_callback() {
             'post_type'      => 'project_task',
             'posts_per_page' => -1,
             'post_status'    => 'publish',
-            'orderby'        => ['author' => 'ASC', 'date' => 'ASC'],
+            'orderby'        => [ 'author' => 'ASC', 'date' => 'ASC' ],
+            // Limit the query strictly to the posts created for this test so pre-existing
+            // tasks in the database do not affect the results.
+            'post__in'       => [ $range_post1, $range_post2, $range_post3 ],
         ];
-        $q_range       = new WP_Query($args_range);
-        $start_ts      = strtotime('2025-07-20 00:00:00');
-        $end_ts        = strtotime('2025-07-22 23:59:59');
+        $q_range       = new WP_Query( $args_range );
+        $start_ts      = strtotime( '2025-07-20 00:00:00' );
+        $end_ts        = strtotime( '2025-07-22 23:59:59' );
         $included_post = [];
         if ($q_range->have_posts()) {
             while ($q_range->have_posts()) {
                 $q_range->the_post();
                 $pid          = get_the_ID();
                 $is_relevant  = false;
-                $creation_ts  = get_the_date('U', $pid);
-                if ($creation_ts >= $start_ts && $creation_ts <= $end_ts) {
+                $creation_ts  = get_the_date( 'U', $pid );
+                if ( $creation_ts >= $start_ts && $creation_ts <= $end_ts ) {
                     $is_relevant = true;
                 }
-                if (! $is_relevant) {
-                    $sessions = get_field('sessions', $pid);
-                    if (! empty($sessions) && is_array($sessions)) {
-                        foreach ($sessions as $session) {
-                            if (! empty($session['session_start_time'])) {
-                                $session_ts = strtotime($session['session_start_time']);
-                                if ($session_ts >= $start_ts && $session_ts <= $end_ts) {
+                if ( ! $is_relevant ) {
+                    $sessions = get_field( 'sessions', $pid );
+                    if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+                        foreach ( $sessions as $session ) {
+                            if ( ! empty( $session['session_start_time'] ) ) {
+                                $session_ts = strtotime( $session['session_start_time'] );
+                                if ( $session_ts >= $start_ts && $session_ts <= $end_ts ) {
                                     $is_relevant = true;
                                     break;
                                 }
@@ -348,20 +351,37 @@ function ptt_run_self_tests_callback() {
                         }
                     }
                 }
-                if ($is_relevant) {
+                if ( $is_relevant ) {
                     $included_post[] = $pid;
                 }
             }
         }
         wp_reset_postdata();
 
-        $expected = [$range_post1, $range_post2];
-        sort($expected);
-        sort($included_post);
-        if ($included_post === $expected) {
-            $results[] = ['name' => 'Report Date Range Filter', 'status' => 'Pass', 'message' => 'Date range filtering returned expected tasks.'];
+        $expected = [ $range_post1, $range_post2 ];
+        sort( $expected );
+        sort( $included_post );
+        if ( $included_post === $expected ) {
+            $results[] = [
+                'name'    => 'Report Date Range Filter',
+                'status'  => 'Pass',
+                'message' => 'Date range filtering returned expected tasks.',
+            ];
         } else {
-            $results[] = ['name' => 'Report Date Range Filter', 'status' => 'Fail', 'message' => 'Unexpected tasks: ' . implode(',', $included_post)];
+            $missing    = array_diff( $expected, $included_post );
+            $unexpected = array_diff( $included_post, $expected );
+            $parts      = [];
+            if ( ! empty( $missing ) ) {
+                $parts[] = 'Missing tasks: ' . implode( ',', $missing );
+            }
+            if ( ! empty( $unexpected ) ) {
+                $parts[] = 'Unexpected tasks: ' . implode( ',', $unexpected );
+            }
+            $results[] = [
+                'name'    => 'Report Date Range Filter',
+                'status'  => 'Fail',
+                'message' => implode( '; ', $parts ) . '.',
+            ];
         }
 
         wp_delete_post($range_post1, true);
