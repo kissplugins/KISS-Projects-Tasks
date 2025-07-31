@@ -3,6 +3,19 @@
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
 ---
+### Version 1.7.27 (2025-07-30)
+* **Feature**: Added an "Assignee" column to all report views (Classic, Task Focused, and Single Day) for better visibility on multi-user reports.
+
+---
+### Version 1.7.26 (2025-07-30)
+* **Feature**: Added a notice to the top of the Reports page explaining how the date filter works for each view mode.
+
+---
+### Version 1.7.25 (2025-07-30)
+* **Improved**: "Classic" and "Task Focused" reports now include tasks based on their session entry dates, not just creation dates, providing a more accurate view of work within a period.
+* **Feature**: Added "Creation Date" and "Last Entry Date" columns to the "Classic" and "Task Focused" report views for improved clarity.
+
+---
 ### Version 1.7.24 (2025-07-24)
 * **Improved:** Author labels now read "Assignee" in the Tasks admin screens and reports.
 
