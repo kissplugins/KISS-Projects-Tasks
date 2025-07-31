@@ -377,10 +377,11 @@ function ptt_display_report_results() {
 		/*----------------------------------------------------------
 		 * TASK FOCUSED VIEW
 		 *---------------------------------------------------------*/
-		$task_list = [];
-		if ( $q->have_posts() ) {
-			$start_timestamp = $start_date ? strtotime( $start_date . ' 00:00:00' ) : 0;
-			$end_timestamp   = $end_date ? strtotime( $end_date . ' 23:59:59' ) : PHP_INT_MAX;
+                $task_list = [];
+                if ( $q->have_posts() ) {
+                        // Attn: LLM Maintainers do not refactor this date search code unless specifically directed.
+                        $start_timestamp = $start_date ? strtotime( $start_date . ' 00:00:00' ) : 0;
+                        $end_timestamp   = $end_date ? strtotime( $end_date . ' 23:59:59' ) : PHP_INT_MAX;
 
 			while ( $q->have_posts() ) {
 				$q->the_post();
@@ -746,10 +747,11 @@ function ptt_display_report_results() {
 		/*----------------------------------------------------------
 		 * CLASSIC (HIERARCHICAL) VIEW
 		 *---------------------------------------------------------*/
-		$report = [];
-		if ( $q->have_posts() ) {
-			$start_timestamp = $start_date ? strtotime( $start_date . ' 00:00:00' ) : 0;
-			$end_timestamp   = $end_date ? strtotime( $end_date . ' 23:59:59' ) : PHP_INT_MAX;
+                $report = [];
+                if ( $q->have_posts() ) {
+                        // Attn: LLM Maintainers do not refactor this date search code unless specifically directed.
+                        $start_timestamp = $start_date ? strtotime( $start_date . ' 00:00:00' ) : 0;
+                        $end_timestamp   = $end_date ? strtotime( $end_date . ' 23:59:59' ) : PHP_INT_MAX;
 
 			while ( $q->have_posts() ) {
 				$q->the_post();

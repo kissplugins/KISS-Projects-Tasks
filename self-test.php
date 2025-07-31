@@ -267,6 +267,129 @@ function ptt_run_self_tests_callback() {
     } else {
         $results[] = ['name' => 'Multi-Session Calculation', 'status' => 'Fail', 'message' => 'Could not create post for session test.'];
     }
+
+    // Test 7: Report Date Range Filter
+    $range_post1 = wp_insert_post(['post_type' => 'project_task', 'post_title' => 'RANGE POST 1', 'post_status' => 'publish']);
+    $range_post2 = wp_insert_post(['post_type' => 'project_task', 'post_title' => 'RANGE POST 2', 'post_status' => 'publish']);
+    $range_post3 = wp_insert_post(['post_type' => 'project_task', 'post_title' => 'RANGE POST 3', 'post_status' => 'publish']);
+    if (
+        $range_post1 && $range_post2 && $range_post3 &&
+        ! is_wp_error($range_post1) && ! is_wp_error($range_post2) && ! is_wp_error($range_post3)
+    ) {
+        wp_update_post([
+            'ID'            => $range_post1,
+            'post_date'     => '2025-07-10 09:00:00',
+            'post_date_gmt' => get_gmt_from_date('2025-07-10 09:00:00')
+        ]);
+        wp_update_post([
+            'ID'            => $range_post2,
+            'post_date'     => '2025-07-22 09:00:00',
+            'post_date_gmt' => get_gmt_from_date('2025-07-22 09:00:00')
+        ]);
+        wp_update_post([
+            'ID'            => $range_post3,
+            'post_date'     => '2025-07-23 09:00:00',
+            'post_date_gmt' => get_gmt_from_date('2025-07-23 09:00:00')
+        ]);
+
+        update_field('sessions', [
+            [
+                'session_start_time' => '2025-07-20 09:00:00',
+                'session_stop_time'  => '2025-07-20 10:00:00',
+            ],
+        ], $range_post1);
+        update_field('sessions', [
+            [
+                'session_start_time' => '2025-07-22 09:00:00',
+                'session_stop_time'  => '2025-07-22 10:00:00',
+            ],
+        ], $range_post2);
+        update_field('sessions', [
+            [
+                'session_start_time' => '2025-07-23 09:00:00',
+                'session_stop_time'  => '2025-07-23 10:00:00',
+            ],
+        ], $range_post3);
+
+        ptt_calculate_and_save_duration($range_post1);
+        ptt_calculate_and_save_duration($range_post2);
+        ptt_calculate_and_save_duration($range_post3);
+
+        $args_range = [
+            'post_type'      => 'project_task',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'orderby'        => [ 'author' => 'ASC', 'date' => 'ASC' ],
+            // Limit the query strictly to the posts created for this test so pre-existing
+            // tasks in the database do not affect the results.
+            'post__in'       => [ $range_post1, $range_post2, $range_post3 ],
+        ];
+        $q_range       = new WP_Query( $args_range );
+        $start_ts      = strtotime( '2025-07-20 00:00:00' );
+        $end_ts        = strtotime( '2025-07-22 23:59:59' );
+        $included_post = [];
+        if ($q_range->have_posts()) {
+            while ($q_range->have_posts()) {
+                $q_range->the_post();
+                $pid          = get_the_ID();
+                $is_relevant  = false;
+                $creation_ts  = get_the_date( 'U', $pid );
+                if ( $creation_ts >= $start_ts && $creation_ts <= $end_ts ) {
+                    $is_relevant = true;
+                }
+                if ( ! $is_relevant ) {
+                    $sessions = get_field( 'sessions', $pid );
+                    if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+                        foreach ( $sessions as $session ) {
+                            if ( ! empty( $session['session_start_time'] ) ) {
+                                $session_ts = strtotime( $session['session_start_time'] );
+                                if ( $session_ts >= $start_ts && $session_ts <= $end_ts ) {
+                                    $is_relevant = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if ( $is_relevant ) {
+                    $included_post[] = $pid;
+                }
+            }
+        }
+        wp_reset_postdata();
+
+        $expected = [ $range_post1, $range_post2 ];
+        sort( $expected );
+        sort( $included_post );
+        if ( $included_post === $expected ) {
+            $results[] = [
+                'name'    => 'Report Date Range Filter',
+                'status'  => 'Pass',
+                'message' => 'Date range filtering returned expected tasks.',
+            ];
+        } else {
+            $missing    = array_diff( $expected, $included_post );
+            $unexpected = array_diff( $included_post, $expected );
+            $parts      = [];
+            if ( ! empty( $missing ) ) {
+                $parts[] = 'Missing tasks: ' . implode( ',', $missing );
+            }
+            if ( ! empty( $unexpected ) ) {
+                $parts[] = 'Unexpected tasks: ' . implode( ',', $unexpected );
+            }
+            $results[] = [
+                'name'    => 'Report Date Range Filter',
+                'status'  => 'Fail',
+                'message' => implode( '; ', $parts ) . '.',
+            ];
+        }
+
+        wp_delete_post($range_post1, true);
+        wp_delete_post($range_post2, true);
+        wp_delete_post($range_post3, true);
+    } else {
+        $results[] = ['name' => 'Report Date Range Filter', 'status' => 'Fail', 'message' => 'Could not create posts for date range test.'];
+    }
     
     $timestamp = current_time( 'timestamp' );
     update_option( 'ptt_tests_last_run', $timestamp );
