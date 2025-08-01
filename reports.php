@@ -52,6 +52,20 @@ function ptt_format_task_notes( $content, $max_length = 200 ) {
 	return $content;
 }
 
+/**
+ * Retrieves the Assignee display name for a task.
+ *
+ * @param int $post_id Task ID.
+ * @return string Assignee name or "No Assignee".
+ */
+function ptt_get_assignee_name( $post_id ) {
+       $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );
+       if ( $assignee_id ) {
+               return get_the_author_meta( 'display_name', $assignee_id );
+       }
+       return __( 'No Assignee', 'ptt' );
+}
+
 /*===================================================================
  * Register admin‑side “Reports” sub‑menu
  *==================================================================*/
@@ -136,18 +150,21 @@ function ptt_reports_page_html() {
 						</td>
 					</tr>
 
-					<tr>
-						<th scope="row"><label for="user_id">Select Assignee</label></th>
-						<td>
-							<?php
-							wp_dropdown_users( [
-								'name'            => 'user_id',
-								'show_option_all' => 'All Users',
-								'selected'        => isset( $_REQUEST['user_id'] ) ? intval( $_REQUEST['user_id'] ) : 0,
-														] );
-														?>
-												</td>
-										</tr>
+                                       <tr>
+                                               <th scope="row"><label for="assignee_id">Select Assignee</label></th>
+                                               <td>
+                                                       <?php
+                                                       wp_dropdown_users(
+                                                               [
+                                                                       'name'            => 'assignee_id',
+                                                                       'role__in'        => [ 'author', 'editor', 'administrator' ],
+                                                                       'show_option_all' => 'All Assignees',
+                                                                       'selected'        => isset( $_REQUEST['assignee_id'] ) ? intval( $_REQUEST['assignee_id'] ) : 0,
+                                                               ]
+                                                       );
+                                                       ?>
+                                               </td>
+                                       </tr>
 
 									   <tr>
 											   <th scope="row"><label for="status_id">Select&nbsp;Status</label></th>
@@ -266,28 +283,38 @@ function ptt_reports_page_html() {
  *==================================================================*/
 function ptt_display_report_results() {
 
-	$user_id     = isset( $_REQUEST['user_id'] )    ? intval( $_REQUEST['user_id'] )    : 0;
-	$client_id   = isset( $_REQUEST['client_id'] )  ? intval( $_REQUEST['client_id'] )  : 0;
-	$project_id  = isset( $_REQUEST['project_id'] ) ? intval( $_REQUEST['project_id'] ) : 0;
-	$status_id   = isset( $_REQUEST['status_id'] )  ? intval( $_REQUEST['status_id'] )  : 0;
-	$start_date  = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
-	$end_date    = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
-	$sort_status = isset( $_REQUEST['sort_status'] ) ? sanitize_text_field( $_REQUEST['sort_status'] ) : ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
-	$view_mode   = isset( $_REQUEST['view_mode'] )   ? sanitize_text_field( $_REQUEST['view_mode'] )   : 'classic';
+       $assignee_id = isset( $_REQUEST['assignee_id'] ) ? intval( $_REQUEST['assignee_id'] ) : 0;
+       $client_id   = isset( $_REQUEST['client_id'] )   ? intval( $_REQUEST['client_id'] )   : 0;
+       $project_id  = isset( $_REQUEST['project_id'] )  ? intval( $_REQUEST['project_id'] )  : 0;
+       $status_id   = isset( $_REQUEST['status_id'] )   ? intval( $_REQUEST['status_id'] )   : 0;
+       $start_date  = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
+       $end_date    = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
+       $sort_status = isset( $_REQUEST['sort_status'] ) ? sanitize_text_field( $_REQUEST['sort_status'] ) : ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
+       $view_mode   = isset( $_REQUEST['view_mode'] )   ? sanitize_text_field( $_REQUEST['view_mode'] )   : 'classic';
 
 	/*--------------------------------------------------------------
 	 * Build WP_Query arguments
 	 *-------------------------------------------------------------*/
-	$args = [
-		'post_type'      => 'project_task',
-		'posts_per_page' => -1,
-		'post_status'    => 'publish',
-		'orderby'        => [ 'author' => 'ASC', 'date' => 'ASC' ], // Group by user, then sort tasks chronologically
-	];
+       $args = [
+               'post_type'      => 'project_task',
+               'posts_per_page' => -1,
+               'post_status'    => 'publish',
+               'meta_key'       => 'ptt_assignee',
+               'orderby'        => [ 'meta_value_num' => 'ASC', 'date' => 'ASC' ],
+       ];
 
-	if ( $user_id ) {
-		$args['author'] = $user_id;
-	}
+       $meta_query = [];
+       if ( $assignee_id ) {
+               $meta_query[] = [
+                       'key'     => 'ptt_assignee',
+                       'value'   => $assignee_id,
+                       'compare' => '=',
+                       'type'    => 'NUMERIC',
+               ];
+       }
+       if ( ! empty( $meta_query ) ) {
+               $args['meta_query'] = $meta_query;
+       }
 
 	/* Taxonomy filtering */
 	$tax_query = [ 'relation' => 'AND' ];
@@ -438,7 +465,7 @@ function ptt_display_report_results() {
 				$task_base = [
 					'id'              => $post_id,
 					'title'           => get_the_title(),
-					'assignee_name'   => get_the_author_meta( 'display_name' ),
+                                       'assignee_name'   => ptt_get_assignee_name( $post_id ),
 					'client_name'     => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
 					'project_name'    => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
 					'creation_date'   => get_the_date( 'Y-m-d', $post_id ),
@@ -615,7 +642,7 @@ function ptt_display_report_results() {
 					$daily_tasks[] = [
 						'id'             => $post_id,
 						'title'          => get_the_title(),
-						'assignee_name'  => get_the_author_meta( 'display_name' ),
+                                       'assignee_name'  => ptt_get_assignee_name( $post_id ),
 						'client_name'    => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
 						'project_name'   => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
 						'sort_timestamp' => $sort_timestamp,
@@ -802,15 +829,15 @@ function ptt_display_report_results() {
 				$duration = (float) get_field( 'calculated_duration', $post_id );
 				$grand_total += $duration;
 
-				$author_id    = get_the_author_meta( 'ID' );
-				$display_name = get_the_author_meta( 'display_name', $author_id );
-				$slack_user   = get_user_meta( $author_id, 'slack_username', true );
-				$slack_id     = get_user_meta( $author_id, 'slack_user_id', true );
+                               $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );
+                               $display_name = $assignee_id ? get_the_author_meta( 'display_name', $assignee_id ) : __( 'No Assignee', 'ptt' );
+                               $slack_user   = $assignee_id ? get_user_meta( $assignee_id, 'slack_username', true ) : '';
+                               $slack_id     = $assignee_id ? get_user_meta( $assignee_id, 'slack_user_id', true ) : '';
 
-				$author_name = $display_name;
-				if ( ! empty( $slack_user ) && ! empty( $slack_id ) ) {
-					$author_name .= ' (@' . $slack_user . ' - ' . $slack_id . ')';
-				}
+                               $assignee_name = $display_name;
+                               if ( $assignee_id && ! empty( $slack_user ) && ! empty( $slack_id ) ) {
+                                       $assignee_name .= ' (@' . $slack_user . ' - ' . $slack_id . ')';
+                               }
 
 				$client_terms   = get_the_terms( $post_id, 'client' );
 				$client_id_term = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->term_id : 0;
@@ -826,31 +853,31 @@ function ptt_display_report_results() {
 				$task_budget    = get_field( 'task_max_budget', $post_id );
 				$project_budget = $project_id_term ? get_field( 'project_max_budget', 'project_' . $project_id_term ) : 0;
 				
-				if ( ! isset( $report[ $author_id ] ) ) {
-					$report[ $author_id ] = [ 'name' => $author_name, 'total' => 0, 'clients' => [] ];
-				}
-				if ( ! isset( $report[ $author_id ]['clients'][ $client_id_term ] ) ) {
-					$report[ $author_id ]['clients'][ $client_id_term ] = [ 'name' => $client_name, 'total' => 0, 'projects' => [] ];
-				}
-				if ( ! isset( $report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] ) ) {
-					$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] = [ 'name' => $project_name, 'total' => 0, 'tasks' => [] ];
-				}
+                               if ( ! isset( $report[ $assignee_id ] ) ) {
+                                       $report[ $assignee_id ] = [ 'name' => $assignee_name, 'total' => 0, 'clients' => [] ];
+                               }
+                               if ( ! isset( $report[ $assignee_id ]['clients'][ $client_id_term ] ) ) {
+                                       $report[ $assignee_id ]['clients'][ $client_id_term ] = [ 'name' => $client_name, 'total' => 0, 'projects' => [] ];
+                               }
+                               if ( ! isset( $report[ $assignee_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] ) ) {
+                                       $report[ $assignee_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ] = [ 'name' => $project_name, 'total' => 0, 'tasks' => [] ];
+                               }
 
-				$report[ $author_id ]['total'] += $duration;
-				$report[ $author_id ]['clients'][ $client_id_term ]['total'] += $duration;
-				$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['total'] += $duration;
-				$report[ $author_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['tasks'][] = [
-					'id'              => $post_id,
-					'title'           => get_the_title(),
-					'assignee_name'   => get_the_author_meta( 'display_name' ),
-					'creation_date'   => get_the_date( 'Y-m-d', $post_id ),
-					'last_entry_date' => $last_entry_date,
-					'duration'        => $duration,
-					'content'         => get_the_content(),
-					'task_budget'     => $task_budget,
-					'project_budget'  => $project_budget,
-					'status_id'       => $status_id_term,
-				];
+                               $report[ $assignee_id ]['total'] += $duration;
+                               $report[ $assignee_id ]['clients'][ $client_id_term ]['total'] += $duration;
+                               $report[ $assignee_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['total'] += $duration;
+                               $report[ $assignee_id ]['clients'][ $client_id_term ]['projects'][ $project_id_term ]['tasks'][] = [
+                                       'id'              => $post_id,
+                                       'title'           => get_the_title(),
+                                       'assignee_name'   => ptt_get_assignee_name( $post_id ),
+                                       'creation_date'   => get_the_date( 'Y-m-d', $post_id ),
+                                       'last_entry_date' => $last_entry_date,
+                                       'duration'        => $duration,
+                                       'content'         => get_the_content(),
+                                       'task_budget'     => $task_budget,
+                                       'project_budget'  => $project_budget,
+                                       'status_id'       => $status_id_term,
+                               ];
 			}
 			wp_reset_postdata();
 		}

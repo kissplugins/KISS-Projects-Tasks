@@ -3,6 +3,11 @@
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
 ---
+### Version 1.7.31 (2025-08-01)
+* **Change:** Restored WordPress default "Author" label and added a new "Assignee" field.
+* **Feature:** Reports now filter and display using the custom "Assignee" field.
+
+---
 ### Version 1.7.30 (2025-07-30)
 * **Feature**: Added in-dashboard changelog viewer and reorganized Tasks menu order.
 * **Change**: Moved dynamic version number display from Settings to Changelog menu item.
