@@ -119,6 +119,9 @@ function ptt_self_test_page_html() {
         <div id="ptt-test-results-container" style="margin-top: 20px;">
              <div class="ptt-ajax-spinner" style="display:none;"></div>
         </div>
+        <hr />
+        <button id="ptt-sync-authors" class="button">Synchronize Authors -> Assignee</button>
+        <p id="ptt-sync-authors-result"></p>
     </div>
     <?php
 }
@@ -464,6 +467,14 @@ function ptt_run_self_tests_callback() {
         $results[] = ['name' => 'Report Date Range Filter', 'status' => 'Fail', 'message' => 'Could not create posts for date range test.'];
     }
     
+    // Test 8: User Query for Assignees
+    $assignee_users = get_users(['capability' => 'publish_posts', 'fields' => 'ID']);
+    if (!empty($assignee_users) && is_array($assignee_users)) {
+        $results[] = ['name' => 'User Query for Assignees', 'status' => 'Pass', 'message' => 'Found ' . count($assignee_users) . ' potential assignees with "publish_posts" capability.'];
+    } else {
+        $results[] = ['name' => 'User Query for Assignees', 'status' => 'Fail', 'message' => 'Could not find any users with "publish_posts" capability. Assignee dropdown may be empty.'];
+    }
+
     $timestamp = current_time( 'timestamp' );
     update_option( 'ptt_tests_last_run', $timestamp );
 
@@ -473,3 +484,32 @@ function ptt_run_self_tests_callback() {
     ]);
 }
 add_action( 'wp_ajax_ptt_run_self_tests', 'ptt_run_self_tests_callback' );
+
+/**
+ * AJAX handler to copy post authors into the Assignee field.
+ */
+function ptt_sync_authors_assignee_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $posts = get_posts(
+        [
+            'post_type'      => 'project_task',
+            'post_status'    => 'any',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+        ]
+    );
+
+    $count = 0;
+    foreach ( $posts as $post_id ) {
+        $author_id = (int) get_post_field( 'post_author', $post_id );
+        update_post_meta( $post_id, 'ptt_assignee', $author_id );
+        $count++;
+    }
+
+    wp_send_json_success( [ 'count' => $count ] );
+}
+add_action( 'wp_ajax_ptt_sync_authors_assignee', 'ptt_sync_authors_assignee_callback' );

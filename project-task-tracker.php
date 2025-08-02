@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.30
+ * Version:           1.7.34
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.30' );
+define( 'PTT_VERSION', '1.7.34' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -692,35 +692,103 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
 // =================================================================
 
 /**
- * Renames the default Author column to "Assignee" on the Tasks list table.
- *
- * @param array $columns Existing column labels.
- * @return array Modified column labels.
+ * Adds a combined Author & Assignee meta box on the Task editor.
  */
-function ptt_rename_author_column( $columns ) {
-    if ( isset( $columns['author'] ) ) {
-        $columns['author'] = __( 'Assignee', 'ptt' );
-    }
-    return $columns;
-}
-add_filter( 'manage_project_task_posts_columns', 'ptt_rename_author_column' );
-
-/**
- * Replaces the Author meta box with an "Assignee" meta box on the Task editor.
- */
-function ptt_assignee_meta_box() {
-    remove_meta_box( 'authordiv', 'project_task', 'core' );
+function ptt_author_assignee_meta_box_setup() {
+    remove_meta_box( 'authordiv', 'project_task', 'side' );
     add_meta_box(
-        'assigneediv',
-        __( 'Assignee', 'ptt' ),
-        'post_author_meta_box',
+        'ptt-author-assignee',
+        __( 'Author & Assignee', 'ptt' ),
+        'ptt_author_assignee_meta_box',
         'project_task',
         'side',
         'core',
         [ '__back_compat_meta_box' => true ]
     );
 }
-add_action( 'add_meta_boxes_project_task', 'ptt_assignee_meta_box' );
+add_action( 'add_meta_boxes_project_task', 'ptt_author_assignee_meta_box_setup' );
+
+/**
+ * Renders the Author & Assignee meta box.
+ *
+ * @param WP_Post $post Current post object.
+ */
+function ptt_author_assignee_meta_box( $post ) {
+    post_author_meta_box( $post );
+
+    $assignee = (int) get_post_meta( $post->ID, 'ptt_assignee', true );
+    wp_nonce_field( 'ptt_save_assignee', 'ptt_assignee_nonce' );
+
+    echo '<p>';
+    echo '<label for="ptt_assignee">' . esc_html__( 'Assignee', 'ptt' ) . '</label><br />';
+    wp_dropdown_users(
+        [
+            'name'             => 'ptt_assignee',
+            'id'               => 'ptt_assignee',
+            'capability'       => 'publish_posts', // More robust than role__in
+            'selected'         => $assignee,
+            'show_option_none' => __( 'No Assignee', 'ptt' ),
+        ]
+    );
+    echo '</p>';
+}
+
+/**
+ * Saves the Assignee field.
+ *
+ * @param int $post_id Post ID.
+ */
+function ptt_save_assignee_meta( $post_id ) {
+    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+        return;
+    }
+
+    if ( ! isset( $_POST['ptt_assignee_nonce'] ) || ! wp_verify_nonce( $_POST['ptt_assignee_nonce'], 'ptt_save_assignee' ) ) {
+        return;
+    }
+
+    if ( ! current_user_can( 'edit_post', $post_id ) ) {
+        return;
+    }
+
+    $assignee = isset( $_POST['ptt_assignee'] ) ? absint( $_POST['ptt_assignee'] ) : 0;
+    update_post_meta( $post_id, 'ptt_assignee', $assignee );
+}
+add_action( 'save_post_project_task', 'ptt_save_assignee_meta' );
+
+
+/**
+ * Adds Assignee column to the Tasks list table.
+ *
+ * @param array $columns Existing columns.
+ * @return array Modified columns.
+ */
+function ptt_add_assignee_column( $columns ) {
+    $new = [];
+    foreach ( $columns as $key => $label ) {
+        $new[ $key ] = $label;
+        if ( 'author' === $key ) {
+            $new['ptt_assignee'] = __( 'Assignee', 'ptt' );
+        }
+    }
+    return $new;
+}
+add_filter( 'manage_project_task_posts_columns', 'ptt_add_assignee_column' );
+
+/**
+ * Renders the Assignee column content.
+ *
+ * @param string $column  Column name.
+ * @param int    $post_id Post ID.
+ */
+function ptt_render_assignee_column( $column, $post_id ) {
+    if ( 'ptt_assignee' === $column ) {
+        $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );
+        $name        = $assignee_id ? get_the_author_meta( 'display_name', $assignee_id ) : __( 'No Assignee', 'ptt' );
+        echo esc_html( $name );
+    }
+}
+add_action( 'manage_project_task_posts_custom_column', 'ptt_render_assignee_column', 10, 2 );
 
 
 // =================================================================
