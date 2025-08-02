@@ -3,6 +3,10 @@
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
 ---
+### Version 1.7.36 (2025-08-01)
+* **Fixed:** Reassigning the author from the combined "Author & Assignee" metabox now saves reliably across different WordPress setups.
+
+---
 ### Version 1.7.35 (2025-08-01)
 * **Fixed:** The "Author" field in the custom "Author & Assignee" metabox now saves correctly when changed.
 
