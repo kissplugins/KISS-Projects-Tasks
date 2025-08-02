@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.35
+ * Version:           1.7.36
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.35' );
+define( 'PTT_VERSION', '1.7.36' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -692,32 +692,28 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
 // =================================================================
 
 /**
- * Adds a combined Author & Assignee meta box on the Task editor.
+ * Adds a custom "Assignee" meta box on the Task editor.
  */
-function ptt_author_assignee_meta_box_setup() {
-    remove_meta_box( 'authordiv', 'project_task', 'side' );
+function ptt_add_assignee_meta_box_setup() {
     add_meta_box(
-        'ptt-author-assignee',
-        __( 'Author & Assignee', 'ptt' ),
-        'ptt_author_assignee_meta_box',
+        'ptt-assignee',
+        __( 'Assignee', 'ptt' ),
+        'ptt_render_assignee_meta_box',
         'project_task',
         'side',
-        'core',
-        [ '__back_compat_meta_box' => true ]
+        'default'
     );
 }
-add_action( 'add_meta_boxes_project_task', 'ptt_author_assignee_meta_box_setup' );
+add_action( 'add_meta_boxes_project_task', 'ptt_add_assignee_meta_box_setup' );
 
 /**
- * Renders the Author & Assignee meta box.
+ * Renders the Assignee meta box content.
  *
  * @param WP_Post $post Current post object.
  */
-function ptt_author_assignee_meta_box( $post ) {
-    post_author_meta_box( $post );
-
+function ptt_render_assignee_meta_box( $post ) {
     $assignee = (int) get_post_meta( $post->ID, 'ptt_assignee', true );
-    wp_nonce_field( 'ptt_save_assignee', 'ptt_assignee_nonce' );
+    wp_nonce_field( 'ptt_save_assignee_nonce', 'ptt_assignee_nonce' );
 
     echo '<p>';
     echo '<label for="ptt_assignee">' . esc_html__( 'Assignee', 'ptt' ) . '</label><br />';
@@ -725,7 +721,7 @@ function ptt_author_assignee_meta_box( $post ) {
         [
             'name'             => 'ptt_assignee',
             'id'               => 'ptt_assignee',
-            'capability'       => 'publish_posts', // More robust than role__in
+            'capability'       => 'publish_posts',
             'selected'         => $assignee,
             'show_option_none' => __( 'No Assignee', 'ptt' ),
         ]
@@ -734,7 +730,7 @@ function ptt_author_assignee_meta_box( $post ) {
 }
 
 /**
- * Saves the Author and Assignee fields.
+ * Saves the Assignee custom field.
  *
  * @param int $post_id Post ID.
  */
@@ -743,32 +739,12 @@ function ptt_save_assignee_meta( $post_id ) {
         return;
     }
 
-    if ( ! isset( $_POST['ptt_assignee_nonce'] ) || ! wp_verify_nonce( $_POST['ptt_assignee_nonce'], 'ptt_save_assignee' ) ) {
+    if ( ! isset( $_POST['ptt_assignee_nonce'] ) || ! wp_verify_nonce( $_POST['ptt_assignee_nonce'], 'ptt_save_assignee_nonce' ) ) {
         return;
     }
 
     if ( ! current_user_can( 'edit_post', $post_id ) ) {
         return;
-    }
-
-    // Handle saving the post author
-    if ( isset( $_POST['post_author_override'] ) ) {
-        $new_author_id = absint( $_POST['post_author_override'] );
-        if ( $new_author_id ) {
-            $post_to_update = get_post( $post_id );
-            // Check if the author has actually changed to prevent unnecessary updates/loops
-            if ( $post_to_update->post_author != $new_author_id ) {
-                // Unhook this function to prevent infinite loops
-                remove_action( 'save_post_project_task', 'ptt_save_assignee_meta', 10 );
-                // Update the post's author
-                wp_update_post([
-                    'ID'          => $post_id,
-                    'post_author' => $new_author_id,
-                ]);
-                // Re-hook this function
-                add_action( 'save_post_project_task', 'ptt_save_assignee_meta', 10, 1 );
-            }
-        }
     }
 
     // Handle saving the assignee
