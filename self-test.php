@@ -421,8 +421,6 @@ function ptt_run_self_tests_callback() {
             'posts_per_page' => -1,
             'post_status'    => 'publish',
             'orderby'        => [ 'author' => 'ASC', 'date' => 'ASC' ],
-            // Limit the query strictly to the posts created for this test so pre-existing
-            // tasks in the database do not affect the results.
             'post__in'       => [ $range_post1, $range_post2, $range_post3 ],
         ];
         $q_range       = new WP_Query( $args_range );
@@ -463,26 +461,14 @@ function ptt_run_self_tests_callback() {
         sort( $expected );
         sort( $included_post );
         if ( $included_post === $expected ) {
-            $results[] = [
-                'name'    => 'Report Date Range Filter',
-                'status'  => 'Pass',
-                'message' => 'Date range filtering returned expected tasks.',
-            ];
+            $results[] = ['name' => 'Report Date Range Filter', 'status' => 'Pass', 'message' => 'Date range filtering returned expected tasks.'];
         } else {
             $missing    = array_diff( $expected, $included_post );
             $unexpected = array_diff( $included_post, $expected );
             $parts      = [];
-            if ( ! empty( $missing ) ) {
-                $parts[] = 'Missing tasks: ' . implode( ',', $missing );
-            }
-            if ( ! empty( $unexpected ) ) {
-                $parts[] = 'Unexpected tasks: ' . implode( ',', $unexpected );
-            }
-            $results[] = [
-                'name'    => 'Report Date Range Filter',
-                'status'  => 'Fail',
-                'message' => implode( '; ', $parts ) . '.',
-            ];
+            if ( ! empty( $missing ) ) $parts[] = 'Missing tasks: ' . implode( ',', $missing );
+            if ( ! empty( $unexpected ) ) $parts[] = 'Unexpected tasks: ' . implode( ',', $unexpected );
+            $results[] = ['name' => 'Report Date Range Filter', 'status' => 'Fail', 'message' => implode( '; ', $parts ) . '.'];
         }
 
         wp_delete_post($range_post1, true);
@@ -498,6 +484,52 @@ function ptt_run_self_tests_callback() {
         $results[] = ['name' => 'User Query for Assignees', 'status' => 'Pass', 'message' => 'Found ' . count($assignee_users) . ' potential assignees with "publish_posts" capability.'];
     } else {
         $results[] = ['name' => 'User Query for Assignees', 'status' => 'Fail', 'message' => 'Could not find any users with "publish_posts" capability. Assignee dropdown may be empty.'];
+    }
+
+    // Test 9: Helper Function ptt_get_assignee_name()
+    $test_user_id = wp_insert_user([
+        'user_login' => 'ptt_test_user_' . wp_rand(),
+        'user_pass'  => wp_generate_password(),
+        'display_name' => 'PTT Test Assignee',
+    ]);
+    $test_post_id_2 = wp_insert_post(['post_type' => 'project_task', 'post_title' => 'ASSIGNEE HELPER TEST']);
+
+    if ($test_user_id && $test_post_id_2 && !is_wp_error($test_user_id) && !is_wp_error($test_post_id_2)) {
+        update_post_meta($test_post_id_2, 'ptt_assignee', $test_user_id);
+        $name_from_func = ptt_get_assignee_name($test_post_id_2);
+        $check1 = ($name_from_func === 'PTT Test Assignee');
+
+        delete_post_meta($test_post_id_2, 'ptt_assignee');
+        $no_name_from_func = ptt_get_assignee_name($test_post_id_2);
+        $check2 = ($no_name_from_func === 'No Assignee');
+
+        if ($check1 && $check2) {
+            $results[] = ['name' => 'Test Helper: Get Assignee Name', 'status' => 'Pass', 'message' => 'Function correctly returned both a set name and the default string.'];
+        } else {
+            $results[] = ['name' => 'Test Helper: Get Assignee Name', 'status' => 'Fail', 'message' => 'Function did not return the expected strings.'];
+        }
+        wp_delete_post($test_post_id_2, true);
+        wp_delete_user($test_user_id);
+    } else {
+        $results[] = ['name' => 'Test Helper: Get Assignee Name', 'status' => 'Fail', 'message' => 'Could not create test user or post for helper function test.'];
+    }
+
+    // Test 10: Helper Function ptt_format_task_notes()
+    $pass = true;
+    $messages = [];
+    $long_str = '<b>Test:</b> This string is very long and should be truncated. It also includes a URL https://example.com which should be converted to a link. This part of the string is extra text just to make sure that it goes well over the two hundred character limit to properly test the truncation.';
+    $formatted_long = ptt_format_task_notes($long_str);
+    if (strlen($formatted_long) >= 200 || strpos($formatted_long, '…') === false) { $pass = false; $messages[] = 'Truncation failed.'; }
+    if (strpos($formatted_long, '<a href') === false) { $pass = false; $messages[] = 'URL conversion failed.'; }
+    if (strpos($formatted_long, '<b>') !== false) { $pass = false; $messages[] = 'HTML stripping failed.'; }
+
+    $empty_str = ptt_format_task_notes('');
+    if ($empty_str !== '') { $pass = false; $messages[] = 'Empty string was not handled correctly.'; }
+    
+    if ($pass) {
+        $results[] = ['name' => 'Test Helper: Format Task Notes', 'status' => 'Pass', 'message' => 'Function correctly handled truncation, linking, and sanitization.'];
+    } else {
+        $results[] = ['name' => 'Test Helper: Format Task Notes', 'status' => 'Fail', 'message' => implode(' ', $messages)];
     }
 
     $timestamp = current_time( 'timestamp' );
