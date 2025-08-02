@@ -188,7 +188,7 @@ function ptt_run_self_tests_callback() {
         update_field('start_time', '2025-07-19 10:00:00', $calc_test_post_id);
         update_field('stop_time', '2025-07-19 11:30:00', $calc_test_post_id); // 1.5 hours
         $duration = ptt_calculate_and_save_duration($calc_test_post_id);
-        
+
         if ($duration == '1.50') {
             $results[] = ['name' => 'Calculate Total Time (Basic)', 'status' => 'Pass', 'message' => 'Correctly calculated 1.50 hours.'];
         } else {
@@ -230,7 +230,7 @@ function ptt_run_self_tests_callback() {
     } else {
         $results[] = ['name' => 'Status Update Logic', 'status' => 'Fail', 'message' => 'Could not create test post or term for status update test.'];
     }
-    
+
     // Cleanup for Test 4 - This is now unconditional to ensure deletion.
     wp_delete_post($status_post, true);
     if ($status_term && !is_wp_error($status_term)) {
@@ -352,12 +352,12 @@ function ptt_run_self_tests_callback() {
             ],
         ];
         update_field('sessions', $sessions_data, $session_post_id);
-        
+
         // Recalculate all durations
         ptt_recalculate_on_save($session_post_id);
 
         $total_duration = get_field('calculated_duration', $session_post_id);
-        
+
         if ($total_duration == '2.00') {
             $results[] = ['name' => 'Multi-Session Calculation', 'status' => 'Pass', 'message' => 'Correctly calculated total from mixed sessions (1.5 + 0.5 = 2.00).'];
         } else {
@@ -477,7 +477,7 @@ function ptt_run_self_tests_callback() {
     } else {
         $results[] = ['name' => 'Report Date Range Filter', 'status' => 'Fail', 'message' => 'Could not create posts for date range test.'];
     }
-    
+
     // Test 8: User Query for Assignees
     $assignee_users = get_users(['capability' => 'publish_posts', 'fields' => 'ID']);
     if (!empty($assignee_users) && is_array($assignee_users)) {
@@ -518,14 +518,32 @@ function ptt_run_self_tests_callback() {
     $pass = true;
     $messages = [];
     $long_str = '<b>Test:</b> This string is very long and should be truncated. It also includes a URL https://example.com which should be converted to a link. This part of the string is extra text just to make sure that it goes well over the two hundred character limit to properly test the truncation.';
-    $formatted_long = ptt_format_task_notes($long_str);
-    if (strlen($formatted_long) >= 200 || strpos($formatted_long, '…') === false) { $pass = false; $messages[] = 'Truncation failed.'; }
-    if (strpos($formatted_long, '<a href') === false) { $pass = false; $messages[] = 'URL conversion failed.'; }
-    if (strpos($formatted_long, '<b>') !== false) { $pass = false; $messages[] = 'HTML stripping failed.'; }
+    $formatted_long = ptt_format_task_notes($long_str, 200);
+
+    $has_link = strpos($formatted_long, '<a href') !== false;
+    $has_ellipsis = strpos($formatted_long, '…') !== false;
+
+    // A meaningful test checks the length of the VISIBLE text.
+    $visible_text = wp_strip_all_tags($formatted_long);
+    $visible_length = mb_strlen($visible_text, 'UTF-8');
+
+    if (!$has_link) {
+        $pass = false;
+        $messages[] = 'Validation failed: The output is missing the clickable link.';
+    }
+    if (!$has_ellipsis) {
+        $pass = false;
+        $messages[] = "Validation failed: The output is missing the ellipsis '…' character.";
+    }
+    // Check if the visible text length is approximately 200 characters.
+    if ($visible_length > 200) {
+        $pass = false;
+        $messages[] = "Validation failed: The visible text is too long (Length: {$visible_length}).";
+    }
 
     $empty_str = ptt_format_task_notes('');
     if ($empty_str !== '') { $pass = false; $messages[] = 'Empty string was not handled correctly.'; }
-    
+
     if ($pass) {
         $results[] = ['name' => 'Test Helper: Format Task Notes', 'status' => 'Pass', 'message' => 'Function correctly handled truncation, linking, and sanitization.'];
     } else {

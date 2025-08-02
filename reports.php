@@ -19,22 +19,16 @@ if ( ! defined( 'WPINC' ) ) {
  * Helper: Format Task Notes (URLs → links, truncate > 200 chars)
  *==================================================================*/
 function ptt_format_task_notes( $content, $max_length = 200 ) {
-	$content = wp_strip_all_tags( $content );
-	$content = trim( $content );
-
+	$content = trim( wp_strip_all_tags( $content ) );
 	if ( empty( $content ) ) {
 		return '';
 	}
 
-	// Convert URLs to links using the reliable core function.
-	$content_with_links = make_clickable( $content );
-
-	// Now, if the result is too long, truncate it safely without breaking HTML.
-	if ( mb_strlen( $content_with_links ) > $max_length ) {
-		return wp_html_excerpt( $content_with_links, $max_length - 1, '&hellip;' );
+	if ( mb_strlen( $content, 'UTF-8' ) > $max_length ) {
+		$content = mb_substr( $content, 0, $max_length - 1, 'UTF-8' ) . '…';
 	}
-
-	return $content_with_links;
+    
+	return make_clickable( $content );
 }
 
 /**
