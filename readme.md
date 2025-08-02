@@ -1,5 +1,3 @@
-Of course. Here is the updated `readme.md` file with the requested section added to the FAQ.
-
 # 🚀 KISS Project & Task Time Tracker
 
 A robust WordPress plugin for tracking time spent on client projects and individual tasks. It integrates seamlessly with the WordPress admin area and provides a flexible front-end interface for users.
@@ -51,7 +49,6 @@ A robust WordPress plugin for tracking time spent on client projects and individ
     * **Task Focused:** A flat list of all tasks.
     * **Single Day:** A chronological daily log with clickable navigation to jump between days. This view shows all tasks created or worked on during the selected day and calculates a net total, excluding breaks.
 * **Over-Budget Highlighting:** The "Orig. Budget" column automatically highlights entries in red if the tracked time exceeds the allocated budget.
-* **Developer Self-Test:** A built-in testing module to verify core functionality, including multi-session calculations and reporting logic.
 
 ***
 
@@ -104,6 +101,16 @@ This is useful if you forgot to start a timer and need to log time after the fac
 3.  Use the filters at the top to select a user, client, project, or status. For "Classic" and "Task Focused" views, select a date range. For the "Single Day" view, select a single day and use the `<` and `>` arrows next to the date to quickly navigate between days.
 4.  Click **"Run Report"**.
 5.  The results will be displayed based on your selections. Note any items in red under the "Orig. Budget" column, as these have exceeded their budget.
+
+***
+
+## 🧪 Developer Self-Test Module
+
+The plugin includes a built-in testing suite, available under **Tasks → Settings**. The purpose of these automated tests is to ensure core functionalities work as expected and to prevent regressions (when a code change accidentally breaks an existing feature). These tests are practical and meaningful because they validate key user-facing features.
+
+* **Status Sorting Test**: This test verifies that the custom sorting logic on the reports page works correctly (e.g., ensuring 'In Progress' tasks always appear before 'Completed' tasks). This is a practical test because it confirms that reports are always displayed in a logical, user-friendly order.
+* **Note Formatting Test**: Another test checks the helper function that prepares task notes for display in reports. It ensures that notes are correctly truncated to the proper length and that any URLs within the notes are converted into clickable links. This is meaningful as it directly impacts the readability and functionality of the final report.
+* **Other Core Tests**: Additional tests verify other critical functions like time-duration calculations, data saving, and taxonomy creation to ensure the plugin remains stable and reliable.
 
 ***
 

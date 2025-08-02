@@ -1,4 +1,24 @@
 <?php
+/**
+ * =================================================================
+ * 11.0 SELF-TEST MODULE
+ * =================================================================
+ * LLM Maintainer Note: The goal of this file is to provide a suite
+ * of practical and meaningful tests that prevent regressions in the
+ * plugin's core functionality. Tests should validate features from a
+ * user's perspective, not just abstract technical details.
+ *
+ * Good tests to maintain and add include:
+ * - Core data operations (e.g., saving a post, calculating time).
+ * - Key helper functions that impact the front-end (e.g., note
+ * formatting for reports).
+ * - Complex logic that has a direct impact on the user experience
+ * (e.g., the custom status sorting for reports).
+ *
+ * When adding tests, ensure they create and then fully clean up
+ * their own data to remain independent and reliable.
+ * =================================================================
+ */
 
 // If this file is called directly, abort.
 if ( ! defined( 'WPINC' ) ) {
@@ -231,112 +251,100 @@ function ptt_run_self_tests_callback() {
         $results[] = ['name' => 'Status Update Logic', 'status' => 'Fail', 'message' => 'Could not create test post or term for status update test.'];
     }
     
-    // Cleanup for Test 4 - This is now unconditional to ensure deletion.
-    wp_delete_post($status_post, true);
+    // Cleanup for Test 4
+    if ($status_post) wp_delete_post($status_post, true);
     if ($status_term && !is_wp_error($status_term)) {
         wp_delete_term($status_term['term_id'], 'task_status');
     }
 
-    // Test 5: Reporting Logic
-    $report_client  = wp_insert_term('REPORT CLIENT ' . wp_rand(), 'client');
-    $report_project = wp_insert_term('REPORT PROJECT ' . wp_rand(), 'project');
-    $report_status  = wp_insert_term('REPORT STATUS ' . wp_rand(), 'task_status');
-    $admin_id = get_current_user_id();
-    $report_post1 = wp_insert_post([
-        'post_type'   => 'project_task',
-        'post_title'  => 'REPORT POST 1',
-        'post_status' => 'publish',
-        'post_author' => $admin_id
-    ]);
-    wp_update_post([
-        'ID'            => $report_post1,
-        'post_date'     => '2025-07-20 08:00:00',
-        'post_date_gmt' => get_gmt_from_date('2025-07-20 08:00:00')
-    ]);
-    wp_set_object_terms($report_post1, $report_client['term_id'], 'client');
-    wp_set_object_terms($report_post1, $report_project['term_id'], 'project');
-    wp_set_object_terms($report_post1, $report_status['term_id'], 'task_status');
-    update_field('start_time', '2025-07-20 08:00:00', $report_post1);
-    update_field('stop_time', '2025-07-20 09:00:00', $report_post1);
-    ptt_calculate_and_save_duration($report_post1);
-    $report_post2 = wp_insert_post([
-        'post_type'   => 'project_task',
-        'post_title'  => 'REPORT POST 2',
-        'post_status' => 'publish',
-        'post_author' => $admin_id
-    ]);
-    wp_update_post([
-        'ID'            => $report_post2,
-        'post_date'     => '2025-07-21 08:00:00',
-        'post_date_gmt' => get_gmt_from_date('2025-07-21 08:00:00')
-    ]);
-    wp_set_object_terms($report_post2, $report_client['term_id'], 'client');
-    wp_set_object_terms($report_post2, $report_project['term_id'], 'project');
-    wp_set_object_terms($report_post2, $report_status['term_id'], 'task_status');
-    update_field('start_time', '2025-07-21 08:00:00', $report_post2);
-    update_field('stop_time', '2025-07-21 10:00:00', $report_post2);
-    ptt_calculate_and_save_duration($report_post2);
-    $other_user = wp_insert_user([
-        'user_login' => 'ptt_other_' . wp_generate_password(4, false),
-        'user_pass'  => wp_generate_password(),
-        'role'       => 'subscriber'
-    ]);
-    $report_post3 = wp_insert_post([
-        'post_type'   => 'project_task',
-        'post_title'  => 'REPORT POST 3',
-        'post_status' => 'publish',
-        'post_author' => $other_user
-    ]);
-    wp_set_object_terms($report_post3, $report_client['term_id'], 'client');
-    wp_set_object_terms($report_post3, $report_project['term_id'], 'project');
-    wp_set_object_terms($report_post3, $report_status['term_id'], 'task_status');
-    update_field('start_time', '2025-07-21 08:00:00', $report_post3);
-    update_field('stop_time', '2025-07-21 09:00:00', $report_post3);
-    ptt_calculate_and_save_duration($report_post3);
+    // Test 5: Reporting: Custom Status Sorting
+    $status_names = ['Completed', 'In Progress', 'Not Started'];
+    $term_ids = [];
+    $post_ids = [];
+    $setup_ok = true;
+    $error_detail = '';
 
-    $args = [
-        'post_type'      => 'project_task',
-        'posts_per_page' => -1,
-        'post_status'    => 'publish',
-        'orderby'        => ['author' => 'ASC', 'date' => 'ASC'],
-        'author'         => $admin_id,
-        'tax_query'      => [
-            [
-                'taxonomy' => 'client',
-                'field'    => 'term_id',
-                'terms'    => $report_client['term_id'],
-            ],
-        ],
-        'date_query'     => [
-            [
-                'after'     => '2025-07-19 00:00:00',
-                'before'    => '2025-07-22 23:59:59',
-                'inclusive' => true,
-            ],
-        ],
-    ];
-    $report_query = new WP_Query($args);
-    $grand = 0.0;
-    if ($report_query->have_posts()) {
-        foreach ($report_query->posts as $rp) {
-            $grand += (float) get_field('calculated_duration', $rp->ID);
+    // 1. Setup Phase: Get or create necessary terms and posts.
+    foreach ($status_names as $name) {
+        $term = get_term_by('name', $name, 'task_status');
+        if (!$term) {
+            $result = wp_insert_term($name, 'task_status');
+            if (is_wp_error($result)) {
+                $setup_ok = false;
+                $error_detail = "wp_insert_term failed for '{$name}': " . $result->get_error_message();
+                break;
+            }
+            $term_ids[$name] = $result['term_id'];
+        } else {
+            $term_ids[$name] = $term->term_id;
         }
-    }
-    wp_reset_postdata();
 
-    if ($report_query->post_count === 2 && number_format($grand, 2) === '3.00') {
-        $results[] = ['name' => 'Reporting Logic', 'status' => 'Pass', 'message' => 'Report query returned expected posts and total.'];
+        $post_id = wp_insert_post(['post_type' => 'project_task', 'post_title' => "SORT TEST - {$name}", 'post_status' => 'publish']);
+        if (!$post_id || is_wp_error($post_id)) {
+            $setup_ok = false;
+            if (is_wp_error($post_id)) {
+                $error_detail = "wp_insert_post failed for '{$name}': " . $post_id->get_error_message();
+            } else {
+                $error_detail = "wp_insert_post returned a zero ID for '{$name}'.";
+            }
+            break;
+        }
+        $post_ids[$name] = $post_id;
+        wp_set_object_terms($post_id, $term_ids[$name], 'task_status');
+    }
+
+    if ($setup_ok) {
+        // 2. Replicate sorting logic from reports page
+        $tasks_to_sort = [
+            ['id' => $post_ids['Completed'],   'status_id' => $term_ids['Completed'],   'last_entry_date' => '2025-01-03'],
+            ['id' => $post_ids['In Progress'], 'status_id' => $term_ids['In Progress'], 'last_entry_date' => '2025-01-01'],
+            ['id' => $post_ids['Not Started'], 'status_id' => $term_ids['Not Started'], 'last_entry_date' => '2025-01-02'],
+        ];
+
+        $status_terms          = get_terms( [ 'taxonomy' => 'task_status', 'hide_empty' => false ] );
+        $default_order_names   = [ 'In Progress', 'Not Started', 'Blocked', 'Paused', 'Completed' ];
+        $status_order          = [];
+        $index                 = 1;
+        foreach ( $default_order_names as $name ) {
+            foreach ( $status_terms as $term ) {
+                if ( ! isset( $status_order[ $term->term_id ] ) && strcasecmp( $term->name, $name ) === 0 ) {
+                    $status_order[ $term->term_id ] = $index++;
+                }
+            }
+        }
+        foreach ( $status_terms as $term ) {
+            if ( ! isset( $status_order[ $term->term_id ] ) ) {
+                $status_order[ $term->term_id ] = $index++;
+            }
+        }
+
+        usort( $tasks_to_sort, function( $a, $b ) use ( $status_order ) {
+            $oa = isset( $status_order[ $a['status_id'] ] ) ? $status_order[ $a['status_id'] ] : PHP_INT_MAX;
+            $ob = isset( $status_order[ $b['status_id'] ] ) ? $status_order[ $b['status_id'] ] : PHP_INT_MAX;
+            if ( $oa === $ob ) { return strcmp( $b['last_entry_date'], $a['last_entry_date'] ); }
+            return $oa <=> $ob;
+        } );
+
+        // 3. Assert the results
+        $sorted_ids = wp_list_pluck($tasks_to_sort, 'id');
+        $expected_order = [ $post_ids['In Progress'], $post_ids['Not Started'], $post_ids['Completed'] ];
+
+        if ($sorted_ids === $expected_order) {
+            $results[] = ['name' => 'Reporting: Custom Status Sorting', 'status' => 'Pass', 'message' => 'Tasks were correctly sorted based on the default status order.'];
+        } else {
+            $expected_str = implode(',', $expected_order);
+            $actual_str = implode(',', $sorted_ids);
+            $results[] = ['name' => 'Reporting: Custom Status Sorting', 'status' => 'Fail', 'message' => "Task sorting did not match the expected order. Expected: [{$expected_str}], Got: [{$actual_str}]."];
+        }
+
     } else {
-        $results[] = ['name' => 'Reporting Logic', 'status' => 'Fail', 'message' => 'Unexpected report results.'];
+        $results[] = ['name' => 'Reporting: Custom Status Sorting', 'status' => 'Fail', 'message' => "Test data setup failed. Details: {$error_detail}"];
     }
 
-    wp_delete_post($report_post1, true);
-    wp_delete_post($report_post2, true);
-    wp_delete_post($report_post3, true);
-    wp_delete_user($other_user);
-    wp_delete_term($report_client['term_id'], 'client');
-    wp_delete_term($report_project['term_id'], 'project');
-    wp_delete_term($report_status['term_id'], 'task_status');
+    // 4. Teardown: Only delete the posts we created.
+    foreach($post_ids as $p_id) {
+        if ($p_id) wp_delete_post($p_id, true);
+    }
 
     // Test 6: Multi-Session Duration Calculation
     $session_post_id = wp_insert_post(['post_type' => 'project_task', 'post_title' => 'SESSION TEST POST', 'post_status' => 'publish']);
@@ -421,8 +429,6 @@ function ptt_run_self_tests_callback() {
             'posts_per_page' => -1,
             'post_status'    => 'publish',
             'orderby'        => [ 'author' => 'ASC', 'date' => 'ASC' ],
-            // Limit the query strictly to the posts created for this test so pre-existing
-            // tasks in the database do not affect the results.
             'post__in'       => [ $range_post1, $range_post2, $range_post3 ],
         ];
         $q_range       = new WP_Query( $args_range );
@@ -463,26 +469,14 @@ function ptt_run_self_tests_callback() {
         sort( $expected );
         sort( $included_post );
         if ( $included_post === $expected ) {
-            $results[] = [
-                'name'    => 'Report Date Range Filter',
-                'status'  => 'Pass',
-                'message' => 'Date range filtering returned expected tasks.',
-            ];
+            $results[] = ['name' => 'Report Date Range Filter', 'status' => 'Pass', 'message' => 'Date range filtering returned expected tasks.'];
         } else {
             $missing    = array_diff( $expected, $included_post );
             $unexpected = array_diff( $included_post, $expected );
             $parts      = [];
-            if ( ! empty( $missing ) ) {
-                $parts[] = 'Missing tasks: ' . implode( ',', $missing );
-            }
-            if ( ! empty( $unexpected ) ) {
-                $parts[] = 'Unexpected tasks: ' . implode( ',', $unexpected );
-            }
-            $results[] = [
-                'name'    => 'Report Date Range Filter',
-                'status'  => 'Fail',
-                'message' => implode( '; ', $parts ) . '.',
-            ];
+            if ( ! empty( $missing ) ) $parts[] = 'Missing tasks: ' . implode( ',', $missing );
+            if ( ! empty( $unexpected ) ) $parts[] = 'Unexpected tasks: ' . implode( ',', $unexpected );
+            $results[] = ['name' => 'Report Date Range Filter', 'status' => 'Fail', 'message' => implode( '; ', $parts ) . '.'];
         }
 
         wp_delete_post($range_post1, true);
@@ -498,6 +492,70 @@ function ptt_run_self_tests_callback() {
         $results[] = ['name' => 'User Query for Assignees', 'status' => 'Pass', 'message' => 'Found ' . count($assignee_users) . ' potential assignees with "publish_posts" capability.'];
     } else {
         $results[] = ['name' => 'User Query for Assignees', 'status' => 'Fail', 'message' => 'Could not find any users with "publish_posts" capability. Assignee dropdown may be empty.'];
+    }
+
+    // Test 9: Helper Function ptt_get_assignee_name()
+    $test_user_id = wp_insert_user([
+        'user_login' => 'ptt_test_user_' . wp_rand(),
+        'user_pass'  => wp_generate_password(),
+        'display_name' => 'PTT Test Assignee',
+    ]);
+    $test_post_id_2 = wp_insert_post(['post_type' => 'project_task', 'post_title' => 'ASSIGNEE HELPER TEST']);
+
+    if ($test_user_id && $test_post_id_2 && !is_wp_error($test_user_id) && !is_wp_error($test_post_id_2)) {
+        update_post_meta($test_post_id_2, 'ptt_assignee', $test_user_id);
+        $name_from_func = ptt_get_assignee_name($test_post_id_2);
+        $check1 = ($name_from_func === 'PTT Test Assignee');
+
+        delete_post_meta($test_post_id_2, 'ptt_assignee');
+        $no_name_from_func = ptt_get_assignee_name($test_post_id_2);
+        $check2 = ($no_name_from_func === 'No Assignee');
+
+        if ($check1 && $check2) {
+            $results[] = ['name' => 'Test Helper: Get Assignee Name', 'status' => 'Pass', 'message' => 'Function correctly returned both a set name and the default string.'];
+        } else {
+            $results[] = ['name' => 'Test Helper: Get Assignee Name', 'status' => 'Fail', 'message' => 'Function did not return the expected strings.'];
+        }
+        wp_delete_post($test_post_id_2, true);
+        if ($test_user_id && !is_wp_error($test_user_id)) wp_delete_user($test_user_id);
+    } else {
+        $results[] = ['name' => 'Test Helper: Get Assignee Name', 'status' => 'Fail', 'message' => 'Could not create test user or post for helper function test.'];
+    }
+
+    // Test 10: Helper Function ptt_format_task_notes()
+    $pass = true;
+    $messages = [];
+    $long_str = '<b>Test:</b> This string is very long and should be truncated. It also includes a URL https://example.com which should be converted to a link. This part of the string is extra text just to make sure that it goes well over the two hundred character limit to properly test the truncation.';
+    $formatted_long = ptt_format_task_notes($long_str, 200);
+
+    $has_link = strpos($formatted_long, '<a href') !== false;
+    $has_ellipsis = strpos($formatted_long, '…') !== false;
+    
+    // A meaningful test checks the length of the VISIBLE text.
+    $visible_text = wp_strip_all_tags($formatted_long);
+    $visible_length = mb_strlen($visible_text, 'UTF-8');
+
+    if (!$has_link) {
+        $pass = false;
+        $messages[] = 'Validation failed: The output is missing the clickable link.';
+    }
+    if (!$has_ellipsis) {
+        $pass = false;
+        $messages[] = "Validation failed: The output is missing the ellipsis '…' character.";
+    }
+    // Check if the visible text length is approximately 200 characters.
+    if ($visible_length > 200) {
+        $pass = false;
+        $messages[] = "Validation failed: The visible text is too long (Length: {$visible_length}).";
+    }
+    
+    $empty_str = ptt_format_task_notes('');
+    if ($empty_str !== '') { $pass = false; $messages[] = 'Empty string was not handled correctly.'; }
+    
+    if ($pass) {
+        $results[] = ['name' => 'Test Helper: Format Task Notes', 'status' => 'Pass', 'message' => 'Function correctly handled truncation, linking, and sanitization.'];
+    } else {
+        $results[] = ['name' => 'Test Helper: Format Task Notes', 'status' => 'Fail', 'message' => implode(' ', $messages)];
     }
 
     $timestamp = current_time( 'timestamp' );

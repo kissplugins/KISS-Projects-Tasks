@@ -19,37 +19,16 @@ if ( ! defined( 'WPINC' ) ) {
  * Helper: Format Task Notes (URLs → links, truncate > 200 chars)
  *==================================================================*/
 function ptt_format_task_notes( $content, $max_length = 200 ) {
-	$content = wp_strip_all_tags( $content );
-	$content = trim( $content );
-
+	$content = trim( wp_strip_all_tags( $content ) );
 	if ( empty( $content ) ) {
 		return '';
 	}
 
-	$truncated = false;
-	if ( strlen( $content ) > $max_length ) {
-		$content   = substr( $content, 0, $max_length - 3 );
-		$truncated = true;
+	if ( mb_strlen( $content, 'UTF-8' ) > $max_length ) {
+		$content = mb_substr( $content, 0, $max_length - 1, 'UTF-8' ) . '…';
 	}
-
-	$content = esc_html( $content );
-
-	$url_pattern = '/(https?:\/\/[^\s<>"{}|\\^`\[\]]+)/i';
-	$content     = preg_replace_callback(
-		$url_pattern,
-		function ( $m ) {
-			$url         = $m[1];
-			$display_url = strlen( $url ) > 50 ? substr( $url, 0, 47 ) . '…' : $url;
-			return '<a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . $display_url . '</a>';
-		},
-		$content
-	);
-
-	if ( $truncated ) {
-		$content .= '…';
-	}
-
-	return $content;
+    
+	return make_clickable( $content );
 }
 
 /**
@@ -157,7 +136,7 @@ function ptt_reports_page_html() {
                                                        wp_dropdown_users(
                                                                [
                                                                        'name'            => 'assignee_id',
-                                                                       'role__in'        => [ 'author', 'editor', 'administrator' ],
+                                                                       'capability'      => 'publish_posts',
                                                                        'show_option_all' => 'All Assignees',
                                                                        'selected'        => isset( $_REQUEST['assignee_id'] ) ? intval( $_REQUEST['assignee_id'] ) : 0,
                                                                ]
