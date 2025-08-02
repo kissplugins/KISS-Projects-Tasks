@@ -3,6 +3,18 @@
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
 ---
+### Version 1.7.36 (2025-08-01)
+* **Fixed:** Simplified "Assignee" metabox by removing Author.
+
+---
+### Version 1.7.34 (2025-08-01)
+* **Fixed:** Resolved a server-specific issue where the Assignee dropdown would not populate. Changed user query from role-based to capability-based for better reliability across different WordPress environments (including Multisite).
+
+---
+### Version 1.7.33 (2025-08-01)
+* **Fixed:** The "Assignee" dropdown now correctly appears in the "Author & Assignee" metabox on the task editor screen.
+
+---
 ### Version 1.7.32 (2025-08-01)
 * **Feature:** Added a Settings utility to synchronize Authors into the Assignee field.
 * **Feature:** Display the Assignee alongside Author in the All Tasks list.

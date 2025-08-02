@@ -137,13 +137,38 @@ function ptt_run_self_tests_callback() {
 
     $results = [];
 
-    // Test 1: Task Post Save
-    $test_post_id = wp_insert_post(['post_type' => 'project_task', 'post_title' => 'SELF TEST POST', 'post_status' => 'trash']);
-    if ($test_post_id && !is_wp_error($test_post_id)) {
-        $results[] = ['name' => 'Task Post Save', 'status' => 'Pass', 'message' => 'Successfully created and trashed test post.'];
-        wp_delete_post($test_post_id, true); // force delete
+    // Test 1: Task Post Save & Assignee Update
+    $test_post_id = wp_insert_post([
+        'post_type'   => 'project_task',
+        'post_title'  => 'SELF TEST POST',
+        'post_status' => 'publish',
+    ]);
+
+    if ( $test_post_id && ! is_wp_error( $test_post_id ) ) {
+        $admin_id = get_current_user_id();
+        update_post_meta( $test_post_id, 'ptt_assignee', $admin_id );
+        $saved_assignee = (int) get_post_meta( $test_post_id, 'ptt_assignee', true );
+
+        if ( $saved_assignee === $admin_id ) {
+            $results[] = [
+                'name'    => 'Task Post Save & Assignee Update',
+                'status'  => 'Pass',
+                'message' => 'Successfully created post and updated its assignee meta field.',
+            ];
+        } else {
+            $results[] = [
+                'name'    => 'Task Post Save & Assignee Update',
+                'status'  => 'Fail',
+                'message' => 'Created post but failed to update or verify assignee meta field.',
+            ];
+        }
+        wp_delete_post( $test_post_id, true ); // force delete
     } else {
-        $results[] = ['name' => 'Task Post Save', 'status' => 'Fail', 'message' => 'Failed to create test post.'];
+        $results[] = [
+            'name'    => 'Task Post Save & Assignee Update',
+            'status'  => 'Fail',
+            'message' => 'Failed to create test post.',
+        ];
     }
 
     // Test 2: Create Client + Project
