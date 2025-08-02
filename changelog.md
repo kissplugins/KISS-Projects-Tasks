@@ -3,6 +3,11 @@
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
 ---
+### Version 1.7.39 (2025-08-01)
+* **Improved:** Refined the "Reporting Logic" self-test to specifically validate the custom status sorting logic, making it more meaningful for catching regressions in the report display.
+* **Improved:** Made the "Format Task Notes" self-test more robust by checking the length of the visible text instead of raw HTML and improving its error messages for easier debugging.
+
+---
 ### Version 1.7.38 (2025-08-01)
 * **Fixed:** Implemented a more robust fix for the `ptt_format_task_notes` helper function by using the `make_clickable` core WordPress function. This resolves the "Truncation failed" and "URL conversion failed" self-test errors.
 
