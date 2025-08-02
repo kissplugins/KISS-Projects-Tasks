@@ -3,8 +3,20 @@
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
 ---
+### Version 1.7.38 (2025-08-01)
+* **Fixed:** Implemented a more robust fix for the `ptt_format_task_notes` helper function by using the `make_clickable` core WordPress function. This resolves the "Truncation failed" and "URL conversion failed" self-test errors.
+
+---
+### Version 1.7.37 (2025-08-01)
+* **Fixed:** Resolved a bug in the `ptt_format_task_notes` helper function that caused the "Truncation failed" self-test to fail. The function now correctly truncates notes after converting URLs to links.
+
+---
 ### Version 1.7.36 (2025-08-01)
-* **Fixed:** Simplified "Assignee" metabox by removing Author.
+* **Changed:** Reverted the "Author & Assignee" metabox to be a standalone "Assignee" metabox to improve stability. The default WordPress "Author" metabox is now used for assigning authors.
+
+---
+### Version 1.7.35 (2025-08-01)
+* **Fixed:** The "Author" field in the custom "Author & Assignee" metabox now saves correctly when changed.
 
 ---
 ### Version 1.7.34 (2025-08-01)
