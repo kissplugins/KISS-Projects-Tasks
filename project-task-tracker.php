@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.35
+ * Version:           1.7.36
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.35' );
+define( 'PTT_VERSION', '1.7.36' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -751,23 +751,32 @@ function ptt_save_assignee_meta( $post_id ) {
         return;
     }
 
-    // Handle saving the post author
+    // Handle saving the post author.
+    $new_author_id = 0;
     if ( isset( $_POST['post_author_override'] ) ) {
         $new_author_id = absint( $_POST['post_author_override'] );
-        if ( $new_author_id ) {
-            $post_to_update = get_post( $post_id );
-            // Check if the author has actually changed to prevent unnecessary updates/loops
-            if ( $post_to_update->post_author != $new_author_id ) {
-                // Unhook this function to prevent infinite loops
-                remove_action( 'save_post_project_task', 'ptt_save_assignee_meta', 10 );
-                // Update the post's author
-                wp_update_post([
+    } elseif ( isset( $_POST['post_author'] ) ) {
+        $new_author_id = absint( $_POST['post_author'] );
+    }
+
+    if ( $new_author_id ) {
+        $post_to_update = get_post( $post_id );
+
+        // Check if the author has actually changed to prevent unnecessary updates/loops.
+        if ( (int) $post_to_update->post_author !== $new_author_id ) {
+            // Unhook this function to prevent infinite loops.
+            remove_action( 'save_post_project_task', 'ptt_save_assignee_meta', 10 );
+
+            // Update the post's author.
+            wp_update_post(
+                [
                     'ID'          => $post_id,
                     'post_author' => $new_author_id,
-                ]);
-                // Re-hook this function
-                add_action( 'save_post_project_task', 'ptt_save_assignee_meta', 10, 1 );
-            }
+                ]
+            );
+
+            // Re-hook this function.
+            add_action( 'save_post_project_task', 'ptt_save_assignee_meta', 10, 1 );
         }
     }
 
