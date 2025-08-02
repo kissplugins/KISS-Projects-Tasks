@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.32
+ * Version:           1.7.34
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.32' );
+define( 'PTT_VERSION', '1.7.34' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -723,11 +723,11 @@ function ptt_author_assignee_meta_box( $post ) {
     echo '<label for="ptt_assignee">' . esc_html__( 'Assignee', 'ptt' ) . '</label><br />';
     wp_dropdown_users(
         [
-            'name'            => 'ptt_assignee',
-            'id'              => 'ptt_assignee',
-            'role__in'        => [ 'author', 'editor', 'administrator' ],
-            'selected'        => $assignee,
-            'show_option_none'=> __( 'No Assignee', 'ptt' ),
+            'name'             => 'ptt_assignee',
+            'id'               => 'ptt_assignee',
+            'capability'       => 'publish_posts', // More robust than role__in
+            'selected'         => $assignee,
+            'show_option_none' => __( 'No Assignee', 'ptt' ),
         ]
     );
     echo '</p>';
