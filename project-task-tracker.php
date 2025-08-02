@@ -695,7 +695,7 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
  * Adds a combined Author & Assignee meta box on the Task editor.
  */
 function ptt_author_assignee_meta_box_setup() {
-    remove_meta_box( 'authordiv', 'project_task', 'core' );
+    remove_meta_box( 'authordiv', 'project_task', 'side' );
     add_meta_box(
         'ptt-author-assignee',
         __( 'Author & Assignee', 'ptt' ),
