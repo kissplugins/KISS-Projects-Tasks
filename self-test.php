@@ -119,6 +119,9 @@ function ptt_self_test_page_html() {
         <div id="ptt-test-results-container" style="margin-top: 20px;">
              <div class="ptt-ajax-spinner" style="display:none;"></div>
         </div>
+        <hr />
+        <button id="ptt-sync-authors" class="button">Synchronize Authors -> Assignee</button>
+        <p id="ptt-sync-authors-result"></p>
     </div>
     <?php
 }
@@ -473,3 +476,32 @@ function ptt_run_self_tests_callback() {
     ]);
 }
 add_action( 'wp_ajax_ptt_run_self_tests', 'ptt_run_self_tests_callback' );
+
+/**
+ * AJAX handler to copy post authors into the Assignee field.
+ */
+function ptt_sync_authors_assignee_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $posts = get_posts(
+        [
+            'post_type'      => 'project_task',
+            'post_status'    => 'any',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+        ]
+    );
+
+    $count = 0;
+    foreach ( $posts as $post_id ) {
+        $author_id = (int) get_post_field( 'post_author', $post_id );
+        update_post_meta( $post_id, 'ptt_assignee', $author_id );
+        $count++;
+    }
+
+    wp_send_json_success( [ 'count' => $count ] );
+}
+add_action( 'wp_ajax_ptt_sync_authors_assignee', 'ptt_sync_authors_assignee_callback' );
