@@ -206,7 +206,7 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'client' ],
-        'show_in_menu'      => 'edit.php?post_type=project_task',
+        'show_in_menu'      => true,
     ];
     register_taxonomy( 'client', [ 'project_task' ], $client_args );
 
@@ -231,7 +231,7 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'project' ],
-        'show_in_menu'      => 'edit.php?post_type=project_task',
+        'show_in_menu'      => true,
     ];
     register_taxonomy( 'project', [ 'project_task' ], $project_args );
 
@@ -254,7 +254,7 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'task_status' ],
-        'show_in_menu'      => 'edit.php?post_type=project_task',
+        'show_in_menu'      => true,
         'default_term'      => [
             'name' => 'Not Started',
             'slug' => 'not-started',
