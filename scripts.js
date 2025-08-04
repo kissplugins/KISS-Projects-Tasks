@@ -895,6 +895,36 @@ jQuery(document).ready(function ($) {
      * ADMIN REPORTS PAGE
      * ---------------------------------------------------------------
      */
+    function handleReportViewModeChange() {
+        const viewMode = $('input[name="view_mode"]:checked').val();
+        const $dateRow = $('.form-table tr:has(#start_date)');
+        const $endDate = $('#end_date');
+        const $separator = $dateRow.find('.date-range-separator');
+        const $dateLabel = $dateRow.find('th label');
+        const $weekButtons = $('#set-this-week, #set-last-week');
+
+        if (viewMode === 'single_day') {
+            $endDate.hide();
+            $separator.hide();
+            $weekButtons.hide();
+            $dateLabel.text('Select Day');
+        } else {
+            $endDate.show();
+            $separator.show();
+            $weekButtons.show();
+            $dateLabel.text('Date Range');
+        }
+    }
+
+    // Handle view mode change
+    $('input[name="view_mode"]').on('change', handleReportViewModeChange);
+
+    // Run on page load to set initial state
+    if ($('input[name="view_mode"]').length) {
+        handleReportViewModeChange();
+    }
+
+
     const formatDate = (date) => {
         const y = date.getFullYear();
         const m = ('0' + (date.getMonth() + 1)).slice(-2);
@@ -932,6 +962,33 @@ jQuery(document).ready(function ($) {
         $('#end_date').val(formatDate(lastSaturday));
     });
 
+    // Handle status change on reports page
+    $(document).on('change', '.ptt-report-status-select', function() {
+        const $select = $(this);
+        const postId = $select.data('postid');
+        const statusId = $select.val();
+        const $container = $select.parent();
+
+        showSpinner($container);
+        $select.prop('disabled', true);
+
+        $.post(ptt_ajax_object.ajax_url, {
+            action: 'ptt_update_task_status',
+            nonce: ptt_ajax_object.nonce,
+            post_id: postId,
+            status_id: statusId
+        }).done(function(response) {
+            // Optional: Show a success indicator
+        }).fail(function() {
+            alert('Failed to update status.');
+            // Revert on failure if needed
+            $select.val($select.find('option[selected]').val());
+        }).always(function() {
+            hideSpinner($container);
+            $select.prop('disabled', false);
+        });
+    });
+
 
     /**
      * ---------------------------------------------------------------
@@ -951,8 +1008,8 @@ jQuery(document).ready(function ($) {
             action: 'ptt_run_self_tests',
             nonce: ptt_ajax_object.nonce
         }).done(function (response) {
-            if (response.success) {
-                const results = response.data.results || response.data;
+            if (response.success && response.data && Array.isArray(response.data.results)) {
+                const results = response.data.results;
                 let tableHtml = '<table class="wp-list-table widefat striped"><thead><tr><th>Test Name</th><th>Status</th><th>Message</th></tr></thead><tbody>';
                 results.forEach(function (result) {
                     tableHtml += `<tr>
@@ -962,12 +1019,14 @@ jQuery(document).ready(function ($) {
                     </tr>`;
                 });
                 tableHtml += '</tbody></table>';
-                $resultsContainer.append(tableHtml);
+                $resultsContainer.html(tableHtml); // Use .html() to clear previous results
                 if (response.data.time) {
                     $('#ptt-last-test-time').text('Tests Last Ran at ' + response.data.time);
                 }
             } else {
-                $resultsContainer.append('<p class="error">An error occurred while running tests.</p>');
+                // Handle cases where the response is not what was expected
+                let errorMessage = '<p class="status-fail">An error occurred while running tests. The server returned an unexpected response, which may indicate a fatal error or that a sub-process was interrupted.</p>';
+                $resultsContainer.html(errorMessage);
             }
         }).fail(function () {
             $resultsContainer.append('<p class="error">A server error occurred.</p>');
@@ -980,4 +1039,27 @@ jQuery(document).ready(function ($) {
     if ($('#ptt-run-self-tests').length) {
         $('#ptt-run-self-tests').trigger('click');
     }
+
+    $('#ptt-sync-authors').on('click', function () {
+        const $button = $(this);
+        const $result = $('#ptt-sync-authors-result');
+
+        $button.prop('disabled', true);
+        $result.text('Synchronizing...');
+
+        $.post(ptt_ajax_object.ajax_url, {
+            action: 'ptt_sync_authors_assignee',
+            nonce: ptt_ajax_object.nonce
+        }).done(function (response) {
+            if (response.success && typeof response.data.count !== 'undefined') {
+                $result.text('Synchronized ' + response.data.count + ' tasks.');
+            } else {
+                $result.text('Synchronization failed.');
+            }
+        }).fail(function () {
+            $result.text('Server error.');
+        }).always(function () {
+            $button.prop('disabled', false);
+        });
+    });
 });

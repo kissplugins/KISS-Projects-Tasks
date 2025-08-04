@@ -1,4 +1,4 @@
-<canvas>
+Of course. Here is the updated `readme.md` file with the requested section added to the FAQ.
 
 # 🚀 KISS Project & Task Time Tracker
 
@@ -46,9 +46,12 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 ### Reporting & Admin Tools
 * **Reports Dashboard:** A dedicated "Reports" page in the admin area.
 * **Filterable Data:** Filter reports by user, client, project, status, and custom date ranges.
-* **Grouped Results:** Data is logically grouped by User, Client, and Project, with subtotals for each.
+* **Multiple View Modes:** Use the toggle switch to select a view:
+    * **Classic:** Data is logically grouped by User, Client, and Project, with subtotals for each.
+    * **Task Focused:** A flat list of all tasks.
+    * **Single Day:** A chronological daily log with clickable navigation to jump between days. This view shows all tasks created or worked on during the selected day and calculates a net total, excluding breaks.
 * **Over-Budget Highlighting:** The "Orig. Budget" column automatically highlights entries in red if the tracked time exceeds the allocated budget.
-* **Developer Self-Test:** A built-in testing module to verify core functionality.
+* **Developer Self-Test:** A built-in testing module to verify core functionality, including multi-session calculations and reporting logic.
 
 ***
 
@@ -97,9 +100,10 @@ This is useful if you forgot to start a timer and need to log time after the fac
 ### 3. Viewing Reports
 
 1.  Navigate to **Tasks → Reports** from the admin menu.
-2.  Use the filters at the top to select a user, client, project, status, or date range.
-3.  Click **"Run Report"**.
-4.  The results will be grouped by user, then client, then project. Note any items in red under the "Orig. Budget" column, as these have exceeded their budget.
+2.  Use the view mode toggle to select between "Classic", "Task Focused", or "Single Day".
+3.  Use the filters at the top to select a user, client, project, or status. For "Classic" and "Task Focused" views, select a date range. For the "Single Day" view, select a single day and use the `<` and `>` arrows next to the date to quickly navigate between days.
+4.  Click **"Run Report"**.
+5.  The results will be displayed based on your selections. Note any items in red under the "Orig. Budget" column, as these have exceeded their budget.
 
 ***
 
@@ -110,6 +114,11 @@ A: This plugin is built on Advanced Custom Fields Pro. It handles all the custom
 
 **Q: Can I run two timers at once?**
 A: No. To ensure data integrity, the plugin prevents a user from starting a timer if another task is already running for them. You must stop your active task before starting a new one.
+
+**Q: How does the date input field work on the Reports page?**
+A: The behavior of the date filter changes based on the selected "View Mode":
+* **Classic & Task Focused Views:** These modes use a **date range** (start and end date). The report will only show tasks that were **created** within that specific range.
+* **Single Day View:** This mode uses a **single date picker**. It shows all tasks that were either **created** on that day OR had a **work session** that started on that day, making it a true daily log.
 
 **Q: Why can't I add a new session?**
 A: You must complete any open sessions first. Make sure that every existing session row has either been stopped (with a start and stop time) or has a manual duration entered. You cannot add a new session if a previous one is still running.
@@ -122,85 +131,6 @@ A: The total time tracked for the task has exceeded the hours you set in the "Ma
 
 ***
 
-## 📋 Changelog
-### Version 1.7.4 (2025-07-21)
-* **Docs:** Added detailed user instructions and an FAQ section to the Readme file.
-* **Feature:** On screen debugger code for  timer in scripts.js - comment out later
+## View Changelog
 
-### Version 1.7.3 (2025-07-21)
-* **Feature:** Session rows in the admin editor now have a live, one-click timer.
-* **Feature:** Starting and stopping a session timer no longer requires a page reload.
-* **Improved:** Re-used front-end timer logic for back-end sessions to adhere to DRY principles.
-* **Fixed:** Session validation now correctly checks for running timers before allowing a new session to be added.
-
-### Version 1.7.2 (2025-07-21)
-* **Feature:** Orig. Budget amount in reports now appears in red if the task duration exceeds the budget.
-* **Feature:** Added a "Use Today's Date" button under the post title field on the Add/Edit Task screen to quickly prepend the current date.
-
-### Version 1.7.1 (2025-07-21)
-* **Sessions Save:** Adding a new session now automatically saves the task.
-* **Totals:** Task duration is now calculated from the sum of all sessions.
-* **Validation:** New sessions cannot be created while previous ones are incomplete.
-### Version 1.7.0 (2025-07-21)
-* **Sessions:** Tasks now support multiple work sessions via a repeater in the admin editor.
-* **Automatic Stop:** Starting a new session automatically stops any prior running session for that task.
-### Version 1.6.7 (2025-07-21)
-* **Status Taxonomy:** Tasks now include a Task Status with default terms.
-* **Reports/Tasks:** New Status column and filtering options.
-
-### Version 1.6.6 (2025-07-21)
-* **Permalinks:** Task links now include the post ID for easier reference.
-* **Template:** Added front-end task view with timer and manual entry (authors+ only).
-* **Shortcodes:** New `[daily-planner]` and `[weekly-planner]` shortcodes list upcoming tasks.
-### Version 1.6.4 (2025-07-20)
-**Bug Fixes**
-* **Fixed:** Reports page reloaded to task list after submitting query
-
-### Version 1.6.3 (2025-07-20)
-**Sharable Reports**
-* **Added:** URL parameters for reports (user, client, project, dates)
-* **Feature:** Reports auto-load based on incoming URL parameters
-
-
-### Version 1.6.2 (2025-07-20)
-**Budget Display in Reports**
-* **Added:** "Orig. Budget" column to reports showing allocated hours
-* **Feature:** Displays task-specific budget when available
-* **Feature:** Falls back to project budget if no task budget is set
-* **Display:** Shows "(Task)" or "(Project)" label to indicate budget source
-* **Improved:** Column width adjustments for better readability
-
-### Version 1.6.1 (2025-07-20)
-**Reports Enhancement**
-* **Added:** Notes column to reports table showing task content/body
-* **Added:** Automatic URL detection and rendering as clickable links in Notes
-* **Added:** Text truncation at 200 characters with ellipses for long notes
-* **Improved:** Report table layout with proper column widths
-* **Feature:** URLs anywhere in notes are automatically converted to clickable links
-
-### Version 1.6.0 (2025-07-20)
-**Manual Time Entry Feature**
-* **Added:** Manual time entry option in both admin post editor and frontend shortcode
-* **Added:** Manual override checkbox in ACF fields to switch between timer and manual modes
-* **Added:** Decimal hours input with helpful examples (1.5 = 1h 30m)
-* **Added:** Manual Entry button on frontend form for quick time logging
-* **Added:** Validation for manual time entries (must be positive, max 24 hours)
-* **Improved:** Time calculation logic now supports both timer-based and manual entries
-* **Feature:** Users can now log time retrospectively if they forgot to start the timer
-
-### Version 1.5.0 (2025-07-20)
-**Improved Error Handling & Recovery**
-* **Fixed:** Stop button lockout issue with comprehensive error recovery
-* **Added:** Force Stop button for emergency timer recovery
-* **Added:** Session recovery using localStorage - tasks persist across page refreshes
-* **Added:** Auto-detection of active tasks on page load
-* **Added:** Visual timer display showing elapsed time (HH:MM format)
-* **Improved:** Error messages now show specific causes and recovery options
-* **Improved:** Better handling of concurrent tasks with clear user guidance
-* **Enhanced:** Stop button validation to prevent invalid operations
-* **Security:** Added user ownership verification for timer operations
-
-### Version 1.4.7
-* Previous stable release
-
-</canvas>
+For a detailed history of all versions and changes, please see the `changelog.md` file.

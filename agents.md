@@ -24,6 +24,8 @@ Self-Testing Module: Built-in tests for core functionalities to prevent regressi
 Core Principles:
 Increment version numbers up for every change performed.
 
+Please update changelog.md every update with version number and notes.
+
 Modern WordPress Best Practices: Adherence to official WordPress coding standards, security guidelines, and API usage.
 
 DRY (Don't Repeat Yourself): Emphasis on reusable code and minimizing redundancy.

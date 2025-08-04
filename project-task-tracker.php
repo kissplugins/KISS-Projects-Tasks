@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.5
+ * Version:           1.7.39
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.5' );
+define( 'PTT_VERSION', '1.7.39' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -33,11 +33,12 @@ define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
  * 5.0  ENQUEUE SCRIPTS & STYLES
  * 6.0  CORE TIME CALCULATION LOGIC
  * 7.0  ADMIN UI (CPT EDITOR)
+ * 7.5  USER PROFILE INTEGRATION
  * 8.0  AJAX HANDLERS
  * 9.0  FRONT-END SHORTCODE [task-enter] (see shortcodes.php)
  * 10.0 ADMIN PAGES & LINKS (see reports.php)
  * 11.0 SELF-TEST MODULE (see self-test.php)
- *
+ * CHANGELOG - LLM maintainers/Developes please update changelog.md for every update
  * =================================================================
  */
 
@@ -59,7 +60,7 @@ function ptt_activate() {
     ptt_register_taxonomies();
 
     // Ensure default Task Status terms exist
-    $default_statuses = [ 'In Progress', 'Completed', 'Paused' ];
+    $default_statuses = [ 'Not Started', 'In Progress', 'Completed', 'Paused' ];
     foreach ( $default_statuses as $status ) {
         if ( ! term_exists( $status, 'task_status' ) ) {
             wp_insert_term( $status, 'task_status' );
@@ -150,7 +151,7 @@ function ptt_register_post_type() {
         'menu_position'      => 20,
         'menu_icon'          => 'dashicons-clock',
         'supports'           => [ 'title', 'editor', 'author', 'revisions' ],
-        'taxonomies'         => [ 'client', 'project', 'post_tag' ],
+        'taxonomies'         => [ 'client', 'project', 'task_status', 'post_tag' ],
     ];
 
     register_post_type( 'project_task', $args );
@@ -205,6 +206,7 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'client' ],
+        'show_in_menu'      => 'edit.php?post_type=project_task',
     ];
     register_taxonomy( 'client', [ 'project_task' ], $client_args );
 
@@ -229,6 +231,7 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'project' ],
+        'show_in_menu'      => 'edit.php?post_type=project_task',
     ];
     register_taxonomy( 'project', [ 'project_task' ], $project_args );
 
@@ -251,6 +254,11 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'task_status' ],
+        'show_in_menu'      => 'edit.php?post_type=project_task',
+        'default_term'      => [
+            'name' => 'Not Started',
+            'slug' => 'not-started',
+        ],
     ];
     register_taxonomy( 'task_status', [ 'project_task' ], $status_args );
 }
@@ -280,7 +288,7 @@ function ptt_register_acf_fields() {
                 'name' => 'task_max_budget',
                 'type' => 'number',
                 'instructions' => 'Set a time budget for this specific task.',
-                'step' => '0.1',
+                'step' => '0.01',
             ),
              array(
                 'key' => 'field_ptt_task_deadline',
@@ -453,7 +461,7 @@ function ptt_register_acf_fields() {
                 'name' => 'project_max_budget',
                 'type' => 'number',
                 'instructions' => 'Set a total time budget for the entire project.',
-                'step' => '0.1',
+                'step' => '0.01',
             ),
             array(
                 'key' => 'field_ptt_project_deadline',
@@ -687,34 +695,158 @@ add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );
 // =================================================================
 
 /**
- * Adds a Status column to the Tasks list table.
+ * Adds a custom "Assignee" meta box on the Task editor.
+ */
+function ptt_add_assignee_meta_box_setup() {
+    add_meta_box(
+        'ptt-assignee',
+        __( 'Assignee', 'ptt' ),
+        'ptt_render_assignee_meta_box',
+        'project_task',
+        'side',
+        'default'
+    );
+}
+add_action( 'add_meta_boxes_project_task', 'ptt_add_assignee_meta_box_setup' );
+
+/**
+ * Renders the Assignee meta box content.
+ *
+ * @param WP_Post $post Current post object.
+ */
+function ptt_render_assignee_meta_box( $post ) {
+    $assignee = (int) get_post_meta( $post->ID, 'ptt_assignee', true );
+    wp_nonce_field( 'ptt_save_assignee_nonce', 'ptt_assignee_nonce' );
+
+    echo '<p>';
+    echo '<label for="ptt_assignee">' . esc_html__( 'Assignee', 'ptt' ) . '</label><br />';
+    wp_dropdown_users(
+        [
+            'name'             => 'ptt_assignee',
+            'id'               => 'ptt_assignee',
+            'capability'       => 'publish_posts',
+            'selected'         => $assignee,
+            'show_option_none' => __( 'No Assignee', 'ptt' ),
+        ]
+    );
+    echo '</p>';
+}
+
+/**
+ * Saves the Assignee custom field.
+ *
+ * @param int $post_id Post ID.
+ */
+function ptt_save_assignee_meta( $post_id ) {
+    if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+        return;
+    }
+
+    if ( ! isset( $_POST['ptt_assignee_nonce'] ) || ! wp_verify_nonce( $_POST['ptt_assignee_nonce'], 'ptt_save_assignee_nonce' ) ) {
+        return;
+    }
+
+    if ( ! current_user_can( 'edit_post', $post_id ) ) {
+        return;
+    }
+
+    // Handle saving the assignee
+    $assignee = isset( $_POST['ptt_assignee'] ) ? absint( $_POST['ptt_assignee'] ) : 0;
+    update_post_meta( $post_id, 'ptt_assignee', $assignee );
+}
+add_action( 'save_post_project_task', 'ptt_save_assignee_meta' );
+
+
+/**
+ * Adds Assignee column to the Tasks list table.
  *
  * @param array $columns Existing columns.
  * @return array Modified columns.
  */
-function ptt_add_status_column( $columns ) {
-    $columns['task_status'] = 'Status';
-    return $columns;
+function ptt_add_assignee_column( $columns ) {
+    $new = [];
+    foreach ( $columns as $key => $label ) {
+        $new[ $key ] = $label;
+        if ( 'author' === $key ) {
+            $new['ptt_assignee'] = __( 'Assignee', 'ptt' );
+        }
+    }
+    return $new;
 }
-add_filter( 'manage_project_task_posts_columns', 'ptt_add_status_column' );
+add_filter( 'manage_project_task_posts_columns', 'ptt_add_assignee_column' );
 
 /**
- * Renders the Status column content.
+ * Renders the Assignee column content.
  *
  * @param string $column  Column name.
  * @param int    $post_id Post ID.
  */
-function ptt_render_status_column( $column, $post_id ) {
-    if ( 'task_status' === $column ) {
-        $terms = get_the_terms( $post_id, 'task_status' );
-        if ( ! empty( $terms ) && ! is_wp_error( $terms ) ) {
-            echo esc_html( implode( ', ', wp_list_pluck( $terms, 'name' ) ) );
-        } else {
-            echo '&#8212;';
-        }
+function ptt_render_assignee_column( $column, $post_id ) {
+    if ( 'ptt_assignee' === $column ) {
+        $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );
+        $name        = $assignee_id ? get_the_author_meta( 'display_name', $assignee_id ) : __( 'No Assignee', 'ptt' );
+        echo esc_html( $name );
     }
 }
-add_action( 'manage_project_task_posts_custom_column', 'ptt_render_status_column', 10, 2 );
+add_action( 'manage_project_task_posts_custom_column', 'ptt_render_assignee_column', 10, 2 );
+
+
+// =================================================================
+// 7.5 USER PROFILE INTEGRATION
+// =================================================================
+
+/**
+ * Displays custom user profile fields for Slack integration.
+ *
+ * @param WP_User $user The current user object.
+ */
+function ptt_add_user_profile_fields( $user ) {
+    ?>
+    <h3>KISS PTT - Sleuth Integration</h3>
+    <table class="form-table">
+        <tr>
+            <th><label for="slack_username">Slack Username</label></th>
+            <td>
+                <input type="text" name="slack_username" id="slack_username" value="<?php echo esc_attr( get_the_author_meta( 'slack_username', $user->ID ) ); ?>" class="regular-text" /><br />
+                <span class="description">Enter the user's Slack username (e.g., noelsaw).</span>
+            </td>
+        </tr>
+        <tr>
+            <th><label for="slack_user_id">Slack User ID</label></th>
+            <td>
+                <input type="text" name="slack_user_id" id="slack_user_id" value="<?php echo esc_attr( get_the_author_meta( 'slack_user_id', $user->ID ) ); ?>" class="regular-text" /><br />
+                <span class="description">Enter the user's Slack User ID (e.g., U1234567890).</span>
+            </td>
+        </tr>
+    </table>
+    <?php
+}
+add_action( 'show_user_profile', 'ptt_add_user_profile_fields' );
+add_action( 'edit_user_profile', 'ptt_add_user_profile_fields' );
+
+
+/**
+ * Saves the custom user profile fields.
+ *
+ * @param int $user_id The ID of the user being saved.
+ * @return bool
+ */
+function ptt_save_user_profile_fields( $user_id ) {
+    if ( ! current_user_can( 'edit_user', $user_id ) ) {
+        return false;
+    }
+
+    if ( isset( $_POST['slack_username'] ) ) {
+        update_user_meta( $user_id, 'slack_username', sanitize_text_field( $_POST['slack_username'] ) );
+    }
+
+    if ( isset( $_POST['slack_user_id'] ) ) {
+        update_user_meta( $user_id, 'slack_user_id', sanitize_text_field( $_POST['slack_user_id'] ) );
+    }
+    return true;
+}
+add_action( 'personal_options_update', 'ptt_save_user_profile_fields' );
+add_action( 'edit_user_profile_update', 'ptt_save_user_profile_fields' );
 
 
 // =================================================================
@@ -1005,6 +1137,35 @@ function ptt_stop_session_timer_callback() {
 }
 add_action( 'wp_ajax_ptt_stop_session_timer', 'ptt_stop_session_timer_callback' );
 
+
+/**
+ * AJAX handler to update a task's status from the reports page.
+ */
+function ptt_update_task_status_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $post_id   = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+    $status_id = isset( $_POST['status_id'] ) ? intval( $_POST['status_id'] ) : 0;
+
+    if ( ! $post_id || ! $status_id ) {
+        wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+    }
+
+    $result = wp_set_object_terms( $post_id, $status_id, 'task_status', false );
+
+    if ( is_wp_error( $result ) ) {
+        wp_send_json_error( [ 'message' => 'Failed to update status.' ] );
+    }
+
+    wp_send_json_success( [ 'message' => 'Status updated successfully.' ] );
+}
+add_action( 'wp_ajax_ptt_update_task_status', 'ptt_update_task_status_callback' );
+
+
 /**
  * Adds a "Settings" link to the plugin's action links on the plugins page.
  *
@@ -1017,3 +1178,15 @@ function ptt_add_settings_link( $links ) {
     return $links;
 }
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'ptt_add_settings_link' );
+
+/**
+ * =================================================================
+ * CHANGELOG
+ * =================================================================
+ *
+ * == 1.7.39 ==
+ * - Fix: Corrected taxonomy registration to properly display Client, Project, and Status menus under the "Tasks" CPT menu.
+ * - Fix: Associated 'task_status' taxonomy with the 'project_task' CPT in its registration arguments.
+ * - Note: This fix requires the removal of the ptt_reorder_tasks_menu() function from self-test.php to prevent conflicts.
+ *
+ */
