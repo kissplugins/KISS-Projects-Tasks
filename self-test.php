@@ -466,6 +466,38 @@ function ptt_run_self_tests_callback() {
         $results[] = ['name' => 'User Query for Assignees', 'status' => 'Fail', 'message' => 'Could not find any users with "publish_posts" capability. Assignee dropdown may be empty.'];
     }
 
+    // Test 9: Taxonomy Menu Visibility
+    global $submenu;
+    $parent_slug = 'edit.php?post_type=project_task';
+    $missing_items = [];
+    $expected_tax_slugs = [
+        'edit-tags.php?taxonomy=client&post_type=project_task',
+        'edit-tags.php?taxonomy=project&post_type=project_task',
+        'edit-tags.php?taxonomy=task_status&post_type=project_task',
+    ];
+
+    if (isset($submenu[$parent_slug])) {
+        $found_slugs = wp_list_pluck($submenu[$parent_slug], 2);
+        $missing_items = array_diff($expected_tax_slugs, $found_slugs);
+    } else {
+        // If the main menu isn't there, something is very wrong, but we can report everything as missing.
+        $missing_items = $expected_tax_slugs;
+    }
+
+    if (empty($missing_items)) {
+        $results[] = [
+            'name'    => 'Taxonomy Menu Visibility',
+            'status'  => 'Pass',
+            'message' => 'All taxonomy submenu items were found.',
+        ];
+    } else {
+        $results[] = [
+            'name'    => 'Taxonomy Menu Visibility',
+            'status'  => 'Fail',
+            'message' => 'Missing menu items: ' . implode(', ', $missing_items),
+        ];
+    }
+
     $timestamp = current_time( 'timestamp' );
     update_option( 'ptt_tests_last_run', $timestamp );
 
