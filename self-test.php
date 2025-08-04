@@ -44,20 +44,30 @@ add_action( 'admin_menu', 'ptt_add_changelog_submenu_page' );
  */
 function ptt_changelog_page_html() {
     $file_path = PTT_PLUGIN_DIR . 'changelog.md';
-    $content   = '';
-
-    if ( file_exists( $file_path ) ) {
-        $lines   = file( $file_path );
-        $preview = array_slice( $lines, 0, 500 );
-        $content = implode( '', $preview );
-    } else {
-        $content = 'changelog.md not found.';
-    }
 
     echo '<div class="wrap">';
     echo '<h1>Plugin Changelog</h1>';
-    echo '<pre>' . esc_html( $content ) . '</pre>';
-    echo '<p><em>To view entire changelog, please open the changelog.md file in a text viewer.</em></p>';
+
+    if ( function_exists( 'kiss_mdv_render_file' ) ) {
+        $html = kiss_mdv_render_file( $file_path );
+        if ( $html ) {
+            echo $html;
+        } else {
+            echo '<p>Unable to render changelog.</p>';
+        }
+    } else {
+        $content = '';
+        if ( file_exists( $file_path ) ) {
+            $lines   = file( $file_path );
+            $preview = array_slice( $lines, 0, 500 );
+            $content = implode( '', $preview );
+        } else {
+            $content = 'changelog.md not found.';
+        }
+        echo '<pre>' . esc_html( $content ) . '</pre>';
+        echo '<p><em>To view entire changelog, please open the changelog.md file in a text viewer.</em></p>';
+    }
+
     echo '</div>';
 }
 
@@ -498,6 +508,30 @@ function ptt_run_self_tests_callback() {
         $results[] = ['name' => 'User Query for Assignees', 'status' => 'Pass', 'message' => 'Found ' . count($assignee_users) . ' potential assignees with "publish_posts" capability.'];
     } else {
         $results[] = ['name' => 'User Query for Assignees', 'status' => 'Fail', 'message' => 'Could not find any users with "publish_posts" capability. Assignee dropdown may be empty.'];
+    }
+
+    // Test 9: Taxonomy Menu Visibility
+    do_action( 'admin_menu' );
+    global $submenu;
+    $tasks_menu = isset( $submenu['edit.php?post_type=project_task'] ) ? wp_list_pluck( $submenu['edit.php?post_type=project_task'], 2 ) : [];
+    $expected_taxonomies = [
+        'edit-tags.php?taxonomy=client&post_type=project_task',
+        'edit-tags.php?taxonomy=project&post_type=project_task',
+        'edit-tags.php?taxonomy=task_status&post_type=project_task',
+    ];
+    $missing_taxonomies = array_diff( $expected_taxonomies, $tasks_menu );
+    if ( empty( $missing_taxonomies ) ) {
+        $results[] = [
+            'name'    => 'Taxonomy Menu Visibility',
+            'status'  => 'Pass',
+            'message' => 'All taxonomy menu items are present.',
+        ];
+    } else {
+        $results[] = [
+            'name'    => 'Taxonomy Menu Visibility',
+            'status'  => 'Fail',
+            'message' => 'Missing menu items: ' . implode( ', ', $missing_taxonomies ),
+        ];
     }
 
     $timestamp = current_time( 'timestamp' );
