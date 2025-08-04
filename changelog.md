@@ -2,6 +2,7 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
+
 ### Version 1.7.41
 * **Added:** Confirmation dialog with "No" as the default before running "Synchronize Authors → Assignee" on the Self Test page.
 
