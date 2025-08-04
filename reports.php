@@ -109,6 +109,18 @@ add_action( 'admin_init', 'ptt_handle_sort_status_cookie' );
  *==================================================================*/
 function ptt_reports_page_html() {
 
+		// --- DEBUGGING START ---
+		$current_user = wp_get_current_user();
+		echo '<div class="notice notice-warning"><p><strong>DEBUGGING INFO:</strong><br>';
+		echo 'User: ' . $current_user->user_login . ' (ID: ' . $current_user->ID . ')<br>';
+		echo 'Roles: ' . implode( ', ', $current_user->roles ) . '<br>';
+		echo 'Can edit_posts? ' . ( current_user_can( 'edit_posts' ) ? 'Yes' : 'No' ) . '<br>';
+		$user_args = [ 'role__in' => [ 'author', 'editor', 'administrator' ], 'fields' => 'display_name' ];
+		$users = get_users( $user_args );
+		echo 'Users found for dropdown: ' . count( $users ) . ' -> ' . implode( ', ', $users ) . '<br>';
+		echo '</p></div>';
+		// --- DEBUGGING END ---
+
 		$saved_sort = isset( $_REQUEST['sort_status'] )
 			? sanitize_text_field( $_REQUEST['sort_status'] )
 			: ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
