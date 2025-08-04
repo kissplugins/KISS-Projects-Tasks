@@ -277,29 +277,37 @@ function ptt_run_self_tests_callback() {
     ];
 
     /* -------------------------------------------------------------
-     * TEST 9 – Taxonomy Menu Visibility
+     * TEST 9 – Taxonomy Registration & Visibility
      * -----------------------------------------------------------*/
-    do_action( 'admin_menu' ); // Build menus for this request
-    global $submenu;
-
-    $tasks_menu = isset( $submenu['edit.php?post_type=project_task'] )
-        ? wp_list_pluck( $submenu['edit.php?post_type=project_task'], 2 )
-        : [];
-
-    $expected_taxonomies = [
-        'edit-tags.php?taxonomy=client&post_type=project_task',
-        'edit-tags.php?taxonomy=project&post_type=project_task',
-        'edit-tags.php?taxonomy=task_status&post_type=project_task',
+    $taxonomies_to_check = [
+        'client'      => [ 'show_ui' => true, 'show_in_menu' => true ],
+        'project'     => [ 'show_ui' => true, 'show_in_menu' => true ],
+        'task_status' => [ 'show_ui' => true, 'show_in_menu' => true ],
     ];
 
-    $missing = array_diff( $expected_taxonomies, $tasks_menu );
+    $errors = [];
+    foreach ( $taxonomies_to_check as $tax_slug => $props ) {
+        $tax_obj = get_taxonomy( $tax_slug );
+        if ( ! $tax_obj ) {
+            $errors[] = "Taxonomy '{$tax_slug}' is not registered.";
+            continue;
+        }
+        foreach ( $props as $prop => $expected_value ) {
+            if ( ! isset( $tax_obj->{$prop} ) || $tax_obj->{$prop} !== $expected_value ) {
+                $errors[] = "Taxonomy '{$tax_slug}' failed check for property '{$prop}'.";
+            }
+        }
+        if ( ! in_array( 'project_task', $tax_obj->object_type, true ) ) {
+            $errors[] = "Taxonomy '{$tax_slug}' is not associated with the 'project_task' post type.";
+        }
+    }
 
     $results[] = [
-        'name'    => 'Taxonomy Menu Visibility',
-        'status'  => empty( $missing ) ? 'Pass' : 'Fail',
-        'message' => empty( $missing )
-            ? 'All taxonomy menu items are present.'
-            : 'Missing menu items: ' . implode( ', ', $missing ),
+        'name'    => 'Taxonomy Registration & Visibility',
+        'status'  => empty( $errors ) ? 'Pass' : 'Fail',
+        'message' => empty( $errors )
+            ? 'All taxonomies are correctly registered and configured for menu visibility.'
+            : implode( ' ', $errors ),
     ];
 
     /* -------------------------------------------------------------*/
