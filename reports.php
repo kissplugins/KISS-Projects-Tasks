@@ -157,7 +157,7 @@ function ptt_reports_page_html() {
                                                        wp_dropdown_users(
                                                                [
                                                                        'name'            => 'assignee_id',
-                                                                       'role__in'        => [ 'author', 'editor', 'administrator' ],
+                                                                       'capability'      => 'publish_posts',
                                                                        'show_option_all' => 'All Assignees',
                                                                        'selected'        => isset( $_REQUEST['assignee_id'] ) ? intval( $_REQUEST['assignee_id'] ) : 0,
                                                                ]
