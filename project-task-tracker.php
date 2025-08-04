@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.39
+ * Version:           1.7.41
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.39' );
+define( 'PTT_VERSION', '1.7.41' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -497,8 +497,14 @@ function ptt_enqueue_assets() {
     // Main CSS file (now in root)
     wp_enqueue_style( 'ptt-styles', PTT_PLUGIN_URL . 'styles.css', [], PTT_VERSION );
 
+    $deps = [ 'jquery' ];
+    if ( is_admin() ) {
+        $deps[] = 'jquery-ui-dialog';
+        wp_enqueue_style( 'wp-jquery-ui-dialog' );
+    }
+
     // Main JS file (now in root)
-    wp_enqueue_script( 'ptt-scripts', PTT_PLUGIN_URL . 'scripts.js', [ 'jquery' ], PTT_VERSION, true );
+    wp_enqueue_script( 'ptt-scripts', PTT_PLUGIN_URL . 'scripts.js', $deps, PTT_VERSION, true );
     
     // Localize script to pass data like nonces and AJAX URL
     wp_localize_script( 'ptt-scripts', 'ptt_ajax_object', [
@@ -508,7 +514,9 @@ function ptt_enqueue_assets() {
         'concurrent_error'      => __('You have another task running. Please stop it before starting a new one.', 'ptt'),
         'edit_post_link'        => admin_url('post.php?action=edit&post='),
         'todays_date_formatted' => date_i18n( get_option( 'date_format' ), current_time( 'timestamp' ) ),
-    ]);
+        'sync_authors_confirm'  => __( 'Are you sure you want to synchronize Authors to Assignee?', 'ptt' ),
+        'sync_authors_title'    => __( 'Confirm Synchronization', 'ptt' ),
+    ] );
 }
 // Enqueue for admin screens
 add_action( 'admin_enqueue_scripts', 'ptt_enqueue_assets' );
