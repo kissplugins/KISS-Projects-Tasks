@@ -2,6 +2,22 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
+### Version 1.7.39
+Fix: Corrected taxonomy registration to properly display Client, Project, and Status menus under the "Tasks" CPT menu.
+
+Fix: Associated 'task_status' taxonomy with the 'project_task' CPT in its registration arguments.
+
+Note: This fix requires the removal of the ptt_reorder_tasks_menu() function from self-test.php to prevent conflicts.
+
+---
+### Version 1.7.38 (2025-08-05)
+* **Added:** Self-test ensuring taxonomy menu items remain visible under the Tasks menu.
+* **Changed:** Render changelog using `kiss_mdv_render_file` when available.
+
+---
+### Version 1.7.37 (2025-08-04)
+* **Fixed:** Added `show_in_menu` to taxonomy registration so taxonomy management pages appear under the Tasks menu.
+
 ---
 ### Version 1.7.36 (2025-08-01)
 * **Fixed:** Simplified "Assignee" metabox by removing Author.
