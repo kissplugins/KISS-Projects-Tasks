@@ -277,38 +277,42 @@ function ptt_run_self_tests_callback() {
     ];
 
     /* -------------------------------------------------------------
-     * TEST 9 – Taxonomy Registration & Visibility
-     * -----------------------------------------------------------*/
-    $taxonomies_to_check = [
-        'client'      => [ 'show_ui' => true, 'show_in_menu' => true ],
-        'project'     => [ 'show_ui' => true, 'show_in_menu' => true ],
-        'task_status' => [ 'show_ui' => true, 'show_in_menu' => true ],
-    ];
+ * TEST 9 – Taxonomy Registration & Visibility
+ * -----------------------------------------------------------*/
+$taxonomies_to_check = [ 'client', 'project', 'task_status' ];
+$errors = [];
 
-    $errors = [];
-    foreach ( $taxonomies_to_check as $tax_slug => $props ) {
-        $tax_obj = get_taxonomy( $tax_slug );
-        if ( ! $tax_obj ) {
-            $errors[] = "Taxonomy '{$tax_slug}' is not registered.";
-            continue;
-        }
-        foreach ( $props as $prop => $expected_value ) {
-            if ( ! isset( $tax_obj->{$prop} ) || $tax_obj->{$prop} !== $expected_value ) {
-                $errors[] = "Taxonomy '{$tax_slug}' failed check for property '{$prop}'.";
-            }
-        }
-        if ( ! in_array( 'project_task', $tax_obj->object_type, true ) ) {
-            $errors[] = "Taxonomy '{$tax_slug}' is not associated with the 'project_task' post type.";
-        }
+foreach ( $taxonomies_to_check as $tax_slug ) {
+    $tax_obj = get_taxonomy( $tax_slug );
+    
+    if ( ! $tax_obj ) {
+        $errors[] = "Taxonomy '{$tax_slug}' is not registered.";
+        continue;
     }
+    
+    // Check if taxonomy has UI visibility
+    if ( empty( $tax_obj->show_ui ) ) {
+        $errors[] = "Taxonomy '{$tax_slug}' has show_ui disabled.";
+    }
+    
+    // Check if taxonomy is visible in menu (can be true or a string)
+    if ( empty( $tax_obj->show_in_menu ) ) {
+        $errors[] = "Taxonomy '{$tax_slug}' has show_in_menu disabled.";
+    }
+    
+    // Check if associated with project_task post type
+    if ( ! in_array( 'project_task', (array) $tax_obj->object_type, true ) ) {
+        $errors[] = "Taxonomy '{$tax_slug}' is not associated with the 'project_task' post type.";
+    }
+}
 
-    $results[] = [
-        'name'    => 'Taxonomy Registration & Visibility',
-        'status'  => empty( $errors ) ? 'Pass' : 'Fail',
-        'message' => empty( $errors )
-            ? 'All taxonomies are correctly registered and configured for menu visibility.'
-            : implode( ' ', $errors ),
-    ];
+$results[] = [
+    'name'    => 'Taxonomy Registration & Visibility',
+    'status'  => empty( $errors ) ? 'Pass' : 'Fail',
+    'message' => empty( $errors )
+        ? 'All taxonomies are correctly registered and configured for menu visibility.'
+        : implode( ' ', $errors ),
+];
 
     /* -------------------------------------------------------------*/
 
