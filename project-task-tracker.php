@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.7.38
+ * Version:           1.7.39
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.7.38' );
+define( 'PTT_VERSION', '1.7.39' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -151,7 +151,7 @@ function ptt_register_post_type() {
         'menu_position'      => 20,
         'menu_icon'          => 'dashicons-clock',
         'supports'           => [ 'title', 'editor', 'author', 'revisions' ],
-        'taxonomies'         => [ 'client', 'project', 'post_tag' ],
+        'taxonomies'         => [ 'client', 'project', 'task_status', 'post_tag' ],
     ];
 
     register_post_type( 'project_task', $args );
@@ -206,7 +206,7 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'client' ],
-        'show_in_menu'      => true,
+        'show_in_menu'      => 'edit.php?post_type=project_task',
     ];
     register_taxonomy( 'client', [ 'project_task' ], $client_args );
 
@@ -231,7 +231,7 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'project' ],
-        'show_in_menu'      => true,
+        'show_in_menu'      => 'edit.php?post_type=project_task',
     ];
     register_taxonomy( 'project', [ 'project_task' ], $project_args );
 
@@ -254,7 +254,7 @@ function ptt_register_taxonomies() {
         'show_admin_column' => true,
         'query_var'         => true,
         'rewrite'           => [ 'slug' => 'task_status' ],
-        'show_in_menu'      => true,
+        'show_in_menu'      => 'edit.php?post_type=project_task',
         'default_term'      => [
             'name' => 'Not Started',
             'slug' => 'not-started',
@@ -1178,3 +1178,15 @@ function ptt_add_settings_link( $links ) {
     return $links;
 }
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'ptt_add_settings_link' );
+
+/**
+ * =================================================================
+ * CHANGELOG
+ * =================================================================
+ *
+ * == 1.7.39 ==
+ * - Fix: Corrected taxonomy registration to properly display Client, Project, and Status menus under the "Tasks" CPT menu.
+ * - Fix: Associated 'task_status' taxonomy with the 'project_task' CPT in its registration arguments.
+ * - Note: This fix requires the removal of the ptt_reorder_tasks_menu() function from self-test.php to prevent conflicts.
+ *
+ */
