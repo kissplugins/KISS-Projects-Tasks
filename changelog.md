@@ -2,6 +2,13 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
+
+### Version 1.7.41
+* **Added:** Confirmation dialog with "No" as the default before running "Synchronize Authors → Assignee" on the Self Test page.
+
+### Version 1.7.40
+* **Fixed:** Assignee dropdown in reports now queries by capability to reliably list Administrators, Editors, and Authors.
+
 ### Version 1.7.39
 Fix: Corrected taxonomy registration to properly display Client, Project, and Status menus under the "Tasks" CPT menu.
 

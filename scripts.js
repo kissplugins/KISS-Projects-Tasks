@@ -1040,26 +1040,44 @@ jQuery(document).ready(function ($) {
         $('#ptt-run-self-tests').trigger('click');
     }
 
-    $('#ptt-sync-authors').on('click', function () {
+    $('#ptt-sync-authors').on('click', function (e) {
+        e.preventDefault();
         const $button = $(this);
         const $result = $('#ptt-sync-authors-result');
 
-        $button.prop('disabled', true);
-        $result.text('Synchronizing...');
-
-        $.post(ptt_ajax_object.ajax_url, {
-            action: 'ptt_sync_authors_assignee',
-            nonce: ptt_ajax_object.nonce
-        }).done(function (response) {
-            if (response.success && typeof response.data.count !== 'undefined') {
-                $result.text('Synchronized ' + response.data.count + ' tasks.');
-            } else {
-                $result.text('Synchronization failed.');
+        $('<div>' + ptt_ajax_object.sync_authors_confirm + '</div>').dialog({
+            modal: true,
+            title: ptt_ajax_object.sync_authors_title,
+            buttons: {
+                'Yes': function () {
+                    $(this).dialog('close');
+                    $button.prop('disabled', true);
+                    $result.text('Synchronizing...');
+                    $.post(ptt_ajax_object.ajax_url, {
+                        action: 'ptt_sync_authors_assignee',
+                        nonce: ptt_ajax_object.nonce
+                    }).done(function (response) {
+                        if (response.success && typeof response.data.count !== 'undefined') {
+                            $result.text('Synchronized ' + response.data.count + ' tasks.');
+                        } else {
+                            $result.text('Synchronization failed.');
+                        }
+                    }).fail(function () {
+                        $result.text('Server error.');
+                    }).always(function () {
+                        $button.prop('disabled', false);
+                    });
+                },
+                'No': function () {
+                    $(this).dialog('close');
+                }
+            },
+            open: function () {
+                $(this).parent().find('.ui-dialog-buttonpane button:contains("No")').focus();
+            },
+            close: function () {
+                $(this).remove();
             }
-        }).fail(function () {
-            $result.text('Server error.');
-        }).always(function () {
-            $button.prop('disabled', false);
         });
     });
 });
