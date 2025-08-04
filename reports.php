@@ -74,7 +74,7 @@ function ptt_add_reports_page() {
 		'edit.php?post_type=project_task',
 		'Time Reports',
 		'Reports',
-		'manage_options',
+		'edit_posts',
 		'ptt-reports',
 		'ptt_reports_page_html'
 	);
@@ -89,7 +89,7 @@ function ptt_handle_sort_status_cookie() {
                return;
        }
 
-       if ( ! current_user_can( 'manage_options' ) ) {
+       if ( ! current_user_can( 'edit_posts' ) ) {
                return;
        }
 
