@@ -341,14 +341,17 @@
             // Save preferences in cookies
             this.saveFilterPreferences(filters);
 
-            // Refresh board via AJAX
+// Refresh board via AJAX
             $.ajax({
                 url: ptt_kanban.ajax_url,
                 type: 'POST',
                 data: {
                     action: 'ptt_kanban_refresh_board',
                     nonce: ptt_kanban.nonce,
-                    ...filters
+                    assignee_filter: filters.assignee_filter,
+                    activity_filter: filters.activity_filter,
+                    client_filter: filters.client_filter,
+                    project_filter: filters.project_filter
                 },
                 success: function(response) {
                     if (response.success) {
