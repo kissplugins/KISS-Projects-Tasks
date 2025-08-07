@@ -640,6 +640,17 @@
     height: 40px;
 }
 
+/* Debug panel */
+.ptt-kanban-debug {
+    margin-top: 15px;
+    padding: 10px;
+    background: #fffbea;
+    border: 1px solid #f0c36d;
+    font-size: 12px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
 /* Notifications */
 .ptt-kanban-notification {
     position: fixed;

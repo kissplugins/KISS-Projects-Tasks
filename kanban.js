@@ -29,6 +29,7 @@
             this.initDragAndDrop();
             this.loadSavedPreferences();
             this.initKeyboardAccessibility();
+            this.debug('Kanban initialized');
         },
 
         // Bind event handlers
@@ -326,7 +327,7 @@
         // Apply filters
         applyFilters: function() {
             const self = this;
-            
+
             // Show loading overlay
             $('#ptt-kanban-loading').fadeIn();
 
@@ -341,7 +342,16 @@
             // Save preferences in cookies
             this.saveFilterPreferences(filters);
 
-// Refresh board via AJAX
+            // Debug: show selected filters
+            self.debug('Applying filters: ' + JSON.stringify(filters));
+
+            if (typeof ptt_kanban === 'undefined') {
+                self.debug('ptt_kanban configuration missing.');
+                $('#ptt-kanban-loading').fadeOut();
+                return;
+            }
+
+            // Refresh board via AJAX
             $.ajax({
                 url: ptt_kanban.ajax_url,
                 type: 'POST',
@@ -354,16 +364,23 @@
                     project_filter: filters.project_filter
                 },
                 success: function(response) {
-                    if (response.success) {
-                        $('#ptt-kanban-board').html(response.data.html);
-                        self.initDragAndDrop();
-                        self.adjustBoardLayout();
-                    } else {
-                        self.showNotification(ptt_kanban.messages.filter_error, 'error');
+                    try {
+                        if (response.success) {
+                            $('#ptt-kanban-board').html(response.data.html);
+                            self.initDragAndDrop();
+                            self.adjustBoardLayout();
+                            self.debug('Board updated successfully.');
+                        } else {
+                            self.showNotification(ptt_kanban.messages.filter_error, 'error');
+                            self.debug('Server returned error while applying filters.');
+                        }
+                    } catch (err) {
+                        self.debug('Processing error: ' + err.message);
                     }
                 },
-                error: function() {
+                error: function(xhr, status, error) {
                     self.showNotification(ptt_kanban.messages.filter_error, 'error');
+                    self.debug('AJAX error: ' + status + ' ' + error);
                 },
                 complete: function() {
                     $('#ptt-kanban-loading').fadeOut();
@@ -430,6 +447,15 @@
                     $(this).remove();
                 });
             }, 3000);
+        },
+
+        // Debug helper
+        debug: function(message) {
+            const $debug = $('#ptt-kanban-debug');
+            if ($debug.length) {
+                const time = new Date().toLocaleTimeString();
+                $debug.append('<div>[' + time + '] ' + message + '</div>');
+            }
         },
 
         // Show task options (for mobile)
