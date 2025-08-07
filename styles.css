@@ -330,3 +330,536 @@
     box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
     font-weight: 600;
 }
+
+/**
+ * =========================================
+ * KANBAN BOARD STYLES
+ * =========================================
+ * Add these styles to your existing styles.css file
+ * @since 1.8.0
+ */
+
+/* Kanban Board Container */
+.ptt-kanban-wrap {
+    max-width: 100%;
+    margin: 20px 20px 20px 0;
+}
+
+.ptt-kanban-board {
+    position: relative;
+    background: #f0f0f1;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+    overflow-x: auto;
+    min-height: 500px;
+}
+
+/* Filters Section */
+.ptt-kanban-filters {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.ptt-kanban-filters .filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+}
+
+.ptt-kanban-filters .filter-item {
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+}
+
+.ptt-kanban-filters .filter-item label {
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: #1d2327;
+}
+
+.ptt-kanban-filters .filter-item select {
+    min-width: 180px;
+}
+
+.ptt-kanban-filters .filter-buttons {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-left: auto;
+}
+
+/* Kanban Columns */
+.ptt-kanban-columns {
+    display: flex;
+    gap: 20px;
+    min-height: 400px;
+    padding-bottom: 20px;
+}
+
+.ptt-kanban-column {
+    flex: 1;
+    min-width: 280px;
+    max-width: 350px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+.ptt-kanban-column-header {
+    padding: 12px 15px;
+    background: #f6f7f7;
+    border-bottom: 2px solid #dcdcde;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ptt-kanban-column-header h3 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.ptt-kanban-column-header .task-count {
+    background: #2271b1;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Tasks Container */
+.ptt-kanban-column-tasks {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+    max-height: calc(100vh - 400px);
+    min-height: 300px;
+}
+
+.ptt-kanban-column-tasks.drag-active {
+    background: #f0f6fc;
+    transition: background 0.2s;
+}
+
+.ptt-kanban-column-tasks.drop-hover {
+    background: #e8f5e9;
+    border: 2px dashed #4caf50;
+    margin: -2px;
+}
+
+/* Task Cards */
+.ptt-kanban-task {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: move;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.ptt-kanban-task:hover {
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+}
+
+.ptt-kanban-task.dragging {
+    opacity: 0.5;
+    transform: rotate(2deg);
+}
+
+.ptt-kanban-task.updating {
+    opacity: 0.6;
+    pointer-events: none;
+    position: relative;
+}
+
+.ptt-kanban-task.updating::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #2271b1;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.ptt-kanban-task.over-budget {
+    border-left: 3px solid #d63638;
+    padding-left: 9px;
+}
+
+.ptt-kanban-task.timer-active {
+    background: #fffbf0;
+    border-color: #f0b849;
+}
+
+/* Task Header */
+.task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 8px;
+}
+
+.task-title {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.4;
+    flex: 1;
+}
+
+.task-title a {
+    color: #2271b1;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.task-title a:hover {
+    text-decoration: underline;
+    color: #135e96;
+}
+
+.timer-indicator {
+    font-size: 16px;
+    margin-left: 5px;
+    animation: pulse 2s infinite;
+}
+
+/* Task Meta */
+.task-meta {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #50575e;
+}
+
+.task-meta > div {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.task-meta .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    color: #787c82;
+}
+
+.over-budget-text {
+    color: #d63638;
+    font-weight: 600;
+}
+
+/* Task Details */
+.task-details {
+    font-size: 11px;
+    color: #646970;
+}
+
+.task-taxonomy {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.task-client,
+.task-project {
+    background: #f0f0f1;
+    padding: 2px 6px;
+    border-radius: 3px;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.task-client {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.task-project {
+    background: #e3f2fd;
+    color: #1565c0;
+}
+
+.task-activity {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+/* Empty State */
+.ptt-kanban-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #787c82;
+    font-style: italic;
+}
+
+/* Loading Overlay */
+.ptt-kanban-loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.ptt-kanban-loading .ptt-ajax-spinner {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+}
+
+/* Notifications */
+.ptt-kanban-notification {
+    position: fixed;
+    top: 50px;
+    right: 20px;
+    padding: 12px 20px;
+    border-radius: 4px;
+    background: #fff;
+    border-left: 4px solid;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 100000;
+    display: none;
+    max-width: 300px;
+}
+
+.ptt-kanban-notification.success {
+    border-color: #4caf50;
+    background: #f1f8f4;
+}
+
+.ptt-kanban-notification.error {
+    border-color: #d63638;
+    background: #fef1f1;
+}
+
+.ptt-kanban-notification.info {
+    border-color: #2271b1;
+    background: #f0f6fc;
+}
+
+/* Task Options (Mobile) */
+.ptt-kanban-task-options {
+    position: absolute;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    z-index: 10000;
+    padding: 5px;
+    min-width: 150px;
+}
+
+.ptt-kanban-task-options button {
+    display: block;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    font-size: 13px;
+    color: #1d2327;
+    transition: background 0.2s;
+}
+
+.ptt-kanban-task-options button:hover {
+    background: #f0f0f1;
+}
+
+/* Responsive Design */
+@media screen and (max-width: 1400px) {
+    .ptt-kanban-column {
+        min-width: 250px;
+    }
+}
+
+@media screen and (max-width: 1024px) {
+    .ptt-kanban-filters .filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .ptt-kanban-filters .filter-item {
+        width: 100%;
+    }
+    
+    .ptt-kanban-filters .filter-buttons {
+        margin-left: 0;
+        margin-top: 10px;
+        justify-content: flex-start;
+    }
+    
+    .ptt-kanban-columns.tablet-view {
+        flex-wrap: wrap;
+    }
+    
+    .ptt-kanban-columns.tablet-view .ptt-kanban-column {
+        flex: 0 0 calc(50% - 10px);
+        max-width: calc(50% - 10px);
+        margin-bottom: 20px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .ptt-kanban-wrap {
+        margin: 10px;
+    }
+    
+    .ptt-kanban-board {
+        padding: 10px;
+        border-radius: 0;
+    }
+    
+    .ptt-kanban-columns.mobile-view {
+        flex-direction: column;
+    }
+    
+    .ptt-kanban-columns.mobile-view .ptt-kanban-column {
+        max-width: 100%;
+        margin-bottom: 15px;
+    }
+    
+    .ptt-kanban-column-tasks {
+        max-height: none;
+        min-height: 100px;
+    }
+    
+    .ptt-kanban-task {
+        cursor: pointer;
+    }
+    
+    .task-meta {
+        flex-wrap: wrap;
+    }
+    
+    .task-taxonomy {
+        flex-wrap: wrap;
+    }
+}
+
+/* Accessibility */
+.ptt-kanban-task:focus {
+    outline: 2px solid #2271b1;
+    outline-offset: 2px;
+}
+
+.ptt-kanban-task:focus-visible {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #2271b1;
+}
+
+/* Animations */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Print Styles */
+@media print {
+    .ptt-kanban-filters,
+    .ptt-kanban-loading,
+    .ptt-kanban-notification {
+        display: none !important;
+    }
+    
+    .ptt-kanban-columns {
+        display: block;
+    }
+    
+    .ptt-kanban-column {
+        page-break-inside: avoid;
+        margin-bottom: 20px;
+        max-width: 100%;
+    }
+    
+    .ptt-kanban-task {
+        page-break-inside: avoid;
+        cursor: default;
+    }
+}
+
+/* Dark Mode Support (if your theme supports it) */
+@media (prefers-color-scheme: dark) {
+    .ptt-kanban-board {
+        background: #1d2327;
+    }
+    
+    .ptt-kanban-column {
+        background: #2c3338;
+        border-color: #3c434a;
+    }
+    
+    .ptt-kanban-column-header {
+        background: #3c434a;
+        border-color: #50575e;
+    }
+    
+    .ptt-kanban-column-header h3 {
+        color: #f0f0f1;
+    }
+    
+    .ptt-kanban-task {
+        background: #2c3338;
+        border-color: #3c434a;
+        color: #f0f0f1;
+    }
+    
+    .ptt-kanban-task.timer-active {
+        background: #3d3a2a;
+    }
+    
+    .task-title a {
+        color: #72aee6;
+    }
+    
+    .task-meta,
+    .task-details {
+        color: #c3c4c7;
+    }
+    
+    .task-client,
+    .task-project {
+        background: #3c434a;
+    }
+    
+    .ptt-kanban-empty-state {
+        color: #787c82;
+    }
+}

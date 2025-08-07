@@ -46,6 +46,7 @@ define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 require_once PTT_PLUGIN_DIR . 'shortcodes.php';
 require_once PTT_PLUGIN_DIR . 'self-test.php';
 require_once PTT_PLUGIN_DIR . 'reports.php';
+require_once PTT_PLUGIN_DIR . 'kanban.php';
 
 // =================================================================
 // 1.0 PLUGIN ACTIVATION & DEACTIVATION
@@ -484,6 +485,16 @@ function ptt_register_acf_fields() {
     ));
 }
 add_action( 'acf/init', 'ptt_register_acf_fields' );
+
+function ptt_activate_kanban_additions() {
+    // Existing activation code...
+    
+    // Add rewrite rules for Kanban
+    ptt_kanban_rewrite_rule();
+    
+    // Flush rewrite rules (this should already be in your activation)
+    flush_rewrite_rules();
+}
 
 
 // =================================================================

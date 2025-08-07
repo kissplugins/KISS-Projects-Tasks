@@ -2,6 +2,18 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
+* ## Version 1.8.0
+ * - Feature: Added comprehensive Kanban board view for visual task management
+ * - Feature: Drag and drop functionality to update task status
+ * - Feature: Advanced filtering by assignee, activity period, client, and project
+ * - Feature: Filter preferences saved in cookies for persistent user experience
+ * - Feature: Responsive design with mobile-friendly task management
+ * - Feature: Keyboard navigation support for accessibility
+ * - Feature: Visual indicators for active timers and over-budget tasks
+ * - Feature: Auto-save functionality with optimistic UI updates
+ * - Feature: Loading states and error handling for all interactions
+ * - Enhancement: Added /kanban rewrite rule for direct access
+ * - Enhancement: Integrated with existing AJAX handlers and security practices
 
 ### Version 1.7.41
 * **Added:** Confirmation dialog with "No" as the default before running "Synchronize Authors → Assignee" on the Self Test page.
