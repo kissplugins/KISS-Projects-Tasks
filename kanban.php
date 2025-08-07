@@ -71,12 +71,12 @@ function ptt_enqueue_kanban_assets( $hook ) {
     }
     
     // Enqueue Kanban JS
-    wp_enqueue_script( 
-        'ptt-kanban', 
-        PTT_PLUGIN_URL . 'kanban.js', 
-        [ 'jquery', 'jquery-ui-sortable' ], 
-        PTT_VERSION, 
-        true 
+    wp_enqueue_script(
+        'ptt-kanban',
+        PTT_PLUGIN_URL . 'kanban.js',
+        [ 'jquery', 'jquery-ui-sortable', 'jquery-ui-draggable', 'jquery-ui-droppable' ],
+        PTT_VERSION,
+        true
     );
     
     // Localize script for AJAX and data
@@ -237,6 +237,9 @@ function ptt_kanban_page_html() {
             <div class="ptt-ajax-spinner"></div>
             <span><?php _e( 'Updating board...', 'ptt' ); ?></span>
         </div>
+
+        <!-- Debug Output -->
+        <div class="ptt-kanban-debug" id="ptt-kanban-debug"></div>
     </div>
     <?php
 }
