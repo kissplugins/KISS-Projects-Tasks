@@ -70,26 +70,30 @@ function ptt_enqueue_kanban_assets( $hook ) {
         return;
     }
     
+    // Enqueue jQuery UI Sortable
+    wp_enqueue_script( 'jquery-ui-sortable' );
+    
     // Enqueue Kanban JS
     wp_enqueue_script(
         'ptt-kanban',
         PTT_PLUGIN_URL . 'kanban.js',
-        [ 'jquery', 'jquery-ui-sortable', 'jquery-ui-draggable', 'jquery-ui-droppable' ],
+        array( 'jquery', 'jquery-ui-sortable' ),
         PTT_VERSION,
         true
     );
     
     // Localize script for AJAX and data
-    wp_localize_script( 'ptt-kanban', 'ptt_kanban', [
+    wp_localize_script( 'ptt-kanban', 'ptt_kanban', array(
         'ajax_url' => admin_url( 'admin-ajax.php' ),
         'nonce' => wp_create_nonce( 'ptt_ajax_nonce' ),
-        'messages' => [
+        'messages' => array(
             'drag_error' => __( 'Failed to update task status. Please try again.', 'ptt' ),
+            'position_error' => __( 'Failed to update task position. Please try again.', 'ptt' ),
             'filter_error' => __( 'Failed to apply filters. Please try again.', 'ptt' ),
             'loading' => __( 'Loading...', 'ptt' ),
             'no_tasks' => __( 'No tasks found matching your filters.', 'ptt' ),
-        ]
-    ] );
+        )
+    ) );
 }
 add_action( 'admin_enqueue_scripts', 'ptt_enqueue_kanban_assets' );
 add_action( 'wp_enqueue_scripts', 'ptt_enqueue_kanban_assets' );
@@ -109,7 +113,7 @@ function ptt_save_kanban_filter_preferences() {
     $cookie_duration = 30 * DAY_IN_SECONDS;
     
     // Save filter preferences if they exist in the request
-    $filters = [ 'assignee_filter', 'activity_filter', 'client_filter', 'project_filter' ];
+    $filters = array( 'assignee_filter', 'activity_filter', 'client_filter', 'project_filter' );
     
     foreach ( $filters as $filter ) {
         if ( isset( $_GET[ $filter ] ) ) {
@@ -163,13 +167,13 @@ function ptt_kanban_page_html() {
                     <div class="filter-item">
                         <label for="assignee_filter"><?php _e( 'Assignee:', 'ptt' ); ?></label>
                         <?php
-                        wp_dropdown_users( [
+                        wp_dropdown_users( array(
                             'name' => 'assignee_filter',
                             'id' => 'assignee_filter',
                             'capability' => 'publish_posts',
                             'show_option_all' => __( 'All Assignees', 'ptt' ),
                             'selected' => intval( $assignee_filter ),
-                        ] );
+                        ) );
                         ?>
                     </div>
                     
@@ -189,7 +193,7 @@ function ptt_kanban_page_html() {
                     <div class="filter-item">
                         <label for="client_filter"><?php _e( 'Client:', 'ptt' ); ?></label>
                         <?php
-                        wp_dropdown_categories( [
+                        wp_dropdown_categories( array(
                             'taxonomy' => 'client',
                             'name' => 'client_filter',
                             'id' => 'client_filter',
@@ -197,7 +201,7 @@ function ptt_kanban_page_html() {
                             'hide_empty' => false,
                             'selected' => intval( $client_filter ),
                             'hierarchical' => true,
-                        ] );
+                        ) );
                         ?>
                     </div>
                     
@@ -205,7 +209,7 @@ function ptt_kanban_page_html() {
                     <div class="filter-item">
                         <label for="project_filter"><?php _e( 'Project:', 'ptt' ); ?></label>
                         <?php
-                        wp_dropdown_categories( [
+                        wp_dropdown_categories( array(
                             'taxonomy' => 'project',
                             'name' => 'project_filter',
                             'id' => 'project_filter',
@@ -213,7 +217,7 @@ function ptt_kanban_page_html() {
                             'hide_empty' => false,
                             'selected' => intval( $project_filter ),
                             'hierarchical' => true,
-                        ] );
+                        ) );
                         ?>
                     </div>
                     
@@ -249,12 +253,12 @@ function ptt_kanban_page_html() {
  */
 function ptt_render_kanban_board( $assignee_filter = 0, $activity_filter = 30, $client_filter = 0, $project_filter = 0 ) {
     // Get all task status terms
-    $statuses = get_terms( [
+    $statuses = get_terms( array(
         'taxonomy' => 'task_status',
         'hide_empty' => false,
         'orderby' => 'term_order',
         'order' => 'ASC',
-    ] );
+    ) );
     
     if ( is_wp_error( $statuses ) || empty( $statuses ) ) {
         echo '<p>' . __( 'No task statuses found. Please create task statuses first.', 'ptt' ) . '</p>';
@@ -262,58 +266,58 @@ function ptt_render_kanban_board( $assignee_filter = 0, $activity_filter = 30, $
     }
     
     // Build base query args
-    $base_args = [
+    $base_args = array(
         'post_type' => 'project_task',
         'posts_per_page' => -1,
         'post_status' => 'publish',
-    ];
+    );
     
     // Apply assignee filter
     if ( $assignee_filter ) {
-        $base_args['meta_query'][] = [
+        $base_args['meta_query'][] = array(
             'key' => 'ptt_assignee',
             'value' => $assignee_filter,
             'compare' => '=',
             'type' => 'NUMERIC',
-        ];
+        );
     }
     
     // Apply activity period filter
     if ( $activity_filter ) {
-        $date_query = [];
+        $date_query = array();
         $days_ago = intval( $activity_filter );
         
         // Include tasks created within the period
-        $date_query[] = [
+        $date_query[] = array(
             'after' => $days_ago . ' days ago',
             'inclusive' => true,
-        ];
+        );
         
-        $base_args['date_query'] = [
+        $base_args['date_query'] = array(
             'relation' => 'OR',
             $date_query,
-        ];
+        );
         
         // We'll also check for sessions within the period in the loop
     }
     
     // Apply taxonomy filters
-    $tax_query = [];
+    $tax_query = array();
     
     if ( $client_filter ) {
-        $tax_query[] = [
+        $tax_query[] = array(
             'taxonomy' => 'client',
             'field' => 'term_id',
             'terms' => $client_filter,
-        ];
+        );
     }
     
     if ( $project_filter ) {
-        $tax_query[] = [
+        $tax_query[] = array(
             'taxonomy' => 'project',
             'field' => 'term_id',
             'terms' => $project_filter,
-        ];
+        );
     }
     
     if ( ! empty( $tax_query ) ) {
@@ -327,14 +331,21 @@ function ptt_render_kanban_board( $assignee_filter = 0, $activity_filter = 30, $
     foreach ( $statuses as $status ) {
         // Query tasks for this status
         $args = $base_args;
-        $args['tax_query'][] = [
+        $args['tax_query'][] = array(
             'taxonomy' => 'task_status',
             'field' => 'term_id',
             'terms' => $status->term_id,
-        ];
+        );
+        
+        // Add position ordering
+        $args['meta_key'] = 'ptt_kanban_position_' . $status->term_id;
+        $args['orderby'] = array(
+            'meta_value_num' => 'ASC',
+            'date' => 'DESC',
+        );
         
         $query = new WP_Query( $args );
-        $tasks = [];
+        $tasks = array();
         
         // Filter tasks based on activity period (including session dates)
         if ( $query->have_posts() ) {
@@ -438,7 +449,7 @@ function ptt_get_task_card_data( $post_id ) {
     $client_name = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '';
     $project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
     
-    return [
+    return array(
         'id' => $post_id,
         'title' => get_the_title( $post_id ),
         'assignee' => $assignee_name,
@@ -450,14 +461,14 @@ function ptt_get_task_card_data( $post_id ) {
         'client' => $client_name,
         'project' => $project_name,
         'edit_link' => get_edit_post_link( $post_id ),
-    ];
+    );
 }
 
 /**
  * Get last activity date for a task
  */
 function ptt_get_last_activity_date( $post_id ) {
-    $dates = [];
+    $dates = array();
     
     // Add creation date
     $dates[] = get_the_date( 'U', $post_id );
@@ -525,7 +536,7 @@ function ptt_task_has_active_timer( $post_id ) {
  * Render a task card
  */
 function ptt_render_task_card( $task ) {
-    $card_classes = [ 'ptt-kanban-task' ];
+    $card_classes = array( 'ptt-kanban-task' );
     if ( $task['is_over_budget'] ) {
         $card_classes[] = 'over-budget';
     }
@@ -606,42 +617,88 @@ function ptt_kanban_update_status_callback() {
     check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
     
     if ( ! current_user_can( 'edit_posts' ) ) {
-        wp_send_json_error( [ 'message' => __( 'Permission denied.', 'ptt' ) ] );
+        wp_send_json_error( array( 'message' => __( 'Permission denied.', 'ptt' ) ) );
     }
     
     $task_id = isset( $_POST['task_id'] ) ? intval( $_POST['task_id'] ) : 0;
     $status_id = isset( $_POST['status_id'] ) ? intval( $_POST['status_id'] ) : 0;
+    $position = isset( $_POST['position'] ) ? intval( $_POST['position'] ) : 0;
     
     if ( ! $task_id || ! $status_id ) {
-        wp_send_json_error( [ 'message' => __( 'Invalid data provided.', 'ptt' ) ] );
+        wp_send_json_error( array( 'message' => __( 'Invalid data provided.', 'ptt' ) ) );
     }
     
     // Verify the task exists
     if ( 'project_task' !== get_post_type( $task_id ) ) {
-        wp_send_json_error( [ 'message' => __( 'Invalid task.', 'ptt' ) ] );
+        wp_send_json_error( array( 'message' => __( 'Invalid task.', 'ptt' ) ) );
     }
     
     // Verify the status exists
     if ( ! term_exists( $status_id, 'task_status' ) ) {
-        wp_send_json_error( [ 'message' => __( 'Invalid status.', 'ptt' ) ] );
+        wp_send_json_error( array( 'message' => __( 'Invalid status.', 'ptt' ) ) );
     }
     
     // Update the task status
     $result = wp_set_object_terms( $task_id, $status_id, 'task_status', false );
     
     if ( is_wp_error( $result ) ) {
-        wp_send_json_error( [ 'message' => __( 'Failed to update task status.', 'ptt' ) ] );
+        wp_send_json_error( array( 'message' => __( 'Failed to update task status.', 'ptt' ) ) );
+    }
+    
+    // Update the position meta for this status
+    update_post_meta( $task_id, 'ptt_kanban_position_' . $status_id, $position );
+    
+    // Clear position meta for other statuses
+    $all_statuses = get_terms( array(
+        'taxonomy' => 'task_status',
+        'hide_empty' => false,
+        'fields' => 'ids',
+    ) );
+    
+    foreach ( $all_statuses as $sid ) {
+        if ( $sid != $status_id ) {
+            delete_post_meta( $task_id, 'ptt_kanban_position_' . $sid );
+        }
     }
     
     // Get updated task data
     $task_data = ptt_get_task_card_data( $task_id );
     
-    wp_send_json_success( [
+    wp_send_json_success( array(
         'message' => __( 'Task status updated successfully.', 'ptt' ),
         'task_data' => $task_data,
-    ] );
+    ) );
 }
 add_action( 'wp_ajax_ptt_kanban_update_status', 'ptt_kanban_update_status_callback' );
+
+/**
+ * AJAX handler for updating task position within a column
+ */
+function ptt_kanban_update_position_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+    
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( array( 'message' => __( 'Permission denied.', 'ptt' ) ) );
+    }
+    
+    $task_id = isset( $_POST['task_id'] ) ? intval( $_POST['task_id'] ) : 0;
+    $status_id = isset( $_POST['status_id'] ) ? intval( $_POST['status_id'] ) : 0;
+    $tasks_order = isset( $_POST['tasks_order'] ) ? array_map( 'intval', $_POST['tasks_order'] ) : array();
+    
+    if ( ! $task_id || ! $status_id || empty( $tasks_order ) ) {
+        wp_send_json_error( array( 'message' => __( 'Invalid data provided.', 'ptt' ) ) );
+    }
+    
+    // Update positions for all tasks in the column
+    foreach ( $tasks_order as $position => $tid ) {
+        update_post_meta( $tid, 'ptt_kanban_position_' . $status_id, $position );
+    }
+    
+    wp_send_json_success( array(
+        'message' => __( 'Task position updated successfully.', 'ptt' ),
+    ) );
+}
+add_action( 'wp_ajax_ptt_kanban_update_position', 'ptt_kanban_update_position_callback' );
 
 /**
  * AJAX handler for refreshing the Kanban board
@@ -650,7 +707,7 @@ function ptt_kanban_refresh_board_callback() {
     check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
     
     if ( ! current_user_can( 'edit_posts' ) ) {
-        wp_send_json_error( [ 'message' => __( 'Permission denied.', 'ptt' ) ] );
+        wp_send_json_error( array( 'message' => __( 'Permission denied.', 'ptt' ) ) );
     }
     
     // Get filter values from AJAX request
@@ -664,8 +721,8 @@ function ptt_kanban_refresh_board_callback() {
     ptt_render_kanban_board( $assignee_filter, $activity_filter, $client_filter, $project_filter );
     $board_html = ob_get_clean();
     
-    wp_send_json_success( [
+    wp_send_json_success( array(
         'html' => $board_html,
-    ] );
+    ) );
 }
 add_action( 'wp_ajax_ptt_kanban_refresh_board', 'ptt_kanban_refresh_board_callback' );

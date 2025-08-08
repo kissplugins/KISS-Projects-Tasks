@@ -2,7 +2,14 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
-* ## Version 1.8.0
+* ## Version 1.8.10
+* - Kanban vertical position for cards
+Position Storage: Each task stores its position per status using meta keys like:
+
+ptt_kanban_position_1 (for status ID 1)
+ptt_kanban_position_2 
+
+* ## Version 1.8.00
  * - Feature: Added comprehensive Kanban board view for visual task management
  * - Feature: Drag and drop functionality to update task status
  * - Feature: Advanced filtering by assignee, activity period, client, and project

@@ -72,29 +72,27 @@
         initDragAndDrop: function() {
             const self = this;
 
-            // Make task cards draggable
-            $('.ptt-kanban-task').draggable({
-                revert: 'invalid',
-                helper: 'clone',
+            // Make columns sortable for vertical reordering
+            $('.ptt-kanban-column-tasks').sortable({
+                connectWith: '.ptt-kanban-column-tasks',
+                placeholder: 'ptt-kanban-task-placeholder',
+                handle: '.ptt-kanban-task',
                 cursor: 'move',
                 opacity: 0.7,
-                zIndex: 1000,
-                containment: '.ptt-kanban-board',
+                revert: 100,
+                tolerance: 'pointer',
+                forcePlaceholderSize: true,
                 start: function(event, ui) {
-                    self.handleDragStart($(this), ui);
+                    self.handleSortStart(event, ui);
                 },
                 stop: function(event, ui) {
-                    self.handleDragStop($(this), ui);
-                }
-            });
-
-            // Make columns droppable
-            $('.ptt-kanban-column-tasks').droppable({
-                accept: '.ptt-kanban-task',
-                hoverClass: 'drop-hover',
-                tolerance: 'pointer',
-                drop: function(event, ui) {
-                    self.handleDrop($(this), ui);
+                    self.handleSortStop(event, ui);
+                },
+                update: function(event, ui) {
+                    // Only process if this is the receiving column
+                    if (this === ui.item.parent()[0]) {
+                        self.handleSortUpdate(event, ui);
+                    }
                 }
             });
 
@@ -132,10 +130,22 @@
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
                     this.classList.add('drop-hover');
+                    
+                    // Get the task being dragged over
+                    const afterElement = self.getDragAfterElement(this, e.clientY);
+                    const draggable = document.querySelector('.dragging');
+                    
+                    if (afterElement == null) {
+                        this.appendChild(draggable);
+                    } else {
+                        this.insertBefore(draggable, afterElement);
+                    }
                 });
 
                 column.addEventListener('dragleave', function(e) {
-                    this.classList.remove('drop-hover');
+                    if (e.target === this) {
+                        this.classList.remove('drop-hover');
+                    }
                 });
 
                 column.addEventListener('drop', function(e) {
@@ -146,11 +156,13 @@
                         const newStatusId = this.dataset.status;
                         const taskId = self.config.draggedTask.dataset.taskId;
                         
-                        // Move the task visually
-                        this.appendChild(self.config.draggedTask);
+                        // Get all task IDs in new order
+                        const tasksOrder = [...this.querySelectorAll('.ptt-kanban-task')].map(task => 
+                            parseInt(task.dataset.taskId)
+                        );
                         
                         // Update on server
-                        self.updateTaskStatus(taskId, newStatusId);
+                        self.updateTaskPositions(taskId, newStatusId, tasksOrder);
                     }
                     
                     this.classList.remove('drop-hover');
@@ -158,34 +170,53 @@
             });
         },
 
-        // Handle drag start
-        handleDragStart: function($task, ui) {
-            this.config.draggedTask = $task;
-            this.config.originalColumn = $task.closest('.ptt-kanban-column-tasks');
-            $task.addClass('dragging');
+        // Get the element after which the dragged element should be inserted
+        getDragAfterElement: function(container, y) {
+            const draggableElements = [...container.querySelectorAll('.ptt-kanban-task:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        },
+
+        // Handle sort start
+        handleSortStart: function(event, ui) {
+            this.config.originalColumn = ui.item.closest('.ptt-kanban-column-tasks');
+            ui.item.addClass('dragging');
             
             // Add visual feedback
             $('.ptt-kanban-column-tasks').addClass('drag-active');
+            
+            // Set placeholder height to match the dragged item
+            ui.placeholder.height(ui.item.height());
         },
 
-        // Handle drag stop
-        handleDragStop: function($task, ui) {
-            $task.removeClass('dragging');
+        // Handle sort stop
+        handleSortStop: function(event, ui) {
+            ui.item.removeClass('dragging');
             $('.ptt-kanban-column-tasks').removeClass('drag-active');
         },
 
-        // Handle drop
-        handleDrop: function($column, ui) {
+        // Handle sort update (when item is dropped)
+        handleSortUpdate: function(event, ui) {
             const self = this;
-            const $task = ui.draggable;
+            const $task = ui.item;
             const taskId = $task.data('task-id');
-            const newStatusId = $column.data('status');
+            const $newColumn = $task.closest('.ptt-kanban-column-tasks');
+            const newStatusId = $newColumn.data('status');
             const originalStatusId = this.config.originalColumn.data('status');
-
-            // Check if status actually changed
-            if (newStatusId === originalStatusId) {
-                return;
-            }
+            
+            // Get all task IDs in the new order
+            const tasksOrder = $newColumn.find('.ptt-kanban-task').map(function() {
+                return $(this).data('task-id');
+            }).get();
 
             // Prevent multiple simultaneous updates
             if (this.config.isProcessing) {
@@ -196,10 +227,6 @@
 
             // Show loading state
             $task.addClass('updating');
-            this.showNotification('Updating task status...', 'info');
-
-            // Optimistically move the task
-            $task.detach().appendTo($column);
             
             // Update empty states
             this.updateEmptyStates();
@@ -207,39 +234,62 @@
             // Update task counts
             this.updateTaskCounts();
 
-            // Send AJAX request to update status
-            $.ajax({
-                url: ptt_kanban.ajax_url,
-                type: 'POST',
-                data: {
+            // Determine which action to take
+            let ajaxData;
+            
+            if (newStatusId === originalStatusId) {
+                // Same column - just update position
+                this.showNotification('Updating task position...', 'info');
+                
+                ajaxData = {
+                    action: 'ptt_kanban_update_position',
+                    nonce: ptt_kanban.nonce,
+                    task_id: taskId,
+                    status_id: newStatusId,
+                    tasks_order: tasksOrder
+                };
+            } else {
+                // Different column - update status and position
+                this.showNotification('Moving task to new status...', 'info');
+                
+                ajaxData = {
                     action: 'ptt_kanban_update_status',
                     nonce: ptt_kanban.nonce,
                     task_id: taskId,
-                    status_id: newStatusId
-                },
+                    status_id: newStatusId,
+                    position: tasksOrder.indexOf(taskId)
+                };
+            }
+
+            // Send AJAX request
+            $.ajax({
+                url: ptt_kanban.ajax_url,
+                type: 'POST',
+                data: ajaxData,
                 success: function(response) {
                     if (response.success) {
                         $task.removeClass('updating');
-                        self.showNotification('Task status updated!', 'success');
                         
-                        // Update task card with new data if needed
-                        if (response.data.task_data) {
-                            self.updateTaskCard($task, response.data.task_data);
+                        if (newStatusId === originalStatusId) {
+                            self.showNotification('Task position updated!', 'success');
+                        } else {
+                            self.showNotification('Task moved successfully!', 'success');
+                            
+                            // Update task card with new data if status changed
+                            if (response.data.task_data) {
+                                self.updateTaskCard($task, response.data.task_data);
+                            }
                         }
                     } else {
                         // Revert on failure
-                        $task.detach().appendTo(self.config.originalColumn);
-                        self.updateEmptyStates();
-                        self.updateTaskCounts();
+                        self.revertTaskPosition($task);
                         self.showNotification(response.data.message || ptt_kanban.messages.drag_error, 'error');
                     }
                 },
                 error: function() {
                     // Revert on error
-                    $task.detach().appendTo(self.config.originalColumn);
+                    self.revertTaskPosition($task);
                     $task.removeClass('updating');
-                    self.updateEmptyStates();
-                    self.updateTaskCounts();
                     self.showNotification(ptt_kanban.messages.drag_error, 'error');
                 },
                 complete: function() {
@@ -248,8 +298,16 @@
             });
         },
 
-        // Update task status via AJAX
-        updateTaskStatus: function(taskId, statusId) {
+        // Revert task to original position
+        revertTaskPosition: function($task) {
+            // This will be handled by jQuery UI sortable's revert option
+            // But we also update our UI state
+            this.updateEmptyStates();
+            this.updateTaskCounts();
+        },
+
+        // Update task positions via AJAX
+        updateTaskPositions: function(taskId, statusId, tasksOrder) {
             const self = this;
             
             if (this.config.isProcessing) {
@@ -262,30 +320,23 @@
                 url: ptt_kanban.ajax_url,
                 type: 'POST',
                 data: {
-                    action: 'ptt_kanban_update_status',
+                    action: 'ptt_kanban_update_position',
                     nonce: ptt_kanban.nonce,
                     task_id: taskId,
-                    status_id: statusId
+                    status_id: statusId,
+                    tasks_order: tasksOrder
                 },
                 success: function(response) {
                     if (response.success) {
                         self.updateEmptyStates();
                         self.updateTaskCounts();
-                        self.showNotification('Task status updated!', 'success');
+                        self.showNotification('Task position updated!', 'success');
                     } else {
-                        // Revert the task to original column
-                        if (self.config.draggedTask && self.config.originalColumn) {
-                            self.config.originalColumn.appendChild(self.config.draggedTask);
-                        }
-                        self.showNotification(response.data.message || ptt_kanban.messages.drag_error, 'error');
+                        self.showNotification(response.data.message || ptt_kanban.messages.position_error, 'error');
                     }
                 },
                 error: function() {
-                    // Revert on error
-                    if (self.config.draggedTask && self.config.originalColumn) {
-                        self.config.originalColumn.appendChild(self.config.draggedTask);
-                    }
-                    self.showNotification(ptt_kanban.messages.drag_error, 'error');
+                    self.showNotification(ptt_kanban.messages.position_error, 'error');
                 },
                 complete: function() {
                     self.config.isProcessing = false;
@@ -472,7 +523,13 @@
                 $button.on('click', function() {
                     const $targetColumn = $('.ptt-kanban-column-tasks[data-status="' + statusId + '"]');
                     $task.detach().appendTo($targetColumn);
-                    PTTKanban.updateTaskStatus(taskId, statusId);
+                    
+                    // Get new order
+                    const tasksOrder = $targetColumn.find('.ptt-kanban-task').map(function() {
+                        return $(this).data('task-id');
+                    }).get();
+                    
+                    PTTKanban.updateTaskPositions(taskId, statusId, tasksOrder);
                     $options.remove();
                 });
                 
@@ -561,7 +618,7 @@
                     }
                 }
                 
-                // Arrow keys to move between columns
+                // Arrow keys to move between columns or tasks
                 if (key >= 37 && key <= 40) {
                     e.preventDefault();
                     self.navigateWithKeyboard($task, key);
@@ -572,38 +629,75 @@
         // Navigate tasks with keyboard
         navigateWithKeyboard: function($task, keyCode) {
             const $currentColumn = $task.closest('.ptt-kanban-column');
-            let $targetColumn;
+            const $currentColumnTasks = $task.closest('.ptt-kanban-column-tasks');
+            let $targetColumn, $targetTask;
             
             switch(keyCode) {
                 case 37: // Left arrow
                     $targetColumn = $currentColumn.prev('.ptt-kanban-column');
+                    if ($targetColumn && $targetColumn.length) {
+                        const taskId = $task.data('task-id');
+                        const newStatusId = $targetColumn.data('status-id');
+                        const $targetContainer = $targetColumn.find('.ptt-kanban-column-tasks');
+                        
+                        $task.detach().appendTo($targetContainer);
+                        
+                        const tasksOrder = $targetContainer.find('.ptt-kanban-task').map(function() {
+                            return $(this).data('task-id');
+                        }).get();
+                        
+                        this.updateTaskPositions(taskId, newStatusId, tasksOrder);
+                        $task.focus();
+                    }
                     break;
+                    
                 case 39: // Right arrow
                     $targetColumn = $currentColumn.next('.ptt-kanban-column');
+                    if ($targetColumn && $targetColumn.length) {
+                        const taskId = $task.data('task-id');
+                        const newStatusId = $targetColumn.data('status-id');
+                        const $targetContainer = $targetColumn.find('.ptt-kanban-column-tasks');
+                        
+                        $task.detach().appendTo($targetContainer);
+                        
+                        const tasksOrder = $targetContainer.find('.ptt-kanban-task').map(function() {
+                            return $(this).data('task-id');
+                        }).get();
+                        
+                        this.updateTaskPositions(taskId, newStatusId, tasksOrder);
+                        $task.focus();
+                    }
                     break;
+                    
                 case 38: // Up arrow
-                    const $prevTask = $task.prev('.ptt-kanban-task');
-                    if ($prevTask.length) {
-                        $prevTask.focus();
+                    $targetTask = $task.prev('.ptt-kanban-task');
+                    if ($targetTask.length) {
+                        // Move task before the previous task
+                        $task.insertBefore($targetTask);
+                        
+                        const tasksOrder = $currentColumnTasks.find('.ptt-kanban-task').map(function() {
+                            return $(this).data('task-id');
+                        }).get();
+                        
+                        this.updateTaskPositions($task.data('task-id'), $currentColumnTasks.data('status'), tasksOrder);
+                        $task.focus();
                     }
-                    return;
+                    break;
+                    
                 case 40: // Down arrow
-                    const $nextTask = $task.next('.ptt-kanban-task');
-                    if ($nextTask.length) {
-                        $nextTask.focus();
+                    $targetTask = $task.next('.ptt-kanban-task');
+                    if ($targetTask.length) {
+                        // Move task after the next task
+                        $task.insertAfter($targetTask);
+                        
+                        const tasksOrder = $currentColumnTasks.find('.ptt-kanban-task').map(function() {
+                            return $(this).data('task-id');
+                        }).get();
+                        
+                        this.updateTaskPositions($task.data('task-id'), $currentColumnTasks.data('status'), tasksOrder);
+                        $task.focus();
                     }
-                    return;
-            }
-            
-            // Move task to new column if arrow left/right was pressed
-            if ($targetColumn && $targetColumn.length) {
-                const taskId = $task.data('task-id');
-                const newStatusId = $targetColumn.data('status-id');
-                const $targetContainer = $targetColumn.find('.ptt-kanban-column-tasks');
-                
-                $task.detach().appendTo($targetContainer);
-                this.updateTaskStatus(taskId, newStatusId);
-                $task.focus();
+                    break;
             }
         }
     };
