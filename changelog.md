@@ -2,6 +2,14 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
+* ## Version 1.9.0
+* - **Feature**: Added new "Today" admin page for a daily dashboard view.
+* - **Feature**: The "Today" page includes a quick-start timer to create new sessions for existing tasks.
+* - **Feature**: Task dropdown on the "Today" page is filtered for "Not Started" or "In Progress" tasks and sorted by most recently modified (LIFO).
+* - **Feature**: View a chronological list of time entries for the last 10 days with a running daily total.
+* - **Enhancement**: The system now stops any other running timer for a user before a new one is started from the "Today" page.
+
+
 * ## Version 1.8.10
 * - Kanban vertical position for cards
 Position Storage: Each task stores its position per status using meta keys like:

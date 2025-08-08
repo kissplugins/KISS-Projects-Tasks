@@ -47,6 +47,7 @@ require_once PTT_PLUGIN_DIR . 'shortcodes.php';
 require_once PTT_PLUGIN_DIR . 'self-test.php';
 require_once PTT_PLUGIN_DIR . 'reports.php';
 require_once PTT_PLUGIN_DIR . 'kanban.php';
+require_once PTT_PLUGIN_DIR . 'today.php';
 
 // =================================================================
 // 1.0 PLUGIN ACTIVATION & DEACTIVATION
