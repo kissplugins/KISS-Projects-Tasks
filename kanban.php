@@ -70,6 +70,9 @@ function ptt_enqueue_kanban_assets( $hook ) {
         return;
     }
     
+    // Enqueue main plugin styles
+    wp_enqueue_style( 'ptt-styles', PTT_PLUGIN_URL . 'styles.css', [], PTT_VERSION );
+
     // Enqueue jQuery UI Sortable
     wp_enqueue_script( 'jquery-ui-sortable' );
     
@@ -272,8 +275,11 @@ function ptt_render_kanban_board( $assignee_filter = 0, $activity_filter = 30, $
         'post_status' => 'publish',
     );
     
-    // Apply assignee filter
+    // Initialize meta_query array if filters are applied
     if ( $assignee_filter ) {
+        if ( ! isset( $base_args['meta_query'] ) ) {
+            $base_args['meta_query'] = array();
+        }
         $base_args['meta_query'][] = array(
             'key' => 'ptt_assignee',
             'value' => $assignee_filter,
@@ -297,55 +303,102 @@ function ptt_render_kanban_board( $assignee_filter = 0, $activity_filter = 30, $
             'relation' => 'OR',
             $date_query,
         );
+    }
+    
+    // Apply taxonomy filters - but don't add empty tax_query
+    if ( $client_filter || $project_filter ) {
+        $tax_query = array();
         
-        // We'll also check for sessions within the period in the loop
+        if ( $client_filter ) {
+            $tax_query[] = array(
+                'taxonomy' => 'client',
+                'field' => 'term_id',
+                'terms' => $client_filter,
+            );
+        }
+        
+        if ( $project_filter ) {
+            $tax_query[] = array(
+                'taxonomy' => 'project',
+                'field' => 'term_id',
+                'terms' => $project_filter,
+            );
+        }
+        
+        if ( ! empty( $tax_query ) ) {
+            if ( count( $tax_query ) > 1 ) {
+                $tax_query['relation'] = 'AND';
+            }
+            $base_args['tax_query'] = $tax_query;
+        }
     }
     
-    // Apply taxonomy filters
-    $tax_query = array();
-    
-    if ( $client_filter ) {
-        $tax_query[] = array(
-            'taxonomy' => 'client',
-            'field' => 'term_id',
-            'terms' => $client_filter,
-        );
-    }
-    
-    if ( $project_filter ) {
-        $tax_query[] = array(
-            'taxonomy' => 'project',
-            'field' => 'term_id',
-            'terms' => $project_filter,
-        );
-    }
-    
-    if ( ! empty( $tax_query ) ) {
-        $tax_query['relation'] = 'AND';
-        $base_args['tax_query'] = $tax_query;
-    }
+    // Debug: Let's also create an "Unassigned" column for tasks without status
+    $unassigned_args = $base_args;
+    $unassigned_args['tax_query'] = array(
+        array(
+            'taxonomy' => 'task_status',
+            'operator' => 'NOT EXISTS',
+        ),
+    );
+    $unassigned_query = new WP_Query( $unassigned_args );
+    $unassigned_count = $unassigned_query->found_posts;
     
     // Render columns
     echo '<div class="ptt-kanban-columns">';
     
+    // Add Unassigned column if there are tasks without status
+    if ( $unassigned_count > 0 ) {
+        ?>
+        <div class="ptt-kanban-column" data-status-id="0">
+            <div class="ptt-kanban-column-header">
+                <h3><?php _e( 'Unassigned', 'ptt' ); ?></h3>
+                <span class="task-count"><?php echo $unassigned_count; ?></span>
+            </div>
+            <div class="ptt-kanban-column-tasks" data-status="0">
+                <?php
+                if ( $unassigned_query->have_posts() ) {
+                    while ( $unassigned_query->have_posts() ) {
+                        $unassigned_query->the_post();
+                        $task = ptt_get_task_card_data( get_the_ID() );
+                        ptt_render_task_card( $task );
+                    }
+                    wp_reset_postdata();
+                }
+                ?>
+            </div>
+        </div>
+        <?php
+    }
+    
     foreach ( $statuses as $status ) {
         // Query tasks for this status
         $args = $base_args;
+        
+        // Initialize tax_query if not set
+        if ( ! isset( $args['tax_query'] ) ) {
+            $args['tax_query'] = array();
+        }
+        
+        // Add status filter
         $args['tax_query'][] = array(
             'taxonomy' => 'task_status',
             'field' => 'term_id',
             'terms' => $status->term_id,
         );
         
-        // Add position ordering
-        $args['meta_key'] = 'ptt_kanban_position_' . $status->term_id;
+        // Simple ordering - first by position if it exists, then by date
         $args['orderby'] = array(
-            'meta_value_num' => 'ASC',
             'date' => 'DESC',
         );
         
         $query = new WP_Query( $args );
         $tasks = array();
+        
+        // Debug output
+        if ( WP_DEBUG ) {
+            echo '<!-- Status: ' . $status->name . ' | Found: ' . $query->found_posts . ' tasks -->';
+        }
         
         // Filter tasks based on activity period (including session dates)
         if ( $query->have_posts() ) {
@@ -370,8 +423,8 @@ function ptt_render_kanban_board( $assignee_filter = 0, $activity_filter = 30, $
                         $include_task = true;
                     }
                     
-                    // Check session dates
-                    if ( ! $include_task ) {
+                    // Check session dates if ACF is available
+                    if ( ! $include_task && function_exists( 'get_field' ) ) {
                         $sessions = get_field( 'sessions', $post_id );
                         if ( ! empty( $sessions ) && is_array( $sessions ) ) {
                             foreach ( $sessions as $session ) {
@@ -401,6 +454,23 @@ function ptt_render_kanban_board( $assignee_filter = 0, $activity_filter = 30, $
             <div class="ptt-kanban-column-tasks" data-status="<?php echo esc_attr( $status->term_id ); ?>">
                 <?php
                 if ( ! empty( $tasks ) ) {
+                    // Sort tasks by position if meta exists
+                    usort( $tasks, function( $a, $b ) use ( $status ) {
+                        $pos_a = get_post_meta( $a['id'], 'ptt_kanban_position_' . $status->term_id, true );
+                        $pos_b = get_post_meta( $b['id'], 'ptt_kanban_position_' . $status->term_id, true );
+                        
+                        if ( $pos_a === '' && $pos_b === '' ) {
+                            return 0;
+                        }
+                        if ( $pos_a === '' ) {
+                            return 1;
+                        }
+                        if ( $pos_b === '' ) {
+                            return -1;
+                        }
+                        return intval( $pos_a ) - intval( $pos_b );
+                    });
+                    
                     foreach ( $tasks as $task ) {
                         ptt_render_task_card( $task );
                     }
@@ -424,16 +494,22 @@ function ptt_get_task_card_data( $post_id ) {
     $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );
     $assignee_name = $assignee_id ? get_the_author_meta( 'display_name', $assignee_id ) : __( 'Unassigned', 'ptt' );
     
-    // Get time logged
-    $duration = get_field( 'calculated_duration', $post_id );
-    $duration = $duration ? floatval( $duration ) : 0;
+    // Get time logged - handle ACF not being available
+    $duration = 0;
+    if ( function_exists( 'get_field' ) ) {
+        $duration = get_field( 'calculated_duration', $post_id );
+        $duration = $duration ? floatval( $duration ) : 0;
+    }
     
     // Get budget
-    $task_budget = get_field( 'task_max_budget', $post_id );
-    $project_terms = get_the_terms( $post_id, 'project' );
+    $task_budget = 0;
     $project_budget = 0;
-    if ( ! is_wp_error( $project_terms ) && $project_terms ) {
-        $project_budget = get_field( 'project_max_budget', 'project_' . $project_terms[0]->term_id );
+    if ( function_exists( 'get_field' ) ) {
+        $task_budget = get_field( 'task_max_budget', $post_id );
+        $project_terms = get_the_terms( $post_id, 'project' );
+        if ( ! is_wp_error( $project_terms ) && $project_terms ) {
+            $project_budget = get_field( 'project_max_budget', 'project_' . $project_terms[0]->term_id );
+        }
     }
     $effective_budget = $task_budget ? $task_budget : $project_budget;
     $is_over_budget = ( $effective_budget > 0 && $duration > $effective_budget );
@@ -447,6 +523,8 @@ function ptt_get_task_card_data( $post_id ) {
     // Get client and project names
     $client_terms = get_the_terms( $post_id, 'client' );
     $client_name = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '';
+    
+    $project_terms = get_the_terms( $post_id, 'project' );
     $project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
     
     return array(
@@ -476,21 +554,23 @@ function ptt_get_last_activity_date( $post_id ) {
     // Add modification date
     $dates[] = get_the_modified_date( 'U', $post_id );
     
-    // Check sessions for latest activity
-    $sessions = get_field( 'sessions', $post_id );
-    if ( ! empty( $sessions ) && is_array( $sessions ) ) {
-        foreach ( $sessions as $session ) {
-            if ( ! empty( $session['session_start_time'] ) ) {
-                $dates[] = strtotime( $session['session_start_time'] );
-            }
-            if ( ! empty( $session['session_stop_time'] ) ) {
-                $dates[] = strtotime( $session['session_stop_time'] );
+    // Check sessions for latest activity - only if ACF is available
+    if ( function_exists( 'get_field' ) ) {
+        $sessions = get_field( 'sessions', $post_id );
+        if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+            foreach ( $sessions as $session ) {
+                if ( ! empty( $session['session_start_time'] ) ) {
+                    $dates[] = strtotime( $session['session_start_time'] );
+                }
+                if ( ! empty( $session['session_stop_time'] ) ) {
+                    $dates[] = strtotime( $session['session_stop_time'] );
+                }
             }
         }
     }
     
     // Get the most recent date
-    $last_activity = max( $dates );
+    $last_activity = ! empty( $dates ) ? max( $dates ) : current_time( 'timestamp' );
     
     // Format relative time
     $current_time = current_time( 'timestamp' );
@@ -511,20 +591,22 @@ function ptt_get_last_activity_date( $post_id ) {
  * Check if task has an active timer
  */
 function ptt_task_has_active_timer( $post_id ) {
-    // Check main timer
-    $start_time = get_field( 'start_time', $post_id );
-    $stop_time = get_field( 'stop_time', $post_id );
-    
-    if ( $start_time && ! $stop_time ) {
-        return true;
-    }
-    
-    // Check session timers
-    $sessions = get_field( 'sessions', $post_id );
-    if ( ! empty( $sessions ) && is_array( $sessions ) ) {
-        foreach ( $sessions as $session ) {
-            if ( ! empty( $session['session_start_time'] ) && empty( $session['session_stop_time'] ) ) {
-                return true;
+    // Check main timer - only if ACF is available
+    if ( function_exists( 'get_field' ) ) {
+        $start_time = get_field( 'start_time', $post_id );
+        $stop_time = get_field( 'stop_time', $post_id );
+        
+        if ( $start_time && ! $stop_time ) {
+            return true;
+        }
+        
+        // Check session timers
+        $sessions = get_field( 'sessions', $post_id );
+        if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+            foreach ( $sessions as $session ) {
+                if ( ! empty( $session['session_start_time'] ) && empty( $session['session_stop_time'] ) ) {
+                    return true;
+                }
             }
         }
     }
