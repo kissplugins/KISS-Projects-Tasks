@@ -1053,39 +1053,6 @@
     background-color: #f6f7f7;
 }
 
-#ptt-today-page-container .ptt-today-entry:hover .entry-actions {
-    display: flex !important;
-}
-
-#ptt-today-page-container .entry-actions {
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    display: none;
-    gap: 5px;
-}
-
-#ptt-today-page-container .entry-actions button {
-    background: #fff;
-    border: 1px solid #c3c4c7;
-    padding: 4px;
-    cursor: pointer;
-    border-radius: 3px;
-    transition: all 0.2s;
-}
-
-#ptt-today-page-container .entry-actions button:hover {
-    background: #2271b1;
-    border-color: #2271b1;
-    color: #fff;
-}
-
-#ptt-today-page-container .entry-actions .dashicons {
-    font-size: 14px;
-    width: 14px;
-    height: 14px;
-}
 
 /* Editable Fields */
 #ptt-today-page-container .entry-duration[data-editable="true"] {
@@ -1271,12 +1238,6 @@
         width: 100%;
     }
     
-    #ptt-today-page-container .entry-actions {
-        position: static;
-        transform: none;
-        margin-top: 10px;
-        justify-content: flex-end;
-    }
 }
 
 /* Accessibility Improvements */
@@ -1285,15 +1246,9 @@
     outline-offset: 2px;
 }
 
-#ptt-today-page-container .entry-actions button:focus {
-    outline: 2px solid #2271b1;
-    outline-offset: 1px;
-}
-
 /* Print Styles */
 @media print {
     #ptt-today-page-container .ptt-today-entry-box,
-    #ptt-today-page-container .entry-actions,
     #ptt-today-page-container .ptt-date-nav,
     #ptt-today-page-container #ptt-today-debug-area {
         display: none !important;

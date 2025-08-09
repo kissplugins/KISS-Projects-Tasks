@@ -45,7 +45,6 @@ class PTT_Today_Entry_Renderer {
 			
 			<?php echo self::render_entry_details( $entry ); ?>
 			<?php echo self::render_entry_duration( $entry ); ?>
-			<?php echo self::render_entry_actions( $entry ); ?>
 			
 		</div>
 		<?php
@@ -118,27 +117,6 @@ class PTT_Today_Entry_Renderer {
 		return ob_get_clean();
 	}
 	
-	/**
-	 * Renders the actions section of an entry.
-	 *
-	 * @param array $entry Entry data.
-	 * @return string HTML output.
-	 */
-	private static function render_entry_actions( $entry ) {
-		// Hidden by default, can be shown on hover or via JS
-		ob_start();
-		?>
-		<div class="entry-actions" style="display: none;">
-			<button class="entry-action-edit" data-action="edit" title="Edit">
-				<span class="dashicons dashicons-edit"></span>
-			</button>
-			<button class="entry-action-delete" data-action="delete" title="Delete">
-				<span class="dashicons dashicons-trash"></span>
-			</button>
-		</div>
-		<?php
-		return ob_get_clean();
-	}
 }
 
 /**

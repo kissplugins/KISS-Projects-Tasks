@@ -1,5 +1,24 @@
 # Changelog
 
+## Version 1.10.2 - Today Page Refinements
+*Release Date: TBD*
+
+### Changed
+- Removed UTC offset from Today page timestamp displays.
+- Hid edit/delete action buttons pending future functionality.
+- Added client name after project in session metadata.
+- Ensured Silkscreen font loads via existing admin stylesheet.
+
+## Version 1.10.1 - Today Page Timestamps
+*Release Date: TBD*
+
+### Added
+- Start and end timestamps with UTC offset on Today page session rows.
+- Silkscreen Google Font applied to numeric time displays.
+
+### Changed
+- Session row layout now shows "Start", "End" and "Sub-total" values.
+
 ## Version 1.10.0 - Today Page Refactoring
 *Release Date: TBD*
 
