@@ -214,6 +214,46 @@ function ptt_today_start_new_session_callback() {
 add_action( 'wp_ajax_ptt_today_start_new_session', 'ptt_today_start_new_session_callback' );
 
 /**
+ * Renders Today page entry rows as HTML.
+ *
+ * This provides a reusable template so the server can still output
+ * markup while also exposing raw entry data for future AJAX-driven
+ * enhancements.
+ *
+ * @param array $entries Array of entry data arrays.
+ * @return string HTML markup for the entries list.
+ */
+function ptt_render_today_entries_html( $entries ) {
+        ob_start();
+        if ( empty( $entries ) ) {
+                echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
+        } else {
+                foreach ( $entries as $entry ) {
+                        $running_class = $entry['is_running'] ? 'running' : '';
+                        ?>
+                        <div class="ptt-today-entry <?php echo esc_attr( $running_class ); ?>">
+                                <div class="entry-details">
+                                        <span class="entry-session-title"><?php echo esc_html( $entry['session_title'] ); ?></span>
+                                        <span class="entry-meta">
+                                                <a href="<?php echo esc_url( $entry['edit_link'] ); ?>" target="_blank">
+                                                        <?php echo esc_html( $entry['task_title'] ); ?>
+                                                </a>
+                                                &bull; <?php echo esc_html( $entry['project_name'] ); ?>
+                                        </span>
+                                </div>
+                                <div class="entry-duration">
+                                        <?php echo esc_html( $entry['start_time'] ); ?> |
+                                        <?php echo $entry['is_running'] ? 'Now' : esc_html( $entry['stop_time'] ); ?> |
+                                        SUB-TOTAL: <?php echo esc_html( $entry['duration'] ); ?>
+                                </div>
+                        </div>
+                        <?php
+                }
+        }
+        return ob_get_clean();
+}
+
+/**
  * AJAX handler to get time entries for a specific day for the current user.
  */
 function ptt_get_daily_entries_callback() {
@@ -230,13 +270,11 @@ function ptt_get_daily_entries_callback() {
 	// Get all tasks for the current user to make the query more efficient.
 	$user_task_ids = ptt_get_tasks_for_user( $user_id );
 
-	// If the user has no tasks, we can stop right here.
-	if ( empty( $user_task_ids ) ) {
-		ob_start();
-		echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
-		$html = ob_get_clean();
-		wp_send_json_success( [ 'html' => $html, 'total' => '00:00' ] );
-	}
+        // If the user has no tasks, return early.
+        if ( empty( $user_task_ids ) ) {
+                $html = ptt_render_today_entries_html( [] );
+                wp_send_json_success( [ 'entries' => [], 'html' => $html, 'total' => '00:00', 'debug' => '' ] );
+        }
 
 	// Get Term IDs for statuses
 	$status_terms_to_include = [];
@@ -300,56 +338,33 @@ function ptt_get_daily_entries_callback() {
 						$project_terms = get_the_terms( $post_id, 'project' );
 						$project_name  = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
 
-						$all_entries[] = [
-							'session_title'  => $session['session_title'],
-							'task_title'     => get_the_title(),
-							'project_name'   => $project_name,
-							'start_time'     => $start_ts,
-							'stop_time'      => $stop_ts, // Added stop_time
-							'duration'       => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
-							'is_running'     => empty( $stop_str ),
-							'post_id'        => $post_id, // Added post_id
-						];
-					}
-				}
-			}
-		}
+                                                $all_entries[] = [
+                                                        'session_title' => $session['session_title'],
+                                                        'task_title'    => get_the_title(),
+                                                        'project_name'  => $project_name,
+                                                        'start_ts'      => $start_ts,
+                                                        'stop_ts'       => $stop_ts,
+                                                        'start_time'    => wp_date( 'g:i:s A', $start_ts ),
+                                                        'stop_time'     => $stop_ts ? wp_date( 'g:i:s A', $stop_ts ) : '',
+                                                        'duration'      => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
+                                                        'is_running'    => empty( $stop_str ),
+                                                        'post_id'       => $post_id,
+                                                        'edit_link'     => get_edit_post_link( $post_id ),
+                                                ];
+                                        }
+                                }
+                        }
+                }
 		wp_reset_postdata();
 	}
 
 	// Sort entries by start time descending
-	usort( $all_entries, function( $a, $b ) {
-		return $b['start_time'] <=> $a['start_time'];
-	} );
+        usort( $all_entries, function( $a, $b ) {
+                return $b['start_ts'] <=> $a['start_ts'];
+        } );
 
-	// Prepare HTML
-	ob_start();
-	if ( empty( $all_entries ) ) {
-		echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
-	} else {
-		foreach ( $all_entries as $entry ) {
-			$running_class = $entry['is_running'] ? 'running' : '';
-			?>
-			<div class="ptt-today-entry <?php echo $running_class; ?>">
-				<div class="entry-details">
-					<span class="entry-session-title"><?php echo esc_html( $entry['session_title'] ); ?></span>
-					<span class="entry-meta">
-						<a href="<?php echo esc_url( get_edit_post_link( $entry['post_id'] ) ); ?>" target="_blank">
-							<?php echo esc_html( $entry['task_title'] ); ?>
-						</a>
-						&bull; <?php echo esc_html( $entry['project_name'] ); ?>
-					</span>
-				</div>
-				<div class="entry-duration">
-					<?php echo esc_html( wp_date( 'g:i:s A', $entry['start_time'] ) ); ?> |
-					<?php echo $entry['is_running'] ? 'Now' : esc_html( wp_date( 'g:i:s A', $entry['stop_time'] ) ); ?> |
-					SUB-TOTAL: <?php echo esc_html( $entry['duration'] ); ?>
-				</div>
-			</div>
-			<?php
-		}
-	}
-	$html = ob_get_clean();
+        // Prepare HTML using the reusable renderer.
+        $html = ptt_render_today_entries_html( $all_entries );
 
 	// Prepare Debug Info for Today page. WARNING: Do not modify or refactor unless specifically requested
 	$debug_info = [];
@@ -397,7 +412,7 @@ function ptt_get_daily_entries_callback() {
 	$total_seconds_remainder = $grand_total_seconds % 60; // Calculate remaining seconds
 	$total_formatted = sprintf( '%02d:%02d:%02d', $total_hours, $total_minutes, $total_seconds_remainder ); // Include seconds
 
-	wp_send_json_success( [ 'html' => $html, 'total' => $total_formatted, 'debug' => $debug_html ] );
+        wp_send_json_success( [ 'entries' => $all_entries, 'html' => $html, 'total' => $total_formatted, 'debug' => $debug_html ] );
 }
 add_action( 'wp_ajax_ptt_get_daily_entries', 'ptt_get_daily_entries_callback' );
 
