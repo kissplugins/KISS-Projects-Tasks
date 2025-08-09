@@ -915,7 +915,7 @@
 }
 
 #ptt-today-page-container .ptt-today-timer-display {
-    font-family: monospace, sans-serif;
+    font-family: 'Silkscreen', monospace, sans-serif;
     font-size: 28px;
     font-weight: bold;
     color: #1d2327;
@@ -990,9 +990,13 @@
 }
 
 #ptt-today-page-container .entry-duration {
-    font-family: monospace, sans-serif;
+    font-family: 'Silkscreen', monospace, sans-serif;
     font-size: 16px;
     font-weight: bold;
+}
+
+#ptt-today-page-container #ptt-today-total strong {
+    font-family: 'Silkscreen', monospace, sans-serif;
 }
 
 #ptt-today-page-container .ptt-today-entry.running .entry-duration {

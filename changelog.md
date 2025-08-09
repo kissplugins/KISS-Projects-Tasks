@@ -2,6 +2,14 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
+## 1.9.3 - 2025-08-08
+
+* **Enhanced:** Timer and duration displays on the Today page now use the Silkscreen Google Font.
+
+## 1.9.2 - 2025-08-08
+
+* **Enhanced:** Task names on the Today page now link to the task editor and display the associated client.
+
 ## 1.9.1 - 2025-08-08
 
 * **Fix**: Updated the "User Data Isolation" self-test to align with the new rule that only shows tasks to the assignee.

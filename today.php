@@ -297,17 +297,23 @@ function ptt_get_daily_entries_callback() {
 						}
 						$grand_total_seconds += $duration_seconds;
 
-						$project_terms = get_the_terms( $post_id, 'project' );
-						$project_name  = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
+                                               $project_terms = get_the_terms( $post_id, 'project' );
+                                               $project_name  = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
 
-						$all_entries[] = [
-							'session_title'  => $session['session_title'],
-							'task_title'     => get_the_title(),
-							'project_name'   => $project_name,
-							'start_time'     => $start_ts,
-							'duration'       => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
-							'is_running'     => empty( $stop_str ),
-						];
+                                               $client_terms = get_the_terms( $post_id, 'client' );
+                                               $client_name  = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–';
+
+                                               $all_entries[] = [
+                                                       'session_title' => $session['session_title'],
+                                                       'task_title'    => get_the_title(),
+                                                       'task_id'       => $post_id,
+                                                       'project_name'  => $project_name,
+                                                       'client_name'   => $client_name,
+                                                       'start_time'    => $start_ts,
+                                                       'stop_time'     => $stop_ts, // Added stop_time
+                                                       'duration'      => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
+                                                       'is_running'    => empty( $stop_str ),
+                                               ];
 					}
 				}
 			}
@@ -328,13 +334,16 @@ function ptt_get_daily_entries_callback() {
 		foreach ( $all_entries as $entry ) {
 			$running_class = $entry['is_running'] ? 'running' : '';
 			?>
-			<div class="ptt-today-entry <?php echo $running_class; ?>">
-				<div class="entry-details">
-					<span class="entry-session-title"><?php echo esc_html( $entry['session_title'] ); ?></span>
-					<span class="entry-meta"><?php echo esc_html( $entry['task_title'] ); ?> &bull; <?php echo esc_html( $entry['project_name'] ); ?></span>
-				</div>
-				<div class="entry-duration">
-					<?php echo esc_html( $entry['duration'] ); ?>
+                               <div class="ptt-today-entry <?php echo $running_class; ?>">
+                               <div class="entry-details">
+                                       <span class="entry-session-title"><?php echo esc_html( $entry['session_title'] ); ?></span>
+                                       <?php $edit_link = get_edit_post_link( $entry['task_id'] ); ?>
+                                       <span class="entry-meta"><a href="<?php echo esc_url( $edit_link ); ?>"><?php echo esc_html( $entry['task_title'] ); ?></a> &bull; <?php echo esc_html( $entry['project_name'] ); ?> &bull; <?php echo esc_html( $entry['client_name'] ); ?></span>
+                               </div>
+                               <div class="entry-duration">
+					<?php echo esc_html( wp_date( 'g:i:s A', $entry['start_time'] ) ); ?> |
+					<?php echo $entry['is_running'] ? 'Now' : esc_html( wp_date( 'g:i:s A', $entry['stop_time'] ) ); ?> |
+					SUB-TOTAL: <?php echo esc_html( $entry['duration'] ); ?>
 				</div>
 			</div>
 			<?php
@@ -351,6 +360,15 @@ function ptt_get_daily_entries_callback() {
 	$debug_info['matched_tasks'] = $q->found_posts;
 	$debug_info['matched_sessions'] = count( $all_entries );
 
+	// Add timezone and time computations
+	$wp_timezone_string = wp_timezone_string();
+	$current_utc_time = current_time('mysql', 1);
+	$current_local_time = current_time('mysql', 0);
+
+	$debug_info['wp_timezone'] = $wp_timezone_string;
+	$debug_info['current_utc_time'] = $current_utc_time;
+	$debug_info['current_local_time'] = $current_local_time;
+
 	ob_start();
 	?>
 	<ul>
@@ -360,6 +378,9 @@ function ptt_get_daily_entries_callback() {
 		<li><strong>Tasks Found:</strong> <?php echo esc_html( $debug_info['matched_tasks'] ); ?></li>
 		<li><strong>Sessions on this Date:</strong> <?php echo esc_html( $debug_info['matched_sessions'] ); ?></li>
 		<li><strong>Task Query Rule:</strong> Tasks where the current user is the assignee.</li>
+		<li><strong>WordPress Timezone:</strong> <?php echo esc_html( $debug_info['wp_timezone'] ); ?></li>
+		<li><strong>Current UTC Time:</strong> <?php echo esc_html( $debug_info['current_utc_time'] ); ?></li>
+		<li><strong>Current Local Time:</strong> <?php echo esc_html( $debug_info['current_local_time'] ); ?></li>
 	</ul>
 	<?php
 	/**
@@ -373,7 +394,8 @@ function ptt_get_daily_entries_callback() {
 
 	$total_hours   = floor( $grand_total_seconds / 3600 );
 	$total_minutes = floor( ( $grand_total_seconds / 60 ) % 60 );
-	$total_formatted = sprintf( '%02d:%02d', $total_hours, $total_minutes );
+	$total_seconds_remainder = $grand_total_seconds % 60; // Calculate remaining seconds
+	$total_formatted = sprintf( '%02d:%02d:%02d', $total_hours, $total_minutes, $total_seconds_remainder ); // Include seconds
 
 	wp_send_json_success( [ 'html' => $html, 'total' => $total_formatted, 'debug' => $debug_html ] );
 }
