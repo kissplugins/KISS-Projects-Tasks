@@ -155,7 +155,7 @@ jQuery(document).ready(function ($) {
             const now = new Date();
             const diff = now - startTime; // in milliseconds
 
-            // --- START DEBUGGING INFO ---
+            // --- START TIMER DEBUGGING INFO ---
             const debugLog = $('#ptt-timer-debug-log');
             if (debugLog.length) {
                 debugLog.html(

@@ -308,6 +308,7 @@ function ptt_get_daily_entries_callback() {
 							'stop_time'      => $stop_ts, // Added stop_time
 							'duration'       => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
 							'is_running'     => empty( $stop_str ),
+							'post_id'        => $post_id, // Added post_id
 						];
 					}
 				}
@@ -332,7 +333,12 @@ function ptt_get_daily_entries_callback() {
 			<div class="ptt-today-entry <?php echo $running_class; ?>">
 				<div class="entry-details">
 					<span class="entry-session-title"><?php echo esc_html( $entry['session_title'] ); ?></span>
-					<span class="entry-meta"><?php echo esc_html( $entry['task_title'] ); ?> &bull; <?php echo esc_html( $entry['project_name'] ); ?></span>
+					<span class="entry-meta">
+						<a href="<?php echo esc_url( get_edit_post_link( $entry['post_id'] ) ); ?>" target="_blank">
+							<?php echo esc_html( $entry['task_title'] ); ?>
+						</a>
+						&bull; <?php echo esc_html( $entry['project_name'] ); ?>
+					</span>
 				</div>
 				<div class="entry-duration">
 					<?php echo esc_html( wp_date( 'g:i:s A', $entry['start_time'] ) ); ?> |
