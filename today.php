@@ -7,7 +7,7 @@
  * This file registers the "Today" page and renders its markup and
  * logic for a daily time-tracking dashboard view.
  *
- * Version: 1.10.0
+ * Version: 1.10.2
  * ------------------------------------------------------------------
  */
 
@@ -33,6 +33,24 @@ function ptt_add_today_page() {
 	);
 }
 add_action( 'admin_menu', 'ptt_add_today_page', 5 ); // High priority to appear early
+
+/**
+ * Enqueues the Silkscreen font and time display styles for the Today page.
+ *
+ * @param string $hook Current admin page hook.
+ */
+function ptt_today_enqueue_font( $hook ) {
+    if ( 'project_task_page_ptt-today' !== $hook ) {
+        return;
+    }
+
+    wp_enqueue_style( 'ptt-silkscreen-font', 'https://fonts.googleapis.com/css2?family=Silkscreen&display=swap', [], null );
+    wp_add_inline_style(
+        'ptt-styles',
+        '.ptt-time-display{font-family:"Silkscreen",monospace;font-weight:400;}.entry-duration{font-family:inherit;font-weight:400;}'
+    );
+}
+add_action( 'admin_enqueue_scripts', 'ptt_today_enqueue_font', 20 );
 
 /**
  * Renders the Today page HTML.
@@ -128,9 +146,9 @@ function ptt_render_today_page_html() {
 					</div>
 					
 					<!-- Total Display -->
-					<span id="ptt-today-total" data-field="total-display">
-						Total: <strong>00:00</strong>
-					</span>
+                                        <span id="ptt-today-total" data-field="total-display">
+                                                Total: <strong class="ptt-time-display">00:00:00</strong>
+                                        </span>
 					
 					<!-- View Options (Future) -->
 					<div class="ptt-today-view-options" style="display: none;">
@@ -150,24 +168,24 @@ function ptt_render_today_page_html() {
 				<div class="ptt-today-entry" data-entry-id="">
 					<div class="entry-details">
 						<span class="entry-session-title" data-field="session_title"></span>
-						<span class="entry-meta">
-							<span class="entry-task-title" data-field="task_title"></span>
-							&bull; 
-							<span class="entry-project-name" data-field="project_name"></span>
-						</span>
-					</div>
-					<div class="entry-duration" data-field="duration"></div>
-					<div class="entry-actions" style="display: none;">
-						<button class="entry-action-edit" data-action="edit">
-							<span class="dashicons dashicons-edit"></span>
-						</button>
-						<button class="entry-action-delete" data-action="delete">
-							<span class="dashicons dashicons-trash"></span>
-						</button>
-					</div>
-				</div>
-			</template>
-		</div>
+                                               <span class="entry-meta">
+                                                        <span class="entry-task-title" data-field="task_title"></span>
+                                                        &bull;
+                                                        <span class="entry-project-name" data-field="project_name"></span>
+                                                        <span class="entry-client-wrapper" data-client-wrapper style="display:none;">
+                                                                &bull;
+                                                                <span class="entry-client-name" data-field="client_name"></span>
+                                                        </span>
+                                               </span>
+                                       </div>
+                                       <div class="entry-duration" data-field="duration">
+                                               Start: <span class="ptt-time-display" data-start></span> |
+                                               End: <span class="ptt-time-display" data-end></span> |
+                                               Sub-total: <span class="ptt-time-display" data-subtotal></span>
+                                       </div>
+                               </div>
+                       </template>
+               </div>
 
 		<!-- Debug Area -->
 		<div id="ptt-today-debug-area" 
@@ -312,23 +330,26 @@ function ptt_today_start_new_session_callback() {
 		wp_send_json_error( [ 'message' => 'Failed to create new session.' ] );
 	}
 
-	// Get task metadata for response
-	$task_title = get_the_title( $post_id );
-	$project_terms = get_the_terms( $post_id, 'project' );
-	$project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
+        // Get task metadata for response
+        $task_title   = get_the_title( $post_id );
+        $project_terms = get_the_terms( $post_id, 'project' );
+        $project_name  = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
+        $client_terms  = get_the_terms( $post_id, 'client' );
+        $client_name   = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '';
 
-	wp_send_json_success( [
-		'message'      => 'Timer started!',
-		'post_id'      => $post_id,
-		'row_index'    => $new_row_index - 1, // add_row returns 1-based index
-		'start_time'   => $new_session['session_start_time'],
-		'task_title'   => $task_title,
-		'project_name' => $project_name,
-		'session_data' => [
-			'title' => $session_title,
-			'notes' => $session_notes,
-		],
-	] );
+        wp_send_json_success( [
+                'message'      => 'Timer started!',
+                'post_id'      => $post_id,
+                'row_index'    => $new_row_index - 1, // add_row returns 1-based index
+                'start_time'   => $new_session['session_start_time'],
+                'task_title'   => $task_title,
+                'project_name' => $project_name,
+                'client_name'  => $client_name,
+                'session_data' => [
+                        'title' => $session_title,
+                        'notes' => $session_notes,
+                ],
+        ] );
 }
 add_action( 'wp_ajax_ptt_today_start_new_session', 'ptt_today_start_new_session_callback' );
 
@@ -356,20 +377,61 @@ function ptt_get_daily_entries_callback() {
 		$filters['project_id'] = $project_id;
 	}
 	
-	// Use the new manager class to render entries
-	$result = PTT_Today_Page_Manager::render_entries_list( $user_id, $target_date, $filters );
-	
-	// Get debug info
-	$entries_count = count( $result['entries'] ?? [] );
-	$tasks_count = count( array_unique( array_column( $result['entries'] ?? [], 'post_id' ) ) );
-	$debug_html = PTT_Today_Page_Manager::get_debug_info( $user_id, $target_date, $tasks_count, $entries_count );
-	
-	wp_send_json_success( [
-		'html'    => $result['html'],
-		'total'   => $result['total'],
-		'debug'   => $debug_html,
-		'entries' => $result['entries'], // Include raw data for JS manipulation
-	] );
+        // Fetch entries and build custom HTML with start/end times
+        $entries = PTT_Today_Data_Provider::get_daily_entries( $user_id, $target_date, $filters );
+        $total   = PTT_Today_Data_Provider::calculate_total_duration( $entries );
+
+        ob_start();
+        if ( empty( $entries ) ) {
+                echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
+        } else {
+                echo '<div class="ptt-today-entries-wrapper" data-date="' . esc_attr( $target_date ) . '">';
+                foreach ( $entries as $entry ) {
+                        $entry_html = PTT_Today_Entry_Renderer::render_entry( $entry );
+
+                        $duration_class = ! empty( $entry['is_running'] ) ? 'entry-duration-running' : '';
+                        $editable_attr  = ! empty( $entry['is_running'] ) ? '' : 'data-editable="true"';
+
+                        $start_num  = $entry['start_time'] ? wp_date( 'h:i:s', $entry['start_time'] ) : '--:--:--';
+                        $start_ampm = $entry['start_time'] ? wp_date( 'A', $entry['start_time'] ) : '';
+
+                        $end_num    = $entry['stop_time'] ? wp_date( 'h:i:s', $entry['stop_time'] ) : '--:--:--';
+                        $end_ampm   = $entry['stop_time'] ? wp_date( 'A', $entry['stop_time'] ) : '';
+
+                        $subtotal   = gmdate( 'H:i:s', $entry['duration_seconds'] ?? 0 );
+
+                        ob_start();
+                        ?>
+                        <div class="entry-duration <?php echo esc_attr( $duration_class ); ?>"
+                             data-field="duration"
+                             data-duration-seconds="<?php echo esc_attr( $entry['duration_seconds'] ?? 0 ); ?>"
+                             <?php echo $editable_attr; ?>>
+                                Start: <span class="ptt-time-display"><?php echo esc_html( $start_num ); ?></span> <?php echo esc_html( $start_ampm ); ?> |
+                                End: <span class="ptt-time-display"><?php echo esc_html( $end_num ); ?></span> <?php echo esc_html( $end_ampm ); ?> |
+                                Sub-total: <span class="ptt-time-display"><?php echo esc_html( $subtotal ); ?></span>
+                        </div>
+                        <?php
+                        $duration_div = ob_get_clean();
+                        $entry_html   = preg_replace( '#<div class="entry-duration[^>]*>.*?</div>#s', $duration_div, $entry_html );
+                        echo $entry_html;
+                }
+                echo '</div>';
+        }
+        $html = ob_get_clean();
+
+        // Get debug info
+        $entries_count = count( $entries );
+        $tasks_count   = count( array_unique( array_column( $entries, 'post_id' ) ) );
+        $debug_html    = PTT_Today_Page_Manager::get_debug_info( $user_id, $target_date, $tasks_count, $entries_count );
+
+        wp_send_json_success(
+                [
+                        'html'    => $html,
+                        'total'   => gmdate( 'H:i:s', $total['seconds'] ),
+                        'debug'   => $debug_html,
+                        'entries' => $entries, // Include raw data for JS manipulation
+                ]
+        );
 }
 add_action( 'wp_ajax_ptt_get_daily_entries', 'ptt_get_daily_entries_callback' );
 
