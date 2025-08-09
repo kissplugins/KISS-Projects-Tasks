@@ -995,8 +995,9 @@ jQuery(document).ready(function ($) {
      * ---------------------------------------------------------------
      */
     if ($('#ptt-today-page-container').length) {
-        const $projectFilter = $('#ptt-today-project-filter');
+        const $userSelect = $('#ptt-today-user-select');
         const $taskSelect = $('#ptt-today-task-select');
+        const $projectDisplay = $('#ptt-today-project-display');
         const $sessionTitle = $('#ptt-today-session-title');
         const $startStopBtn = $('#ptt-today-start-stop-btn');
         const $timerDisplay = $('.ptt-today-timer-display');
@@ -1006,33 +1007,44 @@ jQuery(document).ready(function ($) {
         
         let activeTimerInterval = null;
 
-        // Fetch tasks when project filter changes
-        $projectFilter.on('change', function() {
-            const projectId = $(this).val();
+        function loadTasksForUser() {
+            const userId = $userSelect.val();
             $taskSelect.prop('disabled', true).html('<option value="">Loading...</option>');
 
             $.post(ptt_ajax_object.ajax_url, {
                 action: 'ptt_get_tasks_for_today_page',
                 nonce: ptt_ajax_object.nonce,
-                project_id: projectId
+                user_id: userId
             }).done(function(response) {
                 if (response.success && response.data.length) {
                     let options = '<option value="">-- Select a Task --</option>';
                     response.data.forEach(task => {
-                        options += `<option value="${task.id}">${task.title}</option>`;
+                        const project = task.project_name || '';
+                        options += `<option value="${task.id}" data-project="${project}">${task.title}</option>`;
                     });
                     $taskSelect.html(options).prop('disabled', false);
                 } else {
                     $taskSelect.html('<option value="">No available tasks</option>');
                 }
+                $projectDisplay.val('');
             });
+        }
+
+        $userSelect.on('change', function() {
+            loadTasksForUser();
+            loadDailyEntries();
+        });
+
+        $taskSelect.on('change', function() {
+            const projectName = $(this).find(':selected').data('project') || '';
+            $projectDisplay.val(projectName);
         });
 
         // Main Start/Stop button logic
         $startStopBtn.on('click', function() {
             const $btn = $(this);
             const isRunning = $btn.hasClass('running');
-            
+
             if (isRunning) {
                 // --- STOP TIMER ---
                 const postId = $btn.data('postid');
@@ -1049,7 +1061,8 @@ jQuery(document).ready(function ($) {
                     $btn.removeClass('running').data('postid', '').data('rowindex', '');
                     $sessionTitle.val('').prop('disabled', false);
                     $taskSelect.prop('disabled', false);
-                    $projectFilter.prop('disabled', false);
+                    $userSelect.prop('disabled', false);
+                    $projectDisplay.val('');
                     loadDailyEntries(); // Refresh list
                 }).fail(function(){
                     alert('Failed to stop timer.');
@@ -1061,6 +1074,7 @@ jQuery(document).ready(function ($) {
                 // --- START TIMER ---
                 const taskId = $taskSelect.val();
                 const title = $sessionTitle.val();
+                const userId = $userSelect.val();
 
                 if (!taskId || !title.trim()) {
                     alert('Please enter a session title and select a task.');
@@ -1073,7 +1087,8 @@ jQuery(document).ready(function ($) {
                     action: 'ptt_today_start_new_session',
                     nonce: ptt_ajax_object.nonce,
                     post_id: taskId,
-                    session_title: title
+                    session_title: title,
+                    user_id: userId
                 }).done(function(response){
                     if (response.success) {
                         $btn.addClass('running').text('Stop');
@@ -1081,7 +1096,7 @@ jQuery(document).ready(function ($) {
                         $btn.data('rowindex', response.data.row_index);
                         $sessionTitle.prop('disabled', true);
                         $taskSelect.prop('disabled', true);
-                        $projectFilter.prop('disabled', true);
+                        $userSelect.prop('disabled', true);
                         startTodayPageTimer(response.data.start_time);
                         loadDailyEntries(); // Refresh list to show running timer
                     } else {
@@ -1104,12 +1119,14 @@ jQuery(document).ready(function ($) {
 
         function loadDailyEntries() {
             const selectedDate = $dateSelect.val();
+            const userId = $userSelect.val();
             $entriesList.html('<div class="ptt-ajax-spinner" style="display:block; margin: 40px auto;"></div>');
 
             $.post(ptt_ajax_object.ajax_url, {
                 action: 'ptt_get_daily_entries',
                 nonce: ptt_ajax_object.nonce,
-                date: selectedDate
+                date: selectedDate,
+                user_id: userId
             }).done(function(response){
                 if (response.success) {
                     $entriesList.html(response.data.html);
@@ -1144,7 +1161,7 @@ jQuery(document).ready(function ($) {
         }
 
         // Initial load
-        $projectFilter.trigger('change');
+        loadTasksForUser();
         loadDailyEntries();
     }
 
