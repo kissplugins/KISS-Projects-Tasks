@@ -1114,6 +1114,10 @@ jQuery(document).ready(function ($) {
                 if (response.success) {
                     $entriesList.html(response.data.html);
                     $totalDisplay.text(response.data.total);
+                    // Update debug info
+                    if (response.data.debug) {
+                        $('#ptt-debug-content').html(response.data.debug);
+                    }
                 }
             });
         }
