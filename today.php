@@ -34,6 +34,7 @@ add_action( 'admin_menu', 'ptt_add_today_page', 5 ); // High priority to appear 
  * Renders the Today page HTML.
  */
 function ptt_render_today_page_html() {
+	$current_user = wp_get_current_user();
 	?>
 	<div class="wrap" id="ptt-today-page-container">
 		<h1>Today</h1>
@@ -41,15 +42,18 @@ function ptt_render_today_page_html() {
 		<div class="ptt-today-entry-box">
 			<div class="ptt-today-input-group">
 				<input type="text" id="ptt-today-session-title" placeholder="What are you working on?">
-				<select id="ptt-today-task-select" disabled>
-					<option value="">-- Select a Project First --</option>
+				<select id="ptt-today-task-select" name="ptt-today-task-select" disabled>
+					<option value="">-- Select a Task --</option>
+				</select>
+				<select id="ptt-today-project-filter" name="ptt-today-project-filter" disabled>
+					<option value="">-- Select a Project --</option>
 				</select>
 				<?php
 				wp_dropdown_categories( [
-					'taxonomy'        => 'project',
-					'name'            => 'ptt-today-project-filter',
-					'id'              => 'ptt-today-project-filter',
-					'show_option_all' => 'Filter by Project...',
+					'taxonomy'        => 'client',
+					'name'            => 'ptt-today-client-filter',
+					'id'              => 'ptt-today-client-filter',
+					'show_option_all' => 'Filter by Client...',
 					'hide_empty'      => false,
 					'hierarchical'    => true,
 				] );
@@ -89,13 +93,22 @@ function ptt_render_today_page_html() {
 				</div>
 		</div>
 
+		<div id="ptt-today-debug-footer" style="margin-top: 20px; padding: 10px; background-color: #f5f5f5; border: 1px solid #ddd; font-family: monospace; font-size: 12px; color: #444;">
+			<strong>Debug Info:</strong>
+			<div>User: <span id="debug-user-name"><?php echo esc_html( $current_user->display_name ); ?></span></div>
+			<div>Date: <span id="debug-date"></span></div>
+			<div>Client Filter: <span id="debug-client">None</span></div>
+			<div>Project Filter: <span id="debug-project">None</span></div>
+			<div>Sessions Found: <span id="debug-session-count">0</span></div>
+		</div>
+
 	</div>
 	<?php
 }
 
 /**
  * AJAX handler to get tasks for the Today page dropdown.
- * Fetches tasks that are "Not Started" or "In Progress" for the current user and sorts them by last modified.
+ * Fetches tasks for the current user, optionally filtered by project and/or client.
  */
 function ptt_get_tasks_for_today_page_callback() {
 	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
@@ -104,15 +117,14 @@ function ptt_get_tasks_for_today_page_callback() {
 	}
 
 	$project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
+	$client_id  = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
 	$user_id    = get_current_user_id();
 
-	// Get all tasks for the current user (author or assignee)
 	$user_task_ids = ptt_get_tasks_for_user( $user_id );
 	if ( empty( $user_task_ids ) ) {
-		wp_send_json_success( [] ); // Send empty array if user has no tasks
+		wp_send_json_success( [] );
 	}
 
-	// Get Term IDs for "Not Started" and "In Progress"
 	$status_terms_to_include = [];
 	$not_started = get_term_by( 'name', 'Not Started', 'task_status' );
 	$in_progress = get_term_by( 'name', 'In Progress', 'task_status' );
@@ -127,9 +139,9 @@ function ptt_get_tasks_for_today_page_callback() {
 		'post_type'      => 'project_task',
 		'posts_per_page' => 100,
 		'post_status'    => 'publish',
-		'orderby'        => 'modified', // LIFO
+		'orderby'        => 'modified',
 		'order'          => 'DESC',
-		'post__in'       => $user_task_ids, // Only query user's tasks
+		'post__in'       => $user_task_ids,
 		'tax_query'      => [
 			'relation' => 'AND',
 			[
@@ -145,6 +157,14 @@ function ptt_get_tasks_for_today_page_callback() {
 			'taxonomy' => 'project',
 			'field'    => 'term_id',
 			'terms'    => $project_id,
+		];
+	}
+
+	if ( $client_id > 0 ) {
+		$args['tax_query'][] = [
+			'taxonomy' => 'client',
+			'field'    => 'term_id',
+			'terms'    => $client_id,
 		];
 	}
 
@@ -166,8 +186,73 @@ function ptt_get_tasks_for_today_page_callback() {
 add_action( 'wp_ajax_ptt_get_tasks_for_today_page', 'ptt_get_tasks_for_today_page_callback' );
 
 /**
+ * AJAX handler to get projects based on a selected client.
+ */
+function ptt_get_projects_for_client_callback() {
+	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+	if ( ! current_user_can( 'edit_posts' ) ) {
+		wp_send_json_error();
+	}
+
+	$client_id = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
+	$user_id   = get_current_user_id();
+
+	$user_task_ids = ptt_get_tasks_for_user( $user_id );
+	if ( empty( $user_task_ids ) ) {
+		wp_send_json_success( [] );
+	}
+
+	$args = [
+		'post_type'      => 'project_task',
+		'posts_per_page' => -1,
+		'post__in'       => $user_task_ids,
+		'fields'         => 'ids',
+	];
+
+	if ( $client_id > 0 ) {
+		$args['tax_query'] = [
+			[
+				'taxonomy' => 'client',
+				'field'    => 'term_id',
+				'terms'    => $client_id,
+			],
+		];
+	}
+
+	$task_query = new WP_Query( $args );
+	$project_ids = [];
+
+	if ( $task_query->have_posts() ) {
+		foreach ( $task_query->posts as $task_id ) {
+			$terms = wp_get_post_terms( $task_id, 'project', [ 'fields' => 'ids' ] );
+			if ( ! is_wp_error( $terms ) && ! empty( $terms ) ) {
+				$project_ids = array_merge( $project_ids, $terms );
+			}
+		}
+	}
+
+	$unique_project_ids = array_unique( $project_ids );
+	$projects = [];
+	if ( ! empty( $unique_project_ids ) ) {
+		$project_terms = get_terms([
+			'taxonomy'   => 'project',
+			'include'    => $unique_project_ids,
+			'hide_empty' => false,
+		]);
+		foreach ( $project_terms as $term ) {
+			$projects[] = [
+				'id'   => $term->term_id,
+				'name' => $term->name,
+			];
+		}
+	}
+
+	wp_send_json_success( $projects );
+}
+add_action( 'wp_ajax_ptt_get_projects_for_client', 'ptt_get_projects_for_client_callback' );
+
+/**
  * AJAX handler to start a new session from the Today page.
- * This adds a new row to the session repeater and starts the timer.
  */
 function ptt_today_start_new_session_callback() {
 	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
@@ -182,7 +267,6 @@ function ptt_today_start_new_session_callback() {
 		wp_send_json_error( [ 'message' => 'Invalid Task ID.' ] );
 	}
 
-	// Stop any other running session for the current user first.
 	$active_session = ptt_get_active_session_index_for_user( get_current_user_id() );
 	if ( $active_session ) {
 		ptt_stop_session( $active_session['post_id'], $active_session['index'] );
@@ -202,7 +286,7 @@ function ptt_today_start_new_session_callback() {
 	wp_send_json_success( [
 		'message'    => 'Timer started!',
 		'post_id'    => $post_id,
-		'row_index'  => $new_row_index - 1, // add_row returns 1-based index
+		'row_index'  => $new_row_index - 1,
 		'start_time' => $new_session['session_start_time'],
 	] );
 }
@@ -222,22 +306,20 @@ function ptt_get_daily_entries_callback() {
 	$all_entries = [];
 	$grand_total_seconds = 0;
 
-	// Get all tasks for the current user to make the query more efficient.
 	$user_task_ids = ptt_get_tasks_for_user( $user_id );
 
-	// If the user has no tasks, we can stop right here.
 	if ( empty( $user_task_ids ) ) {
 		ob_start();
 		echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
 		$html = ob_get_clean();
-		wp_send_json_success( [ 'html' => $html, 'total' => '00:00' ] );
+		wp_send_json_success( [ 'html' => $html, 'total' => '00:00', 'session_count' => 0 ] );
 	}
 
 	$args = [
 		'post_type'      => 'project_task',
 		'posts_per_page' => -1,
 		'post_status'    => 'publish',
-		'post__in'       => $user_task_ids, // The crucial filter
+		'post__in'       => $user_task_ids,
 	];
 
 	$q = new WP_Query( $args );
@@ -255,10 +337,9 @@ function ptt_get_daily_entries_callback() {
 						continue;
 					}
 
-					// Validate strtotime before using it
 					$start_ts = strtotime( $start_str );
 					if ( ! $start_ts ) {
-						continue; // Skip if start date is invalid
+						continue;
 					}
 
 					if ( date( 'Y-m-d', $start_ts ) === $target_date ) {
@@ -269,7 +350,6 @@ function ptt_get_daily_entries_callback() {
 						if ( $start_ts && $stop_ts ) {
 							$duration_seconds = $stop_ts - $start_ts;
 						} elseif ( $start_ts && ! $stop_str ) {
-							// For running timers
 							$duration_seconds = time() - $start_ts;
 						}
 						$grand_total_seconds += $duration_seconds;
@@ -292,12 +372,10 @@ function ptt_get_daily_entries_callback() {
 		wp_reset_postdata();
 	}
 
-	// Sort entries by start time descending
 	usort( $all_entries, function( $a, $b ) {
 		return $b['start_time'] <=> $a['start_time'];
 	} );
 
-	// Prepare HTML
 	ob_start();
 	if ( empty( $all_entries ) ) {
 		echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
@@ -323,16 +401,16 @@ function ptt_get_daily_entries_callback() {
 	$total_minutes = floor( ( $grand_total_seconds / 60 ) % 60 );
 	$total_formatted = sprintf( '%02d:%02d', $total_hours, $total_minutes );
 
-	wp_send_json_success( [ 'html' => $html, 'total' => $total_formatted ] );
+	wp_send_json_success( [
+		'html' => $html,
+		'total' => $total_formatted,
+		'session_count' => count( $all_entries ),
+	] );
 }
 add_action( 'wp_ajax_ptt_get_daily_entries', 'ptt_get_daily_entries_callback' );
 
-
 /**
  * Helper to find any active session across all tasks for a specific user.
- *
- * @param int $user_id The user ID to check.
- * @return array|false An array with post_id and index of the active session, or false.
  */
 function ptt_get_active_session_index_for_user( $user_id ) {
 	$user_task_ids = ptt_get_tasks_for_user( $user_id );
@@ -344,7 +422,7 @@ function ptt_get_active_session_index_for_user( $user_id ) {
 		'post_type'      => 'project_task',
 		'posts_per_page' => -1,
 		'post__in'       => $user_task_ids,
-		'fields'         => 'ids', // We only need the IDs
+		'fields'         => 'ids',
 	];
 
 	$query = new WP_Query( $args );
@@ -353,7 +431,6 @@ function ptt_get_active_session_index_for_user( $user_id ) {
 		foreach ( $query->posts as $post_id ) {
 			$index = ptt_get_active_session_index( $post_id );
 			if ( $index !== false ) {
-				// No need to reset postdata as we are only using IDs
 				return [ 'post_id' => $post_id, 'index' => $index ];
 			}
 		}

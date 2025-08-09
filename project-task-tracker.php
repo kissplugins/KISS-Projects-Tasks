@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.9.0
+ * Version:           1.9.1
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.9.0' );
+define( 'PTT_VERSION', '1.9.1' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -507,8 +507,8 @@ function ptt_activate_kanban_additions() {
 /**
  * Enqueues scripts and styles for admin and front-end.
  */
-function ptt_enqueue_assets() {
-    // Main CSS file (now in root)
+function ptt_enqueue_assets( $hook ) {
+    // Main CSS file
     wp_enqueue_style( 'ptt-styles', PTT_PLUGIN_URL . 'styles.css', [], PTT_VERSION );
 
     $deps = [ 'jquery' ];
@@ -517,8 +517,13 @@ function ptt_enqueue_assets() {
         wp_enqueue_style( 'wp-jquery-ui-dialog' );
     }
 
-    // Main JS file (now in root)
+    // Main JS file
     wp_enqueue_script( 'ptt-scripts', PTT_PLUGIN_URL . 'scripts.js', $deps, PTT_VERSION, true );
+    
+    // Enqueue Today page specific script only on its page
+    if ( 'tasks_page_ptt-today' === $hook ) {
+        wp_enqueue_script( 'ptt-today-page-scripts', PTT_PLUGIN_URL . 'today-page.js', ['jquery'], PTT_VERSION, true );
+    }
     
     // Localize script to pass data like nonces and AJAX URL
     wp_localize_script( 'ptt-scripts', 'ptt_ajax_object', [
@@ -530,6 +535,12 @@ function ptt_enqueue_assets() {
         'todays_date_formatted' => date_i18n( get_option( 'date_format' ), current_time( 'timestamp' ) ),
         'sync_authors_confirm'  => __( 'Are you sure you want to synchronize Authors to Assignee?', 'ptt' ),
         'sync_authors_title'    => __( 'Confirm Synchronization', 'ptt' ),
+    ] );
+
+    // Also localize for the today page script for simplicity
+    wp_localize_script( 'ptt-today-page-scripts', 'ptt_ajax_object', [
+        'ajax_url' => admin_url( 'admin-ajax.php' ),
+        'nonce'    => wp_create_nonce( 'ptt_ajax_nonce' ),
     ] );
 }
 // Enqueue for admin screens
@@ -1200,3 +1211,27 @@ function ptt_add_settings_link( $links ) {
     return $links;
 }
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'ptt_add_settings_link' );
+
+/**
+ * =================================================================
+ * CHANGELOG
+ * =================================================================
+ *
+ * == 1.9.1 ==
+ * - Feat: Added cascading Client -> Project -> Task filters to the Today page for easier task selection.
+ * - Feat: Starting a new session now automatically refreshes the entry list to show the current day.
+ * - Feat: Added a debug info panel to the Today page.
+ * - Dev: Added a new self-test to verify the cascading filter logic.
+ *
+ * == 1.9.0 ==
+ * - Feat: Today page is now user-specific, showing only tasks assigned to or authored by the current user.
+ * - Feat: Added a new `helpers.php` file for common utility functions.
+ * - Fix: Hardened `ptt_get_daily_entries` function to prevent errors from invalid date strings.
+ * - Dev: Added a new self-test to verify user data isolation on the Today page.
+ *
+ * == 1.7.39 ==
+ * - Fix: Corrected taxonomy registration to properly display Client, Project, and Status menus under the "Tasks" CPT menu.
+ * - Fix: Associated 'task_status' taxonomy with the 'project_task' CPT in its registration arguments.
+ * - Note: This fix requires the removal of the ptt_reorder_tasks_menu() function from self-test.php to prevent conflicts.
+ *
+ */

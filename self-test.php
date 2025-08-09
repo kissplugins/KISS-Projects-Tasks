@@ -290,17 +290,14 @@ function ptt_run_self_tests_callback() {
             continue;
         }
         
-        // Check if taxonomy has UI visibility
         if ( empty( $tax_obj->show_ui ) ) {
             $errors[] = "Taxonomy '{$tax_slug}' has show_ui disabled.";
         }
         
-        // Check if taxonomy is visible in menu (can be true or a string)
         if ( empty( $tax_obj->show_in_menu ) ) {
             $errors[] = "Taxonomy '{$tax_slug}' has show_in_menu disabled.";
         }
         
-        // Check if associated with project_task post type
         if ( ! in_array( 'project_task', (array) $tax_obj->object_type, true ) ) {
             $errors[] = "Taxonomy '{$tax_slug}' is not associated with the 'project_task' post type.";
         }
@@ -323,34 +320,37 @@ function ptt_run_self_tests_callback() {
     if ( is_wp_error( $user_a_id ) || is_wp_error( $user_b_id ) ) {
         $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => 'Could not create test users.' ];
     } else {
-        // Task 1: Authored by A, Assigned to A
         $task1 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task A1', 'post_author' => $user_a_id, 'post_status' => 'publish' ]);
         update_post_meta($task1, 'ptt_assignee', $user_a_id);
 
-        // Task 2: Authored by B, Assigned to B
         $task2 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task B1', 'post_author' => $user_b_id, 'post_status' => 'publish' ]);
         update_post_meta($task2, 'ptt_assignee', $user_b_id);
 
-        // Task 3: Authored by A, Assigned to B
         $task3 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task A2/B2', 'post_author' => $user_a_id, 'post_status' => 'publish' ]);
         update_post_meta($task3, 'ptt_assignee', $user_b_id);
 
         $tasks_for_a = ptt_get_tasks_for_user( $user_a_id );
-        $tasks_for_b = ptt_get_tasks_for_user( $user_b_id );
+        sort($tasks_for_a);
+        $expected_a = [$task1, $task3];
+        sort($expected_a);
 
-        $pass_a = count( $tasks_for_a ) === 2 && in_array( $task1, $tasks_for_a ) && in_array( $task3, $tasks_for_a );
-        $pass_b = count( $tasks_for_b ) === 2 && in_array( $task2, $tasks_for_b ) && in_array( $task3, $tasks_for_b );
+        $tasks_for_b = ptt_get_tasks_for_user( $user_b_id );
+        sort($tasks_for_b);
+        $expected_b = [$task2, $task3];
+        sort($expected_b);
+
+        $pass_a = ($tasks_for_a == $expected_a);
+        $pass_b = ($tasks_for_b == $expected_b);
 
         if ($pass_a && $pass_b) {
-            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Pass', 'message' => 'ptt_get_tasks_for_user() correctly isolated tasks for users.' ];
+            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Pass', 'message' => 'ptt_get_tasks_for_user() correctly isolated tasks.' ];
         } else {
             $fail_message = 'ptt_get_tasks_for_user() failed. ';
-            if (!$pass_a) $fail_message .= 'User A expected 2 tasks, got ' . count($tasks_for_a) . '. ';
-            if (!$pass_b) $fail_message .= 'User B expected 2 tasks, got ' . count($tasks_for_b) . '.';
+            if (!$pass_a) $fail_message .= 'User A failed. ';
+            if (!$pass_b) $fail_message .= 'User B failed.';
             $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => trim($fail_message) ];
         }
 
-        // Cleanup
         wp_delete_post( $task1, true );
         wp_delete_post( $task2, true );
         wp_delete_post( $task3, true );
@@ -358,6 +358,82 @@ function ptt_run_self_tests_callback() {
         wp_delete_user( $user_a_id );
         wp_delete_user( $user_b_id );
     }
+
+	/* -------------------------------------------------------------
+	 * TEST 11 – Today Page Cascading Filters
+	 * -----------------------------------------------------------*/
+	$test_user_id = wp_insert_user( [ 'user_login' => 'test_user_filter', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
+	$client_x = wp_insert_term( 'Filter Client X', 'client' );
+	$client_y = wp_insert_term( 'Filter Client Y', 'client' );
+	$project_p = wp_insert_term( 'Filter Project P', 'project' );
+	$project_q = wp_insert_term( 'Filter Project Q', 'project' );
+
+	if ( is_wp_error($test_user_id) || is_wp_error($client_x) || is_wp_error($client_y) || is_wp_error($project_p) || is_wp_error($project_q) ) {
+		$results[] = [ 'name' => 'Cascading Filters', 'status' => 'Fail', 'message' => 'Could not create test data (users/terms).' ];
+	} else {
+		$task_p = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Task P', 'post_author' => $test_user_id, 'post_status' => 'publish' ] );
+		wp_set_object_terms( $task_p, $client_x['term_id'], 'client' );
+		wp_set_object_terms( $task_p, $project_p['term_id'], 'project' );
+
+		$task_q = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Task Q', 'post_author' => $test_user_id, 'post_status' => 'publish' ] );
+		wp_set_object_terms( $task_q, $client_y['term_id'], 'client' );
+		wp_set_object_terms( $task_q, $project_q['term_id'], 'project' );
+
+		// Simulate $_POST for the callback
+		$_POST['nonce'] = wp_create_nonce( 'ptt_ajax_nonce' );
+		
+		// Mock being logged in as the test user
+		$original_user_id = get_current_user_id();
+		wp_set_current_user( $test_user_id );
+
+		// Test 1: Get projects for Client X
+		$_POST['client_id'] = $client_x['term_id'];
+		ob_start();
+		ptt_get_projects_for_client_callback();
+		$response1 = json_decode( ob_get_clean(), true );
+		$projects_for_client_x = wp_list_pluck( $response1['data'], 'id' );
+		$pass1 = ( count($projects_for_client_x) === 1 && $projects_for_client_x[0] === $project_p['term_id'] );
+		
+		// Test 2: Get tasks for Client X
+		$_POST['project_id'] = 0;
+		ob_start();
+		ptt_get_tasks_for_today_page_callback();
+		$response2 = json_decode( ob_get_clean(), true );
+		$tasks_for_client_x = wp_list_pluck( $response2['data'], 'id' );
+		$pass2 = ( count($tasks_for_client_x) === 1 && $tasks_for_client_x[0] === $task_p );
+		
+		// Test 3: Get tasks for Project Q
+		$_POST['client_id'] = 0;
+		$_POST['project_id'] = $project_q['term_id'];
+		ob_start();
+		ptt_get_tasks_for_today_page_callback();
+		$response3 = json_decode( ob_get_clean(), true );
+		$tasks_for_project_q = wp_list_pluck( $response3['data'], 'id' );
+		$pass3 = ( count($tasks_for_project_q) === 1 && $tasks_for_project_q[0] === $task_q );
+		
+		wp_set_current_user( $original_user_id ); // Restore original user
+		unset( $_POST['nonce'], $_POST['client_id'], $_POST['project_id'] ); // Clean up
+
+		if ( $pass1 && $pass2 && $pass3 ) {
+			$results[] = [ 'name' => 'Cascading Filters', 'status' => 'Pass', 'message' => 'Successfully filtered projects and tasks.' ];
+		} else {
+			$fail_msg = 'Filter logic failed: ';
+			if (!$pass1) $fail_msg .= 'Projects not filtered by Client. ';
+			if (!$pass2) $fail_msg .= 'Tasks not filtered by Client. ';
+			if (!$pass3) $fail_msg .= 'Tasks not filtered by Project. ';
+			$results[] = [ 'name' => 'Cascading Filters', 'status' => 'Fail', 'message' => trim($fail_msg) ];
+		}
+		
+		// Cleanup
+		wp_delete_post( $task_p, true );
+		wp_delete_post( $task_q, true );
+		wp_delete_term( $client_x['term_id'], 'client' );
+		wp_delete_term( $client_y['term_id'], 'client' );
+		wp_delete_term( $project_p['term_id'], 'project' );
+		wp_delete_term( $project_q['term_id'], 'project' );
+		require_once(ABSPATH.'wp-admin/includes/user.php');
+		wp_delete_user( $test_user_id );
+	}
 
     /* -------------------------------------------------------------*/
 
