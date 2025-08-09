@@ -3,7 +3,7 @@
 ## Version 1.10.1 - Today Page Timestamps
 *Release Date: TBD*
 
-### Added
+### Added - via Codex
 - Start and end timestamps with UTC offset on Today page session rows.
 - Silkscreen Google Font applied to numeric time displays.
 
