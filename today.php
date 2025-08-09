@@ -36,24 +36,29 @@ add_action( 'admin_menu', 'ptt_add_today_page', 5 ); // High priority to appear 
 function ptt_render_today_page_html() {
 	?>
 	<div class="wrap" id="ptt-today-page-container">
-		<h1>Today</h1>
+		<div class="ptt-today-header">
+			<h1>Today</h1>
+			<div class="ptt-today-user-filter">
+				<label for="ptt-today-user-select">Show entries for:</label>
+				<?php
+				wp_dropdown_users( [
+					'name'       => 'ptt-today-user-select',
+					'id'         => 'ptt-today-user-select',
+					'capability' => 'publish_posts',
+					'selected'   => get_current_user_id(),
+				] );
+				?>
+			</div>
+		</div>
+
 
 		<div class="ptt-today-entry-box">
 			<div class="ptt-today-input-group">
 				<input type="text" id="ptt-today-session-title" placeholder="What are you working on?">
 				<select id="ptt-today-task-select" disabled>
-					<option value="">-- Select a Project First --</option>
+					<option value="">-- Select an Assignee --</option>
 				</select>
-				<?php
-				wp_dropdown_categories( [
-					'taxonomy'        => 'project',
-					'name'            => 'ptt-today-project-filter',
-					'id'              => 'ptt-today-project-filter',
-					'show_option_all' => 'Filter by Project...',
-					'hide_empty'      => false,
-					'hierarchical'    => true,
-				] );
-				?>
+				<input type="text" id="ptt-today-project-display" placeholder="Project" readonly>
 			</div>
 			<div class="ptt-today-timer-controls">
 				<div class="ptt-today-timer-display">00:00:00</div>
@@ -94,7 +99,7 @@ function ptt_render_today_page_html() {
 }
 
 /**
- * AJAX handler to get tasks for the Today page dropdown.
+ * AJAX handler to get tasks for the Today page dropdown, filtered by assignee.
  * Fetches tasks that are "Not Started" or "In Progress" and sorts them by last modified.
  */
 function ptt_get_tasks_for_today_page_callback() {
@@ -103,7 +108,11 @@ function ptt_get_tasks_for_today_page_callback() {
 		wp_send_json_error();
 	}
 
-	$project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
+	$assignee_id = isset( $_POST['user_id'] ) ? intval( $_POST['user_id'] ) : 0;
+	if ( ! $assignee_id ) {
+		wp_send_json_success( [] );
+		return;
+	}
 
 	// Get Term IDs for "Not Started" and "In Progress"
 	$status_terms_to_include = [];
@@ -123,22 +132,20 @@ function ptt_get_tasks_for_today_page_callback() {
 		'orderby'        => 'modified', // LIFO
 		'order'          => 'DESC',
 		'tax_query'      => [
-			'relation' => 'AND',
 			[
 				'taxonomy' => 'task_status',
 				'field'    => 'term_id',
 				'terms'    => $status_terms_to_include,
 			],
 		],
+		'meta_query'     => [
+			[
+				'key'     => 'ptt_assignee',
+				'value'   => $assignee_id,
+				'compare' => '=',
+			],
+		],
 	];
-
-	if ( $project_id > 0 ) {
-		$args['tax_query'][] = [
-			'taxonomy' => 'project',
-			'field'    => 'term_id',
-			'terms'    => $project_id,
-		];
-	}
 
 	$query = new WP_Query( $args );
 	$tasks = [];
@@ -156,6 +163,29 @@ function ptt_get_tasks_for_today_page_callback() {
 	wp_send_json_success( $tasks );
 }
 add_action( 'wp_ajax_ptt_get_tasks_for_today_page', 'ptt_get_tasks_for_today_page_callback' );
+
+/**
+ * AJAX handler to get the project name for a given task.
+ */
+function ptt_get_project_for_task_callback() {
+	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+	if ( ! current_user_can( 'edit_posts' ) ) {
+		wp_send_json_error();
+	}
+
+	$task_id = isset( $_POST['task_id'] ) ? intval( $_POST['task_id'] ) : 0;
+	if ( ! $task_id ) {
+		wp_send_json_success( [ 'project_name' => '' ] );
+		return;
+	}
+
+	$project_terms = get_the_terms( $task_id, 'project' );
+	$project_name  = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
+
+	wp_send_json_success( [ 'project_name' => $project_name ] );
+}
+add_action( 'wp_ajax_ptt_get_project_for_task', 'ptt_get_project_for_task_callback' );
+
 
 /**
  * AJAX handler to start a new session from the Today page.
@@ -201,7 +231,7 @@ function ptt_today_start_new_session_callback() {
 add_action( 'wp_ajax_ptt_today_start_new_session', 'ptt_today_start_new_session_callback' );
 
 /**
- * AJAX handler to get time entries for a specific day.
+ * AJAX handler to get time entries for a specific day, filtered by assignee.
  */
 function ptt_get_daily_entries_callback() {
 	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
@@ -210,7 +240,9 @@ function ptt_get_daily_entries_callback() {
 	}
 
 	$target_date = isset( $_POST['date'] ) ? sanitize_text_field( $_POST['date'] ) : date( 'Y-m-d' );
-	$all_entries = [];
+	$assignee_id = isset( $_POST['user_id'] ) ? intval( $_POST['user_id'] ) : 0;
+
+	$all_entries         = [];
 	$grand_total_seconds = 0;
 
 	$args = [
@@ -219,19 +251,29 @@ function ptt_get_daily_entries_callback() {
 		'post_status'    => 'publish',
 	];
 
+	if ( $assignee_id > 0 ) {
+		$args['meta_query'] = [
+			[
+				'key'     => 'ptt_assignee',
+				'value'   => $assignee_id,
+				'compare' => '=',
+			],
+		];
+	}
+
 	$q = new WP_Query( $args );
 
 	if ( $q->have_posts() ) {
 		while ( $q->have_posts() ) {
 			$q->the_post();
-			$post_id = get_the_ID();
+			$post_id  = get_the_ID();
 			$sessions = get_field( 'sessions', $post_id );
 
 			if ( ! empty( $sessions ) && is_array( $sessions ) ) {
 				foreach ( $sessions as $session ) {
 					$start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
 					if ( $start_str && date( 'Y-m-d', strtotime( $start_str ) ) === $target_date ) {
-						$stop_str = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
+						$stop_str         = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
 						$duration_seconds = 0;
 
 						if ( $start_str && $stop_str ) {
@@ -246,12 +288,12 @@ function ptt_get_daily_entries_callback() {
 						$project_name  = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
 
 						$all_entries[] = [
-							'session_title'  => $session['session_title'],
-							'task_title'     => get_the_title(),
-							'project_name'   => $project_name,
-							'start_time'     => strtotime( $start_str ),
-							'duration'       => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
-							'is_running'     => empty( $stop_str ),
+							'session_title' => $session['session_title'],
+							'task_title'    => get_the_title(),
+							'project_name'  => $project_name,
+							'start_time'    => strtotime( $start_str ),
+							'duration'      => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
+							'is_running'    => empty( $stop_str ),
 						];
 					}
 				}
@@ -287,9 +329,9 @@ function ptt_get_daily_entries_callback() {
 	}
 	$html = ob_get_clean();
 
-	$total_hours   = floor( $grand_total_seconds / 3600 );
-	$total_minutes = floor( ( $grand_total_seconds / 60 ) % 60 );
-	$total_formatted = sprintf( '%02d:%02d', $total_hours, $total_minutes );
+	$total_hours         = floor( $grand_total_seconds / 3600 );
+	$total_minutes       = floor( ( $grand_total_seconds / 60 ) % 60 );
+	$total_formatted     = sprintf( '%02d:%02d', $total_hours, $total_minutes );
 
 	wp_send_json_success( [ 'html' => $html, 'total' => $total_formatted ] );
 }
@@ -320,10 +362,19 @@ function ptt_get_active_session_index_for_user( $user_id ) {
 	if ( $query->have_posts() ) {
 		while ( $query->have_posts() ) {
 			$query->the_post();
-			$index = ptt_get_active_session_index( get_the_ID() );
-			if ( $index !== false ) {
-				wp_reset_postdata();
-				return [ 'post_id' => get_the_ID(), 'index' => $index ];
+			$post_id_to_check = get_the_ID();
+			$sessions = get_field('sessions', $post_id_to_check);
+			if (!empty($sessions) && is_array($sessions)) {
+				foreach ($sessions as $index => $session) {
+					// Check if session belongs to the current user and is running
+					// Note: This assumes the person who started the session is the current user.
+					// A more robust system would store user_id per session.
+					if ( ! empty( $session['session_start_time'] ) && empty( $session['session_stop_time'] ) ) {
+						// Found an active session, let's assume it's for the current user.
+						wp_reset_postdata();
+						return [ 'post_id' => $post_id_to_check, 'index' => $index ];
+					}
+				}
 			}
 		}
 	}

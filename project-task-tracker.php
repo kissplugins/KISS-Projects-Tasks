@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.8.10
+ * Version:           1.9.1
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -14,10 +14,10 @@
 
 // If this file is called directly, abort.
 if ( ! defined( 'WPINC' ) ) {
-    die;
+	die;
 }
 
-define( 'PTT_VERSION', '1.8.10' );
+define( 'PTT_VERSION', '1.9.1' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -38,6 +38,7 @@ define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
  * 9.0  FRONT-END SHORTCODE [task-enter] (see shortcodes.php)
  * 10.0 ADMIN PAGES & LINKS (see reports.php)
  * 11.0 SELF-TEST MODULE (see self-test.php)
+ * 12.0 ADMIN PAGE & LINKS (Today) (see today.php)
  * CHANGELOG - LLM maintainers/Developes please update changelog.md for every update
  * =================================================================
  */
@@ -505,9 +506,14 @@ function ptt_activate_kanban_additions() {
 /**
  * Enqueues scripts and styles for admin and front-end.
  */
-function ptt_enqueue_assets() {
-    // Main CSS file (now in root)
+function ptt_enqueue_assets($hook_suffix) {
+    // Main CSS file (for shared styles)
     wp_enqueue_style( 'ptt-styles', PTT_PLUGIN_URL . 'styles.css', [], PTT_VERSION );
+
+	// Conditionally load Today page CSS
+	if ( 'project_task_page_ptt-today' === $hook_suffix ) {
+		wp_enqueue_style( 'ptt-today-styles', PTT_PLUGIN_URL . 'today.css', [], PTT_VERSION );
+	}
 
     $deps = [ 'jquery' ];
     if ( is_admin() ) {
@@ -515,7 +521,7 @@ function ptt_enqueue_assets() {
         wp_enqueue_style( 'wp-jquery-ui-dialog' );
     }
 
-    // Main JS file (now in root)
+    // Main JS file
     wp_enqueue_script( 'ptt-scripts', PTT_PLUGIN_URL . 'scripts.js', $deps, PTT_VERSION, true );
     
     // Localize script to pass data like nonces and AJAX URL
