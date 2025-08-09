@@ -335,8 +335,8 @@ function ptt_get_daily_entries_callback() {
 					<span class="entry-meta"><?php echo esc_html( $entry['task_title'] ); ?> &bull; <?php echo esc_html( $entry['project_name'] ); ?></span>
 				</div>
 				<div class="entry-duration">
-					<?php echo esc_html( date( 'g:i:s A', $entry['start_time'] ) ); ?> |
-					<?php echo $entry['is_running'] ? 'Now' : esc_html( date( 'g:i:s A', $entry['stop_time'] ) ); ?> |
+					<?php echo esc_html( wp_date( 'g:i:s A', $entry['start_time'] ) ); ?> |
+					<?php echo $entry['is_running'] ? 'Now' : esc_html( wp_date( 'g:i:s A', $entry['stop_time'] ) ); ?> |
 					SUB-TOTAL: <?php echo esc_html( $entry['duration'] ); ?>
 				</div>
 			</div>
@@ -354,6 +354,15 @@ function ptt_get_daily_entries_callback() {
 	$debug_info['matched_tasks'] = $q->found_posts;
 	$debug_info['matched_sessions'] = count( $all_entries );
 
+	// Add timezone and time computations
+	$wp_timezone_string = wp_timezone_string();
+	$current_utc_time = current_time('mysql', 1);
+	$current_local_time = current_time('mysql', 0);
+
+	$debug_info['wp_timezone'] = $wp_timezone_string;
+	$debug_info['current_utc_time'] = $current_utc_time;
+	$debug_info['current_local_time'] = $current_local_time;
+
 	ob_start();
 	?>
 	<ul>
@@ -363,6 +372,9 @@ function ptt_get_daily_entries_callback() {
 		<li><strong>Tasks Found:</strong> <?php echo esc_html( $debug_info['matched_tasks'] ); ?></li>
 		<li><strong>Sessions on this Date:</strong> <?php echo esc_html( $debug_info['matched_sessions'] ); ?></li>
 		<li><strong>Task Query Rule:</strong> Tasks where the current user is the assignee.</li>
+		<li><strong>WordPress Timezone:</strong> <?php echo esc_html( $debug_info['wp_timezone'] ); ?></li>
+		<li><strong>Current UTC Time:</strong> <?php echo esc_html( $debug_info['current_utc_time'] ); ?></li>
+		<li><strong>Current Local Time:</strong> <?php echo esc_html( $debug_info['current_local_time'] ); ?></li>
 	</ul>
 	<?php
 	/**
