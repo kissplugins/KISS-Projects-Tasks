@@ -21,27 +21,7 @@ define( 'PTT_VERSION', '1.9.0' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-/**
- * =================================================================
- * TABLE OF CONTENTS
- * =================================================================
- *
- * 1.0  PLUGIN ACTIVATION & DEACTIVATION
- * 2.0  DEPENDENCY CHECKS (ACF Pro)
- * 3.0  CPT & TAXONOMY REGISTRATION
- * 4.0  ACF FIELD REGISTRATION
- * 5.0  ENQUEUE SCRIPTS & STYLES
- * 6.0  CORE TIME CALCULATION LOGIC
- * 7.0  ADMIN UI (CPT EDITOR)
- * 7.5  USER PROFILE INTEGRATION
- * 8.0  AJAX HANDLERS
- * 9.0  FRONT-END SHORTCODE [task-enter] (see shortcodes.php)
- * 10.0 ADMIN PAGES & LINKS (see reports.php)
- * 11.0 SELF-TEST MODULE (see self-test.php)
- * 12.0 HELPERS (see helpers.php)
- * CHANGELOG - LLM maintainers/Developes please update changelog.md for every update
- * =================================================================
- */
+
 
 // Load plugin modules
 require_once PTT_PLUGIN_DIR . 'helpers.php';

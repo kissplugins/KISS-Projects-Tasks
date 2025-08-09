@@ -338,15 +338,15 @@ function ptt_run_self_tests_callback() {
         $tasks_for_a = ptt_get_tasks_for_user( $user_a_id );
         $tasks_for_b = ptt_get_tasks_for_user( $user_b_id );
 
-        $pass_a = count( $tasks_for_a ) === 2 && in_array( $task1, $tasks_for_a ) && in_array( $task3, $tasks_for_a );
+        $pass_a = count( $tasks_for_a ) === 1 && in_array( $task1, $tasks_for_a );
         $pass_b = count( $tasks_for_b ) === 2 && in_array( $task2, $tasks_for_b ) && in_array( $task3, $tasks_for_b );
 
         if ($pass_a && $pass_b) {
-            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Pass', 'message' => 'ptt_get_tasks_for_user() correctly isolated tasks for users.' ];
+            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Pass', 'message' => 'ptt_get_tasks_for_user() correctly isolated tasks for assignees.' ];
         } else {
             $fail_message = 'ptt_get_tasks_for_user() failed. ';
-            if (!$pass_a) $fail_message .= 'User A expected 2 tasks, got ' . count($tasks_for_a) . '. ';
-            if (!$pass_b) $fail_message .= 'User B expected 2 tasks, got ' . count($tasks_for_b) . '.';
+            if (!$pass_a) $fail_message .= 'User A expected 1 task, got ' . count($tasks_for_a) . '. ';
+            if (!$pass_b) $fail_message .= 'User B expected 2 tasks, got ' . count($tasks_for_b) . '. ';
             $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => trim($fail_message) ];
         }
 

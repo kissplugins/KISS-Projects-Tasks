@@ -2,6 +2,11 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
+## 1.9.1 - 2025-08-08
+
+* **Fix**: Updated the "User Data Isolation" self-test to align with the new rule that only shows tasks to the assignee.
+* **Chore**: Removed the inline changelog from the main plugin file (`project-task-tracker.php`) to rely solely on `changelog.md`.
+
 ## 1.9.0 - 2025-08-08
 
 * **Feature**: The "Today" page is now user-specific, showing only tasks assigned to or authored by the current user.
