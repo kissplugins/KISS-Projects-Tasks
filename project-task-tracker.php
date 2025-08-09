@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.9.0
+ * Version:           1.9.3
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.9.0' );
+define( 'PTT_VERSION', '1.9.3' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -488,6 +488,9 @@ function ptt_activate_kanban_additions() {
  * Enqueues scripts and styles for admin and front-end.
  */
 function ptt_enqueue_assets() {
+    // Google Font for timer displays
+    wp_enqueue_style( 'ptt-font-silkscreen', 'https://fonts.googleapis.com/css2?family=Silkscreen&display=swap', [], null );
+
     // Main CSS file (now in root)
     wp_enqueue_style( 'ptt-styles', PTT_PLUGIN_URL . 'styles.css', [], PTT_VERSION );
 
