@@ -89,6 +89,11 @@ function ptt_render_today_page_html() {
 				</div>
 		</div>
 
+		<div id="ptt-today-debug-area" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9;">
+			<h3>Debug Info</h3>
+			<div id="ptt-debug-content"></div>
+		</div>
+
 	</div>
 	<?php
 }
@@ -236,7 +241,7 @@ function ptt_get_daily_entries_callback() {
 	$args = [
 		'post_type'      => 'project_task',
 		'posts_per_page' => -1,
-		'post_status'    => 'publish',
+		'post_status'    => ['publish', 'private', 'completed'], // Include completed tasks
 		'post__in'       => $user_task_ids, // The crucial filter
 	];
 
@@ -319,11 +324,39 @@ function ptt_get_daily_entries_callback() {
 	}
 	$html = ob_get_clean();
 
+	// Prepare Debug Info
+	$debug_info = [];
+	$current_user = wp_get_current_user();
+	$debug_info['user'] = $current_user->user_login . ' (ID: ' . $current_user->ID . ')';
+	$debug_info['date'] = $target_date;
+	$debug_info['queried_statuses'] = implode( ', ', $args['post_status'] );
+	$debug_info['matched_tasks'] = $q->found_posts;
+	$debug_info['matched_sessions'] = count( $all_entries );
+
+	ob_start();
+	?>
+	<ul>
+		<li><strong>User:</strong> <?php echo esc_html( $debug_info['user'] ); ?></li>
+		<li><strong>Date:</strong> <?php echo esc_html( $debug_info['date'] ); ?></li>
+		<li><strong>Queried Statuses:</strong> <?php echo esc_html( $debug_info['queried_statuses'] ); ?></li>
+		<li><strong>Tasks Found:</strong> <?php echo esc_html( $debug_info['matched_tasks'] ); ?></li>
+		<li><strong>Sessions on this Date:</strong> <?php echo esc_html( $debug_info['matched_sessions'] ); ?></li>
+	</ul>
+	<?php
+	/**
+	 * --- Recommendations for Future Debugging ---
+	 * 1. To see the full WP_Query arguments, you could add:
+	 *    <pre><?php print_r( $args ); ?></pre>
+	 * 2. For more complex debugging, consider installing the "Query Monitor" plugin.
+	 * 3. Use browser console logs by passing debug data to JavaScript and using console.log().
+	 */
+	$debug_html = ob_get_clean();
+
 	$total_hours   = floor( $grand_total_seconds / 3600 );
 	$total_minutes = floor( ( $grand_total_seconds / 60 ) % 60 );
 	$total_formatted = sprintf( '%02d:%02d', $total_hours, $total_minutes );
 
-	wp_send_json_success( [ 'html' => $html, 'total' => $total_formatted ] );
+	wp_send_json_success( [ 'html' => $html, 'total' => $total_formatted, 'debug' => $debug_html ] );
 }
 add_action( 'wp_ajax_ptt_get_daily_entries', 'ptt_get_daily_entries_callback' );
 
