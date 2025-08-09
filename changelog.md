@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 1.10.1 - Today Page Timestamps
+*Release Date: TBD*
+
+### Added
+- Start and end timestamps with UTC offset on Today page session rows.
+- Silkscreen Google Font applied to numeric time displays.
+
+### Changed
+- Session row layout now shows "Start", "End" and "Sub-total" values.
+
 ## Version 1.10.0 - Today Page Refactoring
 *Release Date: TBD*
 
