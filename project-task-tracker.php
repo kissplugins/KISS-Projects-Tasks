@@ -500,9 +500,11 @@ function ptt_activate_kanban_additions() {
 }
 
 
-// =================================================================
-// 5.0 ENQUEUE SCRIPTS & STYLES
-// =================================================================
+/**
+ * =================================================================
+ * 5.0 ENQUEUE SCRIPTS & STYLES
+ * =================================================================
+ */
 
 /**
  * Enqueues scripts and styles for admin and front-end.
@@ -517,15 +519,15 @@ function ptt_enqueue_assets( $hook ) {
         wp_enqueue_style( 'wp-jquery-ui-dialog' );
     }
 
-    // Main JS file
+    // Main JS file - always loaded
     wp_enqueue_script( 'ptt-scripts', PTT_PLUGIN_URL . 'scripts.js', $deps, PTT_VERSION, true );
     
-    // Enqueue Today page specific script only on its page
+    // Conditionally enqueue Today page script only on its page
     if ( 'tasks_page_ptt-today' === $hook ) {
         wp_enqueue_script( 'ptt-today-page-scripts', PTT_PLUGIN_URL . 'today-page.js', ['jquery'], PTT_VERSION, true );
     }
     
-    // Localize script to pass data like nonces and AJAX URL
+    // Localize the main script only. The object will be available to all subsequent scripts.
     wp_localize_script( 'ptt-scripts', 'ptt_ajax_object', [
         'ajax_url'              => admin_url( 'admin-ajax.php' ),
         'nonce'                 => wp_create_nonce( 'ptt_ajax_nonce' ),
@@ -535,12 +537,6 @@ function ptt_enqueue_assets( $hook ) {
         'todays_date_formatted' => date_i18n( get_option( 'date_format' ), current_time( 'timestamp' ) ),
         'sync_authors_confirm'  => __( 'Are you sure you want to synchronize Authors to Assignee?', 'ptt' ),
         'sync_authors_title'    => __( 'Confirm Synchronization', 'ptt' ),
-    ] );
-
-    // Also localize for the today page script for simplicity
-    wp_localize_script( 'ptt-today-page-scripts', 'ptt_ajax_object', [
-        'ajax_url' => admin_url( 'admin-ajax.php' ),
-        'nonce'    => wp_create_nonce( 'ptt_ajax_nonce' ),
     ] );
 }
 // Enqueue for admin screens
