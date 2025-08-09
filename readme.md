@@ -1,5 +1,3 @@
-Of course. Here is the updated `readme.md` file with the requested section added to the FAQ.
-
 # 🚀 KISS Project & Task Time Tracker
 
 A robust WordPress plugin for tracking time spent on client projects and individual tasks. It integrates seamlessly with the WordPress admin area and provides a flexible front-end interface for users.
