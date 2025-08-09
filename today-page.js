@@ -60,8 +60,10 @@ jQuery(document).ready(function($) {
                 populateSelect(projectFilter, response.data, '-- Select a Project --');
                 updateTasks(); // Load tasks for the new project list
             } else {
-                projectFilter.html('<option value="0">Could not load projects</option>');
+                projectFilter.prop('disabled', false).html('<option value="0">Could not load projects</option>');
             }
+        }).fail(function() {
+            projectFilter.prop('disabled', false).html('<option value="0">Error loading projects</option>');
         });
     }
 
@@ -83,8 +85,10 @@ jQuery(document).ready(function($) {
             if (response.success) {
                 populateSelect(taskSelect, response.data, '-- Select a Task --');
             } else {
-                taskSelect.html('<option value="">Could not load tasks</option>');
+                taskSelect.prop('disabled', false).html('<option value="">Could not load tasks</option>');
             }
+        }).fail(function() {
+            taskSelect.prop('disabled', false).html('<option value="">Error loading tasks</option>');
         });
     }
 

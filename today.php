@@ -99,6 +99,7 @@ function ptt_render_today_page_html() {
 			<div>Date: <span id="debug-date"></span></div>
 			<div>Client Filter: <span id="debug-client">None</span></div>
 			<div>Project Filter: <span id="debug-project">None</span></div>
+			<div>Task Statuses: <span id="debug-task-statuses">Not Started, In Progress, Completed</span></div>
 			<div>Sessions Found: <span id="debug-session-count">0</span></div>
 		</div>
 
@@ -128,8 +129,12 @@ function ptt_get_tasks_for_today_page_callback() {
 	$status_terms_to_include = [];
 	$not_started = get_term_by( 'name', 'Not Started', 'task_status' );
 	$in_progress = get_term_by( 'name', 'In Progress', 'task_status' );
+	$completed   = get_term_by( 'name', 'Completed', 'task_status' );
+
 	if ( $not_started ) $status_terms_to_include[] = $not_started->term_id;
 	if ( $in_progress ) $status_terms_to_include[] = $in_progress->term_id;
+	if ( $completed ) $status_terms_to_include[] = $completed->term_id;
+
 
 	if ( empty( $status_terms_to_include ) ) {
 		wp_send_json_error( [ 'message' => 'Required task statuses not found.' ] );

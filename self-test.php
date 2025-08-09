@@ -362,6 +362,16 @@ function ptt_run_self_tests_callback() {
 	/* -------------------------------------------------------------
 	 * TEST 11 – Today Page Cascading Filters
 	 * -----------------------------------------------------------*/
+	// Cleanup any leftover data from a failed previous run to make test resilient
+	require_once(ABSPATH.'wp-admin/includes/user.php');
+	if ( $existing_user = get_user_by( 'login', 'test_user_filter' ) ) {
+		wp_delete_user( $existing_user->ID );
+	}
+	if ( $term = get_term_by('name', 'Filter Client X', 'client') ) { wp_delete_term( $term->term_id, 'client' ); }
+	if ( $term = get_term_by('name', 'Filter Client Y', 'client') ) { wp_delete_term( $term->term_id, 'client' ); }
+	if ( $term = get_term_by('name', 'Filter Project P', 'project') ) { wp_delete_term( $term->term_id, 'project' ); }
+	if ( $term = get_term_by('name', 'Filter Project Q', 'project') ) { wp_delete_term( $term->term_id, 'project' ); }
+
 	$test_user_id = wp_insert_user( [ 'user_login' => 'test_user_filter', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
 	$client_x = wp_insert_term( 'Filter Client X', 'client' );
 	$client_y = wp_insert_term( 'Filter Client Y', 'client' );
@@ -379,14 +389,11 @@ function ptt_run_self_tests_callback() {
 		wp_set_object_terms( $task_q, $client_y['term_id'], 'client' );
 		wp_set_object_terms( $task_q, $project_q['term_id'], 'project' );
 
-		// Simulate $_POST for the callback
 		$_POST['nonce'] = wp_create_nonce( 'ptt_ajax_nonce' );
 		
-		// Mock being logged in as the test user
 		$original_user_id = get_current_user_id();
 		wp_set_current_user( $test_user_id );
 
-		// Test 1: Get projects for Client X
 		$_POST['client_id'] = $client_x['term_id'];
 		ob_start();
 		ptt_get_projects_for_client_callback();
@@ -394,7 +401,6 @@ function ptt_run_self_tests_callback() {
 		$projects_for_client_x = wp_list_pluck( $response1['data'], 'id' );
 		$pass1 = ( count($projects_for_client_x) === 1 && $projects_for_client_x[0] === $project_p['term_id'] );
 		
-		// Test 2: Get tasks for Client X
 		$_POST['project_id'] = 0;
 		ob_start();
 		ptt_get_tasks_for_today_page_callback();
@@ -402,7 +408,6 @@ function ptt_run_self_tests_callback() {
 		$tasks_for_client_x = wp_list_pluck( $response2['data'], 'id' );
 		$pass2 = ( count($tasks_for_client_x) === 1 && $tasks_for_client_x[0] === $task_p );
 		
-		// Test 3: Get tasks for Project Q
 		$_POST['client_id'] = 0;
 		$_POST['project_id'] = $project_q['term_id'];
 		ob_start();
@@ -411,8 +416,8 @@ function ptt_run_self_tests_callback() {
 		$tasks_for_project_q = wp_list_pluck( $response3['data'], 'id' );
 		$pass3 = ( count($tasks_for_project_q) === 1 && $tasks_for_project_q[0] === $task_q );
 		
-		wp_set_current_user( $original_user_id ); // Restore original user
-		unset( $_POST['nonce'], $_POST['client_id'], $_POST['project_id'] ); // Clean up
+		wp_set_current_user( $original_user_id );
+		unset( $_POST['nonce'], $_POST['client_id'], $_POST['project_id'] );
 
 		if ( $pass1 && $pass2 && $pass3 ) {
 			$results[] = [ 'name' => 'Cascading Filters', 'status' => 'Pass', 'message' => 'Successfully filtered projects and tasks.' ];
@@ -424,14 +429,12 @@ function ptt_run_self_tests_callback() {
 			$results[] = [ 'name' => 'Cascading Filters', 'status' => 'Fail', 'message' => trim($fail_msg) ];
 		}
 		
-		// Cleanup
 		wp_delete_post( $task_p, true );
 		wp_delete_post( $task_q, true );
 		wp_delete_term( $client_x['term_id'], 'client' );
 		wp_delete_term( $client_y['term_id'], 'client' );
 		wp_delete_term( $project_p['term_id'], 'project' );
 		wp_delete_term( $project_q['term_id'], 'project' );
-		require_once(ABSPATH.'wp-admin/includes/user.php');
 		wp_delete_user( $test_user_id );
 	}
 
