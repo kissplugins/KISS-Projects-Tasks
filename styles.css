@@ -990,9 +990,9 @@
 }
 
 #ptt-today-page-container .entry-duration {
-    font-family: monospace, sans-serif;
-    font-size: 16px;
-    font-weight: bold;
+    font-family: sans-serif;
+    font-size: 14px;
+    font-weight: normal;
 }
 
 #ptt-today-page-container .ptt-today-entry.running .entry-duration {
@@ -1005,4 +1005,256 @@
     font-size: 14px;
     color: #787c82;
     font-style: italic;
+}
+
+/**
+ * =========================================
+ * TODAY PAGE STYLES - ENHANCED
+ * =========================================
+ * @since 1.10.0
+ */
+
+/* Enhanced Controls and Layout */
+#ptt-today-page-container .ptt-today-controls-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+#ptt-today-page-container .ptt-date-nav {
+    background: transparent;
+    border: 1px solid #c3c4c7;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+}
+
+#ptt-today-page-container .ptt-date-nav:hover {
+    background: #f0f0f1;
+    border-color: #2271b1;
+}
+
+#ptt-today-page-container .ptt-date-nav .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    vertical-align: middle;
+}
+
+/* Entry Row Enhancements for Live Editing */
+#ptt-today-page-container .ptt-today-entry {
+    position: relative;
+    transition: background-color 0.2s;
+}
+
+#ptt-today-page-container .ptt-today-entry:hover {
+    background-color: #f6f7f7;
+}
+
+
+/* Editable Fields */
+#ptt-today-page-container .entry-duration[data-editable="true"] {
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+}
+
+#ptt-today-page-container .entry-duration[data-editable="true"]:hover {
+    background-color: #f0f6fc;
+    outline: 1px dashed #2271b1;
+}
+
+#ptt-today-page-container .entry-duration.editing {
+    background-color: #fff;
+    outline: 2px solid #2271b1;
+}
+
+#ptt-today-page-container .entry-duration input {
+    font-family: monospace, sans-serif;
+    font-size: 16px;
+    font-weight: bold;
+    border: none;
+    background: transparent;
+    width: 80px;
+    padding: 0;
+    margin: 0;
+}
+
+/* Session Title as Editable */
+#ptt-today-page-container .entry-session-title[data-editable="true"] {
+    cursor: text;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+}
+
+#ptt-today-page-container .entry-session-title[data-editable="true"]:hover {
+    background-color: #f0f6fc;
+}
+
+#ptt-today-page-container .entry-session-title.editing {
+    background-color: #fff;
+    outline: 2px solid #2271b1;
+}
+
+#ptt-today-page-container .entry-session-title input {
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+}
+
+/* Task Link Selector (Future) */
+#ptt-today-page-container .entry-task-link {
+    position: relative;
+    display: inline-block;
+}
+
+#ptt-today-page-container .entry-task-link.editing {
+    min-width: 200px;
+}
+
+#ptt-today-page-container .task-search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 2px;
+}
+
+#ptt-today-page-container .task-search-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#ptt-today-page-container .task-search-item:hover {
+    background-color: #f0f6fc;
+}
+
+#ptt-today-page-container .task-search-item.selected {
+    background-color: #2271b1;
+    color: #fff;
+}
+
+/* Client Filter Dropdown (Future) */
+#ptt-today-client-filter-container {
+    flex: 0 0 auto;
+}
+
+#ptt-today-client-filter-container.active {
+    display: block !important;
+}
+
+/* View Options */
+#ptt-today-page-container .ptt-today-view-options {
+    display: flex;
+    gap: 5px;
+}
+
+#ptt-today-page-container .ptt-today-view-options button {
+    opacity: 0.7;
+}
+
+#ptt-today-page-container .ptt-today-view-options button.active {
+    opacity: 1;
+    background-color: #2271b1;
+    color: #fff;
+    border-color: #2271b1;
+}
+
+/* Entry Notes Display */
+#ptt-today-page-container .entry-notes {
+    display: block;
+    font-size: 12px;
+    color: #646970;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+/* Loading States */
+#ptt-today-page-container .entry-updating {
+    opacity: 0.6;
+    pointer-events: none;
+    position: relative;
+}
+
+#ptt-today-page-container .entry-updating::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 100px;
+    width: 16px;
+    height: 16px;
+    margin-top: -8px;
+    border: 2px solid #2271b1;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Success/Error Indicators */
+#ptt-today-page-container .entry-success {
+    animation: successFlash 0.5s;
+}
+
+#ptt-today-page-container .entry-error {
+    animation: errorFlash 0.5s;
+}
+
+@keyframes successFlash {
+    0%, 100% { background-color: transparent; }
+    50% { background-color: #d4edda; }
+}
+
+@keyframes errorFlash {
+    0%, 100% { background-color: transparent; }
+    50% { background-color: #f8d7da; }
+}
+
+/* Responsive Adjustments */
+@media screen and (max-width: 1024px) {
+    #ptt-today-page-container .ptt-today-controls-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    #ptt-today-page-container .ptt-today-date-switcher {
+        justify-content: center;
+        width: 100%;
+    }
+    
+}
+
+/* Accessibility Improvements */
+#ptt-today-page-container [data-editable="true"]:focus {
+    outline: 2px solid #2271b1;
+    outline-offset: 2px;
+}
+
+/* Print Styles */
+@media print {
+    #ptt-today-page-container .ptt-today-entry-box,
+    #ptt-today-page-container .ptt-date-nav,
+    #ptt-today-page-container #ptt-today-debug-area {
+        display: none !important;
+    }
+    
+    #ptt-today-page-container .ptt-today-entry {
+        page-break-inside: avoid;
+    }
 }
