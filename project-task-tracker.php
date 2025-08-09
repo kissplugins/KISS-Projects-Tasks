@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.8.10
+ * Version:           1.10.2
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,36 +17,19 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.8.10' );
+define( 'PTT_VERSION', '1.10.2' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
-/**
- * =================================================================
- * TABLE OF CONTENTS
- * =================================================================
- *
- * 1.0  PLUGIN ACTIVATION & DEACTIVATION
- * 2.0  DEPENDENCY CHECKS (ACF Pro)
- * 3.0  CPT & TAXONOMY REGISTRATION
- * 4.0  ACF FIELD REGISTRATION
- * 5.0  ENQUEUE SCRIPTS & STYLES
- * 6.0  CORE TIME CALCULATION LOGIC
- * 7.0  ADMIN UI (CPT EDITOR)
- * 7.5  USER PROFILE INTEGRATION
- * 8.0  AJAX HANDLERS
- * 9.0  FRONT-END SHORTCODE [task-enter] (see shortcodes.php)
- * 10.0 ADMIN PAGES & LINKS (see reports.php)
- * 11.0 SELF-TEST MODULE (see self-test.php)
- * CHANGELOG - LLM maintainers/Developes please update changelog.md for every update
- * =================================================================
- */
+
 
 // Load plugin modules
+require_once PTT_PLUGIN_DIR . 'helpers.php';
 require_once PTT_PLUGIN_DIR . 'shortcodes.php';
 require_once PTT_PLUGIN_DIR . 'self-test.php';
 require_once PTT_PLUGIN_DIR . 'reports.php';
 require_once PTT_PLUGIN_DIR . 'kanban.php';
+require_once PTT_PLUGIN_DIR . 'today.php';
 
 // =================================================================
 // 1.0 PLUGIN ACTIVATION & DEACTIVATION
@@ -1197,15 +1180,3 @@ function ptt_add_settings_link( $links ) {
     return $links;
 }
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'ptt_add_settings_link' );
-
-/**
- * =================================================================
- * CHANGELOG
- * =================================================================
- *
- * == 1.7.39 ==
- * - Fix: Corrected taxonomy registration to properly display Client, Project, and Status menus under the "Tasks" CPT menu.
- * - Fix: Associated 'task_status' taxonomy with the 'project_task' CPT in its registration arguments.
- * - Note: This fix requires the removal of the ptt_reorder_tasks_menu() function from self-test.php to prevent conflicts.
- *
- */

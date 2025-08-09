@@ -72,10 +72,10 @@ function ptt_changelog_page_html() {
 }
 
 /* -----------------------------------------------------------------
- *  NOTE:  The menu‑reordering logic that previously lived here
- *  (`ptt_reorder_tasks_menu()`) was removed in v 1.7.39 because it
- *  could hide taxonomy menu items under certain load‑order
- *  conditions.  The plugin now relies on WordPress’ native order.
+ * NOTE:  The menu‑reordering logic that previously lived here
+ * (`ptt_reorder_tasks_menu()`) was removed in v 1.7.39 because it
+ * could hide taxonomy menu items under certain load‑order
+ * conditions.  The plugin now relies on WordPress’ native order.
  * ----------------------------------------------------------------*/
 
 /**
@@ -277,42 +277,87 @@ function ptt_run_self_tests_callback() {
     ];
 
     /* -------------------------------------------------------------
- * TEST 9 – Taxonomy Registration & Visibility
- * -----------------------------------------------------------*/
-$taxonomies_to_check = [ 'client', 'project', 'task_status' ];
-$errors = [];
+     * TEST 9 – Taxonomy Registration & Visibility
+     * -----------------------------------------------------------*/
+    $taxonomies_to_check = [ 'client', 'project', 'task_status' ];
+    $errors = [];
 
-foreach ( $taxonomies_to_check as $tax_slug ) {
-    $tax_obj = get_taxonomy( $tax_slug );
-    
-    if ( ! $tax_obj ) {
-        $errors[] = "Taxonomy '{$tax_slug}' is not registered.";
-        continue;
+    foreach ( $taxonomies_to_check as $tax_slug ) {
+        $tax_obj = get_taxonomy( $tax_slug );
+        
+        if ( ! $tax_obj ) {
+            $errors[] = "Taxonomy '{$tax_slug}' is not registered.";
+            continue;
+        }
+        
+        // Check if taxonomy has UI visibility
+        if ( empty( $tax_obj->show_ui ) ) {
+            $errors[] = "Taxonomy '{$tax_slug}' has show_ui disabled.";
+        }
+        
+        // Check if taxonomy is visible in menu (can be true or a string)
+        if ( empty( $tax_obj->show_in_menu ) ) {
+            $errors[] = "Taxonomy '{$tax_slug}' has show_in_menu disabled.";
+        }
+        
+        // Check if associated with project_task post type
+        if ( ! in_array( 'project_task', (array) $tax_obj->object_type, true ) ) {
+            $errors[] = "Taxonomy '{$tax_slug}' is not associated with the 'project_task' post type.";
+        }
     }
-    
-    // Check if taxonomy has UI visibility
-    if ( empty( $tax_obj->show_ui ) ) {
-        $errors[] = "Taxonomy '{$tax_slug}' has show_ui disabled.";
-    }
-    
-    // Check if taxonomy is visible in menu (can be true or a string)
-    if ( empty( $tax_obj->show_in_menu ) ) {
-        $errors[] = "Taxonomy '{$tax_slug}' has show_in_menu disabled.";
-    }
-    
-    // Check if associated with project_task post type
-    if ( ! in_array( 'project_task', (array) $tax_obj->object_type, true ) ) {
-        $errors[] = "Taxonomy '{$tax_slug}' is not associated with the 'project_task' post type.";
-    }
-}
 
-$results[] = [
-    'name'    => 'Taxonomy Registration & Visibility',
-    'status'  => empty( $errors ) ? 'Pass' : 'Fail',
-    'message' => empty( $errors )
-        ? 'All taxonomies are correctly registered and configured for menu visibility.'
-        : implode( ' ', $errors ),
-];
+    $results[] = [
+        'name'    => 'Taxonomy Registration & Visibility',
+        'status'  => empty( $errors ) ? 'Pass' : 'Fail',
+        'message' => empty( $errors )
+            ? 'All taxonomies are correctly registered and configured for menu visibility.'
+            : implode( ' ', $errors ),
+    ];
+
+    /* -------------------------------------------------------------
+     * TEST 10 – Today Page User Data Isolation
+     * -----------------------------------------------------------*/
+    $user_a_id = wp_insert_user( [ 'user_login' => 'test_user_a', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
+    $user_b_id = wp_insert_user( [ 'user_login' => 'test_user_b', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
+
+    if ( is_wp_error( $user_a_id ) || is_wp_error( $user_b_id ) ) {
+        $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => 'Could not create test users.' ];
+    } else {
+        // Task 1: Authored by A, Assigned to A
+        $task1 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task A1', 'post_author' => $user_a_id, 'post_status' => 'publish' ]);
+        update_post_meta($task1, 'ptt_assignee', $user_a_id);
+
+        // Task 2: Authored by B, Assigned to B
+        $task2 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task B1', 'post_author' => $user_b_id, 'post_status' => 'publish' ]);
+        update_post_meta($task2, 'ptt_assignee', $user_b_id);
+
+        // Task 3: Authored by A, Assigned to B
+        $task3 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task A2/B2', 'post_author' => $user_a_id, 'post_status' => 'publish' ]);
+        update_post_meta($task3, 'ptt_assignee', $user_b_id);
+
+        $tasks_for_a = ptt_get_tasks_for_user( $user_a_id );
+        $tasks_for_b = ptt_get_tasks_for_user( $user_b_id );
+
+        $pass_a = count( $tasks_for_a ) === 1 && in_array( $task1, $tasks_for_a );
+        $pass_b = count( $tasks_for_b ) === 2 && in_array( $task2, $tasks_for_b ) && in_array( $task3, $tasks_for_b );
+
+        if ($pass_a && $pass_b) {
+            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Pass', 'message' => 'ptt_get_tasks_for_user() correctly isolated tasks for assignees.' ];
+        } else {
+            $fail_message = 'ptt_get_tasks_for_user() failed. ';
+            if (!$pass_a) $fail_message .= 'User A expected 1 task, got ' . count($tasks_for_a) . '. ';
+            if (!$pass_b) $fail_message .= 'User B expected 2 tasks, got ' . count($tasks_for_b) . '. ';
+            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => trim($fail_message) ];
+        }
+
+        // Cleanup
+        wp_delete_post( $task1, true );
+        wp_delete_post( $task2, true );
+        wp_delete_post( $task3, true );
+        require_once(ABSPATH.'wp-admin/includes/user.php');
+        wp_delete_user( $user_a_id );
+        wp_delete_user( $user_b_id );
+    }
 
     /* -------------------------------------------------------------*/
 
