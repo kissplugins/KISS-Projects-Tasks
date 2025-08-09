@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.8.10
+ * Version:           1.9.3
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.8.10' );
+define( 'PTT_VERSION', '1.9.3' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -508,6 +508,10 @@ function ptt_activate_kanban_additions() {
 function ptt_enqueue_assets() {
     // Main CSS file (now in root)
     wp_enqueue_style( 'ptt-styles', PTT_PLUGIN_URL . 'styles.css', [], PTT_VERSION );
+
+    if ( is_admin() && isset( $_GET['page'] ) && 'ptt-today' === $_GET['page'] ) {
+        wp_enqueue_style( 'ptt-today-styles', PTT_PLUGIN_URL . 'today.css', [], PTT_VERSION );
+    }
 
     $deps = [ 'jquery' ];
     if ( is_admin() ) {
@@ -1115,6 +1119,9 @@ function ptt_start_session_timer_callback() {
     update_sub_field( array( 'sessions', $row_index + 1, 'session_start_time' ), $current_time, $post_id );
     update_sub_field( array( 'sessions', $row_index + 1, 'session_stop_time' ), '', $post_id );
     update_sub_field( array( 'sessions', $row_index + 1, 'session_calculated_duration' ), '0.00', $post_id );
+
+    // Ensure task status reflects active work.
+    wp_set_object_terms( $post_id, 'In Progress', 'task_status', false );
 
     wp_send_json_success( [ 'message' => 'Session started!', 'start_time' => $current_time ] );
 }
