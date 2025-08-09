@@ -1003,8 +1003,19 @@ jQuery(document).ready(function ($) {
         const $dateSelect = $('#ptt-today-date-select');
         const $entriesList = $('#ptt-today-entries-list');
         const $totalDisplay = $('#ptt-today-total strong');
-        
+
         let activeTimerInterval = null;
+
+        function renderTodayEntry(entry) {
+            const runningClass = entry.is_running ? 'running' : '';
+            return `<div class="ptt-today-entry ${runningClass}">
+                <div class="entry-details">
+                    <span class="entry-session-title">${entry.session_title}</span>
+                    <span class="entry-meta"><a href="${entry.edit_link}" target="_blank">${entry.task_title}</a> &bull; ${entry.project_name}</span>
+                </div>
+                <div class="entry-duration">${entry.start_time} | ${entry.is_running ? 'Now' : entry.stop_time} | SUB-TOTAL: ${entry.duration}</div>
+            </div>`;
+        }
 
         // Fetch tasks when project filter changes
         $projectFilter.on('change', function() {
@@ -1112,7 +1123,15 @@ jQuery(document).ready(function ($) {
                 date: selectedDate
             }).done(function(response){
                 if (response.success) {
-                    $entriesList.html(response.data.html);
+                    const entries = response.data.entries || [];
+                    $entriesList.empty();
+                    if (entries.length) {
+                        entries.forEach(entry => {
+                            $entriesList.append(renderTodayEntry(entry));
+                        });
+                    } else {
+                        $entriesList.html('<div class="ptt-today-no-entries">No time entries recorded for this day.</div>');
+                    }
                     $totalDisplay.text(response.data.total);
                     // Update debug info
                     if (response.data.debug) {
