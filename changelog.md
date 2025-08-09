@@ -2,6 +2,18 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
+* ## Version 1.9.3
+* - Load tasks and time entries for the selected assignee on the Today page.
+* - Automatically set task status to "In Progress" when a timer starts.
+
+* ## Version 1.9.2
+* - Display the associated client in the Today page project field (`Project - Client`).
+
+* ## Version 1.9.1
+* - Added user selector to the Today page for assigning sessions to different users.
+* - Replaced project filter with a read-only project display tied to the selected task.
+* - Moved Today page styles into a dedicated `today.css` file.
+
 * ## Version 1.9.0
 * - **Feature**: Added new "Today" admin page for a daily dashboard view.
 * - **Feature**: The "Today" page includes a quick-start timer to create new sessions for existing tasks.
