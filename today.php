@@ -238,11 +238,29 @@ function ptt_get_daily_entries_callback() {
 		wp_send_json_success( [ 'html' => $html, 'total' => '00:00' ] );
 	}
 
+	// Get Term IDs for statuses
+	$status_terms_to_include = [];
+	$status_names = ['Not Started', 'In Progress', 'Completed', 'Blocked'];
+	foreach ($status_names as $status_name) {
+		$term = get_term_by('name', $status_name, 'task_status');
+		if ($term) {
+			$status_terms_to_include[] = $term->term_id;
+		}
+	}
+
 	$args = [
 		'post_type'      => 'project_task',
 		'posts_per_page' => -1,
-		'post_status'    => ['publish', 'private', 'completed'], // Include completed tasks
+		'post_status'    => ['publish', 'private'],
 		'post__in'       => $user_task_ids, // The crucial filter
+		'tax_query'      => [
+			'relation' => 'AND',
+			[
+				'taxonomy' => 'task_status',
+				'field'    => 'term_id',
+				'terms'    => $status_terms_to_include,
+			],
+		],
 	];
 
 	$q = new WP_Query( $args );
@@ -329,7 +347,7 @@ function ptt_get_daily_entries_callback() {
 	$current_user = wp_get_current_user();
 	$debug_info['user'] = $current_user->user_login . ' (ID: ' . $current_user->ID . ')';
 	$debug_info['date'] = $target_date;
-	$debug_info['queried_statuses'] = implode( ', ', $args['post_status'] );
+	$debug_info['queried_statuses'] = implode(', ', $status_names);
 	$debug_info['matched_tasks'] = $q->found_posts;
 	$debug_info['matched_sessions'] = count( $all_entries );
 
@@ -341,6 +359,7 @@ function ptt_get_daily_entries_callback() {
 		<li><strong>Queried Statuses:</strong> <?php echo esc_html( $debug_info['queried_statuses'] ); ?></li>
 		<li><strong>Tasks Found:</strong> <?php echo esc_html( $debug_info['matched_tasks'] ); ?></li>
 		<li><strong>Sessions on this Date:</strong> <?php echo esc_html( $debug_info['matched_sessions'] ); ?></li>
+		<li><strong>Task Query Rule:</strong> Tasks where the current user is the assignee.</li>
 	</ul>
 	<?php
 	/**

@@ -40,16 +40,8 @@ function ptt_get_tasks_for_user( $user_id ) {
 	);
 	$assigned_posts = $wpdb->get_col( $assigned_posts_query );
 
-	// Get posts where the user is the author
-	$authored_posts_query = $wpdb->prepare(
-		"SELECT ID FROM {$wpdb->posts}
-		 WHERE post_author = %d AND post_type = 'project_task' AND post_status = 'publish'",
-		$user_id
-	);
-	$authored_posts = $wpdb->get_col( $authored_posts_query );
-
 	// Merge, remove duplicates, and ensure all values are integers
-	$task_ids = array_map( 'intval', array_unique( array_merge( $assigned_posts, $authored_posts ) ) );
+	$task_ids = array_map( 'intval', array_unique( $assigned_posts ) );
 
 	return $task_ids;
 }
