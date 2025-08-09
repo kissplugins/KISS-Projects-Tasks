@@ -2,6 +2,26 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
+## 1.9.1 - 2025-08-08
+
+* **Fix**: Updated the "User Data Isolation" self-test to align with the new rule that only shows tasks to the assignee.
+* **Chore**: Removed the inline changelog from the main plugin file (`project-task-tracker.php`) to rely solely on `changelog.md`.
+
+## 1.9.0 - 2025-08-08
+
+* **Feature**: The "Today" page is now user-specific, showing only tasks assigned to or authored by the current user.
+* **Feature**: Added a new `helpers.php` file for common utility functions, improving code organization.
+* **Fix**: Hardened the daily time entry logic to prevent potential errors from invalid date strings.
+* **Dev**: Added a new self-test (`Test 10`) to verify user data isolation on the Today page and prevent future regressions.
+
+* ## Version 1.8.9
+* - **Feature**: Added new "Today" admin page for a daily dashboard view.
+* - **Feature**: The "Today" page includes a quick-start timer to create new sessions for existing tasks.
+* - **Feature**: Task dropdown on the "Today" page is filtered for "Not Started" or "In Progress" tasks and sorted by most recently modified (LIFO).
+* - **Feature**: View a chronological list of time entries for the last 10 days with a running daily total.
+* - **Enhancement**: The system now stops any other running timer for a user before a new one is started from the "Today" page.
+
+
 * ## Version 1.8.10
 * - Kanban vertical position for cards
 Position Storage: Each task stores its position per status using meta keys like:
