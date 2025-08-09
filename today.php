@@ -342,7 +342,7 @@ function ptt_get_daily_entries_callback() {
 	}
 	$html = ob_get_clean();
 
-	// Prepare Debug Info
+	// Prepare Debug Info for Today page. WARNING: Do not modify or refactor unless specifically requested
 	$debug_info = [];
 	$current_user = wp_get_current_user();
 	$debug_info['user'] = $current_user->user_login . ' (ID: ' . $current_user->ID . ')';
