@@ -989,165 +989,6 @@ jQuery(document).ready(function ($) {
         });
     });
 
-        /**
-     * ---------------------------------------------------------------
-     * TODAY PAGE
-     * ---------------------------------------------------------------
-     */
-    if ($('#ptt-today-page-container').length) {
-        const $projectFilter = $('#ptt-today-project-filter');
-        const $taskSelect = $('#ptt-today-task-select');
-        const $sessionTitle = $('#ptt-today-session-title');
-        const $startStopBtn = $('#ptt-today-start-stop-btn');
-        const $timerDisplay = $('.ptt-today-timer-display');
-        const $dateSelect = $('#ptt-today-date-select');
-        const $entriesList = $('#ptt-today-entries-list');
-        const $totalDisplay = $('#ptt-today-total strong');
-        
-        let activeTimerInterval = null;
-
-        // Fetch tasks when project filter changes
-        $projectFilter.on('change', function() {
-            const projectId = $(this).val();
-            $taskSelect.prop('disabled', true).html('<option value="">Loading...</option>');
-
-            $.post(ptt_ajax_object.ajax_url, {
-                action: 'ptt_get_tasks_for_today_page',
-                nonce: ptt_ajax_object.nonce,
-                project_id: projectId
-            }).done(function(response) {
-                if (response.success && response.data.length) {
-                    let options = '<option value="">-- Select a Task --</option>';
-                    response.data.forEach(task => {
-                        options += `<option value="${task.id}">${task.title}</option>`;
-                    });
-                    $taskSelect.html(options).prop('disabled', false);
-                } else {
-                    $taskSelect.html('<option value="">No available tasks</option>');
-                }
-            });
-        });
-
-        // Main Start/Stop button logic
-        $startStopBtn.on('click', function() {
-            const $btn = $(this);
-            const isRunning = $btn.hasClass('running');
-            
-            if (isRunning) {
-                // --- STOP TIMER ---
-                const postId = $btn.data('postid');
-                const rowIndex = $btn.data('rowindex');
-                $btn.prop('disabled', true).text('Stopping...');
-
-                $.post(ptt_ajax_object.ajax_url, {
-                    action: 'ptt_stop_session_timer',
-                    nonce: ptt_ajax_object.nonce,
-                    post_id: postId,
-                    row_index: rowIndex
-                }).done(function(response){
-                    stopTodayPageTimer();
-                    $btn.removeClass('running').data('postid', '').data('rowindex', '');
-                    $sessionTitle.val('').prop('disabled', false);
-                    $taskSelect.prop('disabled', false);
-                    $projectFilter.prop('disabled', false);
-                    loadDailyEntries(); // Refresh list
-                }).fail(function(){
-                    alert('Failed to stop timer.');
-                }).always(function(){
-                     $btn.prop('disabled', false).text('Start');
-                });
-
-            } else {
-                // --- START TIMER ---
-                const taskId = $taskSelect.val();
-                const title = $sessionTitle.val();
-
-                if (!taskId || !title.trim()) {
-                    alert('Please enter a session title and select a task.');
-                    return;
-                }
-
-                $btn.prop('disabled', true).text('Starting...');
-
-                $.post(ptt_ajax_object.ajax_url, {
-                    action: 'ptt_today_start_new_session',
-                    nonce: ptt_ajax_object.nonce,
-                    post_id: taskId,
-                    session_title: title
-                }).done(function(response){
-                    if (response.success) {
-                        $btn.addClass('running').text('Stop');
-                        $btn.data('postid', response.data.post_id);
-                        $btn.data('rowindex', response.data.row_index);
-                        $sessionTitle.prop('disabled', true);
-                        $taskSelect.prop('disabled', true);
-                        $projectFilter.prop('disabled', true);
-                        startTodayPageTimer(response.data.start_time);
-                        loadDailyEntries(); // Refresh list to show running timer
-                    } else {
-                        alert(response.data.message || 'Could not start timer.');
-                        $btn.text('Start');
-                    }
-                }).fail(function(){
-                    alert('An error occurred.');
-                    $btn.text('Start');
-                }).always(function(){
-                    $btn.prop('disabled', false);
-                });
-            }
-        });
-
-        // Load entries when date changes
-        $dateSelect.on('change', function(){
-            loadDailyEntries();
-        });
-
-        function loadDailyEntries() {
-            const selectedDate = $dateSelect.val();
-            $entriesList.html('<div class="ptt-ajax-spinner" style="display:block; margin: 40px auto;"></div>');
-
-            $.post(ptt_ajax_object.ajax_url, {
-                action: 'ptt_get_daily_entries',
-                nonce: ptt_ajax_object.nonce,
-                date: selectedDate
-            }).done(function(response){
-                if (response.success) {
-                    $entriesList.html(response.data.html);
-                    $totalDisplay.text(response.data.total);
-                }
-            });
-        }
-        
-        function startTodayPageTimer(startTimeStr) {
-            if (activeTimerInterval) clearInterval(activeTimerInterval);
-            const startTime = new Date(startTimeStr.replace(' ', 'T') + 'Z');
-
-            const updateTimer = () => {
-                const now = new Date();
-                const diff = now - startTime;
-
-                const hours = Math.floor(diff / 3600000);
-                const minutes = Math.floor((diff % 3600000) / 60000);
-                const seconds = Math.floor((diff % 60000) / 1000);
-
-                const timeString = `${('0'+hours).slice(-2)}:${('0'+minutes).slice(-2)}:${('0'+seconds).slice(-2)}`;
-                $timerDisplay.text(timeString);
-            };
-            updateTimer();
-            activeTimerInterval = setInterval(updateTimer, 1000);
-        }
-
-        function stopTodayPageTimer() {
-            if (activeTimerInterval) clearInterval(activeTimerInterval);
-            activeTimerInterval = null;
-            $timerDisplay.text('00:00:00');
-        }
-
-        // Initial load
-        $projectFilter.trigger('change');
-        loadDailyEntries();
-    }
-
     /**
      * ---------------------------------------------------------------
      * SELF-TEST MODULE
@@ -1159,8 +1000,7 @@ jQuery(document).ready(function ($) {
         const $spinner = $resultsContainer.find('.ptt-ajax-spinner');
 
         $button.prop('disabled', true);
-        $spinner.show();
-        $resultsContainer.find('table').remove();
+        $resultsContainer.empty().html('<div class="ptt-ajax-spinner" style="display:block;"></div>'); // Clear previous results and show spinner
 
         $.post(ptt_ajax_object.ajax_url, {
             action: 'ptt_run_self_tests',
@@ -1171,23 +1011,31 @@ jQuery(document).ready(function ($) {
                 let tableHtml = '<table class="wp-list-table widefat striped"><thead><tr><th>Test Name</th><th>Status</th><th>Message</th></tr></thead><tbody>';
                 results.forEach(function (result) {
                     tableHtml += `<tr>
-                        <td>${result.name}</td>
-                        <td class="status-${result.status.toLowerCase()}">${result.status}</td>
-                        <td>${result.message}</td>
+                        <td>${result.name || 'Unnamed Test'}</td>
+                        <td class="status-${(result.status || 'fail').toLowerCase()}">${result.status || 'Fail'}</td>
+                        <td>${result.message || 'No message.'}</td>
                     </tr>`;
                 });
                 tableHtml += '</tbody></table>';
-                $resultsContainer.html(tableHtml); // Use .html() to clear previous results
+                $resultsContainer.html(tableHtml);
                 if (response.data.time) {
                     $('#ptt-last-test-time').text('Tests Last Ran at ' + response.data.time);
                 }
             } else {
-                // Handle cases where the response is not what was expected
-                let errorMessage = '<p class="status-fail">An error occurred while running tests. The server returned an unexpected response, which may indicate a fatal error or that a sub-process was interrupted.</p>';
+                let errorMessage = '<p class="status-fail">An error occurred while running tests. The server returned an unexpected or unsuccessful response.</p>';
+                if(response.data && response.data.message){
+                    errorMessage += `<p class="error-details"><strong>Details:</strong> ${response.data.message}</p>`;
+                }
                 $resultsContainer.html(errorMessage);
             }
-        }).fail(function () {
-            $resultsContainer.append('<p class="error">A server error occurred.</p>');
+        }).fail(function (jqXHR, textStatus, errorThrown) {
+            console.error("Self-test AJAX failed:", {jqXHR, textStatus, errorThrown});
+            let errorDetails = `<strong>Status:</strong> ${textStatus}<br><strong>Error:</strong> ${errorThrown}`;
+            if (jqXHR.responseText) {
+                 // Using a div with pre-wrap to preserve formatting of PHP errors
+                errorDetails += `<br><strong>Response:</strong><div class="error-response">${$('<div/>').text(jqXHR.responseText).html()}</div>`;
+            }
+            $resultsContainer.html(`<p class="error">A server error occurred. Please check the browser console for details.</p><div class="error-details">${errorDetails}</div>`);
         }).always(function () {
             $button.prop('disabled', false);
             $spinner.hide();

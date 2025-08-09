@@ -110,10 +110,14 @@ function ptt_render_today_page_html() {
 /**
  * AJAX handler to get tasks for the Today page dropdown.
  * Fetches tasks for the current user, optionally filtered by project and/or client.
+ *
+ * @param bool $return_data If true, returns the data array instead of sending JSON and dying.
+ * @return array|void
  */
-function ptt_get_tasks_for_today_page_callback() {
+function ptt_get_tasks_for_today_page_callback( $return_data = false ) {
 	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
 	if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( $return_data ) { return [ 'success' => false, 'data' => ['message' => 'Permission denied.'] ]; }
 		wp_send_json_error();
 	}
 
@@ -123,6 +127,7 @@ function ptt_get_tasks_for_today_page_callback() {
 
 	$user_task_ids = ptt_get_tasks_for_user( $user_id );
 	if ( empty( $user_task_ids ) ) {
+		if ( $return_data ) { return [ 'success' => true, 'data' => [] ]; }
 		wp_send_json_success( [] );
 	}
 
@@ -137,7 +142,9 @@ function ptt_get_tasks_for_today_page_callback() {
 
 
 	if ( empty( $status_terms_to_include ) ) {
-		wp_send_json_error( [ 'message' => 'Required task statuses not found.' ] );
+        $error_data = [ 'message' => 'Required task statuses not found.' ];
+		if ( $return_data ) { return [ 'success' => false, 'data' => $error_data ]; }
+		wp_send_json_error( $error_data );
 	}
 
 	$args = [
@@ -186,16 +193,21 @@ function ptt_get_tasks_for_today_page_callback() {
 		wp_reset_postdata();
 	}
 
+	if ( $return_data ) { return [ 'success' => true, 'data' => $tasks ]; }
 	wp_send_json_success( $tasks );
 }
 add_action( 'wp_ajax_ptt_get_tasks_for_today_page', 'ptt_get_tasks_for_today_page_callback' );
 
 /**
  * AJAX handler to get projects based on a selected client.
+ *
+ * @param bool $return_data If true, returns the data array instead of sending JSON and dying.
+ * @return array|void
  */
-function ptt_get_projects_for_client_callback() {
+function ptt_get_projects_for_client_callback( $return_data = false ) {
 	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
 	if ( ! current_user_can( 'edit_posts' ) ) {
+		if ( $return_data ) { return [ 'success' => false, 'data' => ['message' => 'Permission denied.'] ]; }
 		wp_send_json_error();
 	}
 
@@ -204,6 +216,7 @@ function ptt_get_projects_for_client_callback() {
 
 	$user_task_ids = ptt_get_tasks_for_user( $user_id );
 	if ( empty( $user_task_ids ) ) {
+		if ( $return_data ) { return [ 'success' => true, 'data' => [] ]; }
 		wp_send_json_success( [] );
 	}
 
@@ -252,6 +265,7 @@ function ptt_get_projects_for_client_callback() {
 		}
 	}
 
+	if ( $return_data ) { return [ 'success' => true, 'data' => $projects ]; }
 	wp_send_json_success( $projects );
 }
 add_action( 'wp_ajax_ptt_get_projects_for_client', 'ptt_get_projects_for_client_callback' );
@@ -278,11 +292,11 @@ function ptt_today_start_new_session_callback() {
 	}
 
 	$new_session = [
-		'session_title'      => $session_title,
-		'session_start_time' => current_time( 'mysql', 1 ), // UTC
+		'field_ptt_session_title'      => $session_title,
+		'field_ptt_session_start_time' => current_time( 'mysql', 1 ), // UTC
 	];
 
-	$new_row_index = add_row( 'sessions', $new_session, $post_id );
+	$new_row_index = add_row( 'field_ptt_sessions', $new_session, $post_id );
 
 	if ( ! $new_row_index ) {
 		wp_send_json_error( [ 'message' => 'Failed to create new session.' ] );
@@ -292,7 +306,7 @@ function ptt_today_start_new_session_callback() {
 		'message'    => 'Timer started!',
 		'post_id'    => $post_id,
 		'row_index'  => $new_row_index - 1,
-		'start_time' => $new_session['session_start_time'],
+		'start_time' => $new_session['field_ptt_session_start_time'],
 	] );
 }
 add_action( 'wp_ajax_ptt_today_start_new_session', 'ptt_today_start_new_session_callback' );
@@ -318,6 +332,7 @@ function ptt_get_daily_entries_callback() {
 		echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
 		$html = ob_get_clean();
 		wp_send_json_success( [ 'html' => $html, 'total' => '00:00', 'session_count' => 0 ] );
+		return;
 	}
 
 	$args = [
@@ -342,28 +357,39 @@ function ptt_get_daily_entries_callback() {
 						continue;
 					}
 
-					$start_ts = strtotime( $start_str );
-					if ( ! $start_ts ) {
-						continue;
+					try {
+						$start_dt = new DateTime($start_str, new DateTimeZone('UTC'));
+						$start_ts = $start_dt->getTimestamp();
+					} catch (Exception $e) {
+						continue; // Skip invalid date format
 					}
 
-					if ( date( 'Y-m-d', $start_ts ) === $target_date ) {
+					if ( $start_dt->format('Y-m-d') === $target_date ) {
 						$stop_str = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
 						$duration_seconds = 0;
-						$stop_ts = strtotime( $stop_str );
 
-						if ( $start_ts && $stop_ts ) {
-							$duration_seconds = $stop_ts - $start_ts;
-						} elseif ( $start_ts && ! $stop_str ) {
+						if ( $stop_str ) {
+							try {
+								$stop_dt = new DateTime($stop_str, new DateTimeZone('UTC'));
+								$stop_ts = $stop_dt->getTimestamp();
+								$duration_seconds = $stop_ts - $start_ts;
+							} catch (Exception $e) {
+								$duration_seconds = 0; // Invalid stop date
+							}
+						} else {
+							// It's a running timer
 							$duration_seconds = time() - $start_ts;
 						}
+
+						if($duration_seconds < 0) $duration_seconds = 0;
+
 						$grand_total_seconds += $duration_seconds;
 
 						$project_terms = get_the_terms( $post_id, 'project' );
 						$project_name  = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
 
 						$all_entries[] = [
-							'session_title'  => $session['session_title'],
+							'session_title'  => isset($session['session_title']) ? $session['session_title'] : '',
 							'task_title'     => get_the_title(),
 							'project_name'   => $project_name,
 							'start_time'     => $start_ts,

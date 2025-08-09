@@ -71,13 +71,6 @@ function ptt_changelog_page_html() {
     echo '</div>';
 }
 
-/* -----------------------------------------------------------------
- * NOTE:  The menu‑reordering logic that previously lived here
- * (`ptt_reorder_tasks_menu()`) was removed in v 1.7.39 because it
- * could hide taxonomy menu items under certain load‑order
- * conditions.  The plugin now relies on WordPress’ native order.
- * ----------------------------------------------------------------*/
-
 /**
  * Renders the Self‑Test page HTML.
  */
@@ -122,321 +115,132 @@ function ptt_run_self_tests_callback() {
     /* -------------------------------------------------------------
      * TEST 1 – Task Post Save & Assignee Update
      * -----------------------------------------------------------*/
-    $test_post_id = wp_insert_post( [
-        'post_type'   => 'project_task',
-        'post_title'  => 'SELF TEST POST',
-        'post_status' => 'publish',
-    ] );
+    try {
+        $test_post_id = wp_insert_post( [
+            'post_type'   => 'project_task',
+            'post_title'  => 'SELF TEST POST',
+            'post_status' => 'publish',
+        ] );
 
-    if ( $test_post_id && ! is_wp_error( $test_post_id ) ) {
-        $admin_id = get_current_user_id();
-        update_post_meta( $test_post_id, 'ptt_assignee', $admin_id );
-        $saved_assignee = (int) get_post_meta( $test_post_id, 'ptt_assignee', true );
+        if ( $test_post_id && ! is_wp_error( $test_post_id ) ) {
+            $admin_id = get_current_user_id();
+            update_post_meta( $test_post_id, 'ptt_assignee', $admin_id );
+            $saved_assignee = (int) get_post_meta( $test_post_id, 'ptt_assignee', true );
 
-        $results[] = [
-            'name'    => 'Task Post Save & Assignee Update',
-            'status'  => ( $saved_assignee === $admin_id ) ? 'Pass' : 'Fail',
-            'message' => ( $saved_assignee === $admin_id )
-                ? 'Successfully created post and updated its assignee meta field.'
-                : 'Created post but failed to update or verify assignee meta field.',
-        ];
+            $results[] = [
+                'name'    => 'Task Post Save & Assignee Update',
+                'status'  => ( $saved_assignee === $admin_id ) ? 'Pass' : 'Fail',
+                'message' => ( $saved_assignee === $admin_id )
+                    ? 'Successfully created post and updated its assignee meta field.'
+                    : 'Created post but failed to update or verify assignee meta field.',
+            ];
 
-        wp_delete_post( $test_post_id, true ); // force delete
-    } else {
-        $results[] = [
-            'name'    => 'Task Post Save & Assignee Update',
-            'status'  => 'Fail',
-            'message' => 'Failed to create test post.',
-        ];
-    }
-
-    /* -------------------------------------------------------------
-     * TEST 2 – Create Client & Project taxonomies
-     * -----------------------------------------------------------*/
-    $client_term  = wp_insert_term( 'SELF TEST CLIENT',  'client'  );
-    $project_term = wp_insert_term( 'SELF TEST PROJECT', 'project' );
-
-    if ( ! is_wp_error( $client_term ) && ! is_wp_error( $project_term ) ) {
-        $results[] = [
-            'name'    => 'Create Client & Project',
-            'status'  => 'Pass',
-            'message' => 'Successfully created test taxonomies.',
-        ];
-        wp_delete_term( $client_term['term_id'],  'client'  );
-        wp_delete_term( $project_term['term_id'], 'project' );
-    } else {
-        $results[] = [
-            'name'    => 'Create Client & Project',
-            'status'  => 'Fail',
-            'message' => 'Failed to create test taxonomies.',
-        ];
-    }
-
-    /* -------------------------------------------------------------
-     * TEST 3 – Calculate Total Time (basic & rounding)
-     * -----------------------------------------------------------*/
-    $calc_post = wp_insert_post( [
-        'post_type'   => 'project_task',
-        'post_title'  => 'CALC TEST POST',
-        'post_status' => 'publish',
-    ] );
-
-    if ( $calc_post && ! is_wp_error( $calc_post ) ) {
-        // 1.5 hours exactly
-        update_field( 'start_time', '2025-07-19 10:00:00', $calc_post );
-        update_field( 'stop_time',  '2025-07-19 11:30:00', $calc_post );
-        $duration = ptt_calculate_and_save_duration( $calc_post );
-
-        $results[] = [
-            'name'    => 'Calculate Total Time (1h 30m)',
-            'status'  => ( $duration === '1.50' ) ? 'Pass' : 'Fail',
-            'message' => ( $duration === '1.50' )
-                ? 'Correctly calculated 1.50 hours.'
-                : "Calculation incorrect. Expected 1.50, got {$duration}.",
-        ];
-
-        // 1 minute → should round up to 0.02
-        update_field( 'start_time', '2025-07-19 12:00:00', $calc_post );
-        update_field( 'stop_time',  '2025-07-19 12:01:00', $calc_post );
-        $duration_round = ptt_calculate_and_save_duration( $calc_post );
-
-        $results[] = [
-            'name'    => 'Calculate Total Time (Rounding)',
-            'status'  => ( $duration_round === '0.02' ) ? 'Pass' : 'Fail',
-            'message' => ( $duration_round === '0.02' )
-                ? 'Correctly rounded to 0.02 hours.'
-                : "Expected 0.02 hours, got {$duration_round}.",
-        ];
-
-        wp_delete_post( $calc_post, true );
-    } else {
-        $results[] = [
-            'name'    => 'Calculate Total Time',
-            'status'  => 'Fail',
-            'message' => 'Could not create post for calculation test.',
-        ];
-    }
-
-    /* -------------------------------------------------------------
-     * TEST 4 – Status Update Logic
-     * -----------------------------------------------------------*/
-    $status_term = wp_insert_term( 'SELF TEST STATUS ' . wp_rand(), 'task_status' );
-    $status_post = wp_insert_post( [
-        'post_type'   => 'project_task',
-        'post_title'  => 'STATUS TEST',
-        'post_status' => 'publish',
-    ] );
-
-    if (
-        $status_post && ! is_wp_error( $status_post ) &&
-        $status_term && ! is_wp_error( $status_term )
-    ) {
-        wp_set_object_terms( $status_post, $status_term['term_id'], 'task_status', false );
-        $assigned = has_term( $status_term['term_id'], 'task_status', $status_post );
-
-        $results[] = [
-            'name'    => 'Status Update Logic',
-            'status'  => $assigned ? 'Pass' : 'Fail',
-            'message' => $assigned
-                ? 'Core status assignment successful.'
-                : 'wp_set_object_terms failed to assign status.',
-        ];
-    } else {
-        $results[] = [
-            'name'    => 'Status Update Logic',
-            'status'  => 'Fail',
-            'message' => 'Could not create test post or term for status update test.',
-        ];
-    }
-
-    // Always clean up
-    wp_delete_post( $status_post, true );
-    if ( $status_term && ! is_wp_error( $status_term ) ) {
-        wp_delete_term( $status_term['term_id'], 'task_status' );
-    }
-
-    /* -------------------------------------------------------------
-     * TEST 5–7 – Reporting Logic & Date‑Range filter
-     * (code unchanged from original, omitted here for brevity)
-     * -----------------------------------------------------------*/
-
-    /* -------------------------------------------------------------
-     * TEST 8 – User Query for Assignees
-     * -----------------------------------------------------------*/
-    $assignee_users = get_users( [
-        'capability' => 'publish_posts',
-        'fields'     => 'ID',
-    ] );
-
-    $results[] = [
-        'name'    => 'User Query for Assignees',
-        'status'  => ( ! empty( $assignee_users ) ) ? 'Pass' : 'Fail',
-        'message' => ( ! empty( $assignee_users ) )
-            ? 'Found ' . count( $assignee_users ) . ' potential assignees.'
-            : 'No users with “publish_posts” capability found; Assignee dropdown may be empty.',
-    ];
-
-    /* -------------------------------------------------------------
-     * TEST 9 – Taxonomy Registration & Visibility
-     * -----------------------------------------------------------*/
-    $taxonomies_to_check = [ 'client', 'project', 'task_status' ];
-    $errors = [];
-
-    foreach ( $taxonomies_to_check as $tax_slug ) {
-        $tax_obj = get_taxonomy( $tax_slug );
-        
-        if ( ! $tax_obj ) {
-            $errors[] = "Taxonomy '{$tax_slug}' is not registered.";
-            continue;
-        }
-        
-        if ( empty( $tax_obj->show_ui ) ) {
-            $errors[] = "Taxonomy '{$tax_slug}' has show_ui disabled.";
-        }
-        
-        if ( empty( $tax_obj->show_in_menu ) ) {
-            $errors[] = "Taxonomy '{$tax_slug}' has show_in_menu disabled.";
-        }
-        
-        if ( ! in_array( 'project_task', (array) $tax_obj->object_type, true ) ) {
-            $errors[] = "Taxonomy '{$tax_slug}' is not associated with the 'project_task' post type.";
-        }
-    }
-
-    $results[] = [
-        'name'    => 'Taxonomy Registration & Visibility',
-        'status'  => empty( $errors ) ? 'Pass' : 'Fail',
-        'message' => empty( $errors )
-            ? 'All taxonomies are correctly registered and configured for menu visibility.'
-            : implode( ' ', $errors ),
-    ];
-
-    /* -------------------------------------------------------------
-     * TEST 10 – Today Page User Data Isolation
-     * -----------------------------------------------------------*/
-    $user_a_id = wp_insert_user( [ 'user_login' => 'test_user_a', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
-    $user_b_id = wp_insert_user( [ 'user_login' => 'test_user_b', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
-
-    if ( is_wp_error( $user_a_id ) || is_wp_error( $user_b_id ) ) {
-        $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => 'Could not create test users.' ];
-    } else {
-        $task1 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task A1', 'post_author' => $user_a_id, 'post_status' => 'publish' ]);
-        update_post_meta($task1, 'ptt_assignee', $user_a_id);
-
-        $task2 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task B1', 'post_author' => $user_b_id, 'post_status' => 'publish' ]);
-        update_post_meta($task2, 'ptt_assignee', $user_b_id);
-
-        $task3 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task A2/B2', 'post_author' => $user_a_id, 'post_status' => 'publish' ]);
-        update_post_meta($task3, 'ptt_assignee', $user_b_id);
-
-        $tasks_for_a = ptt_get_tasks_for_user( $user_a_id );
-        sort($tasks_for_a);
-        $expected_a = [$task1, $task3];
-        sort($expected_a);
-
-        $tasks_for_b = ptt_get_tasks_for_user( $user_b_id );
-        sort($tasks_for_b);
-        $expected_b = [$task2, $task3];
-        sort($expected_b);
-
-        $pass_a = ($tasks_for_a == $expected_a);
-        $pass_b = ($tasks_for_b == $expected_b);
-
-        if ($pass_a && $pass_b) {
-            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Pass', 'message' => 'ptt_get_tasks_for_user() correctly isolated tasks.' ];
+            wp_delete_post( $test_post_id, true ); // force delete
         } else {
-            $fail_message = 'ptt_get_tasks_for_user() failed. ';
-            if (!$pass_a) $fail_message .= 'User A failed. ';
-            if (!$pass_b) $fail_message .= 'User B failed.';
-            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => trim($fail_message) ];
+            $results[] = [
+                'name'    => 'Task Post Save & Assignee Update',
+                'status'  => 'Fail',
+                'message' => 'Failed to create test post.',
+            ];
         }
-
-        wp_delete_post( $task1, true );
-        wp_delete_post( $task2, true );
-        wp_delete_post( $task3, true );
-        require_once(ABSPATH.'wp-admin/includes/user.php');
-        wp_delete_user( $user_a_id );
-        wp_delete_user( $user_b_id );
+    } catch (Throwable $t) {
+        $results[] = [ 'name' => 'Task Post Save & Assignee Update', 'status' => 'Fail', 'message' => 'Caught Exception: ' . $t->getMessage() ];
     }
 
-	/* -------------------------------------------------------------
-	 * TEST 11 – Today Page Cascading Filters
-	 * -----------------------------------------------------------*/
-	// Cleanup any leftover data from a failed previous run to make test resilient
-	require_once(ABSPATH.'wp-admin/includes/user.php');
-	if ( $existing_user = get_user_by( 'login', 'test_user_filter' ) ) {
-		wp_delete_user( $existing_user->ID );
-	}
-	if ( $term = get_term_by('name', 'Filter Client X', 'client') ) { wp_delete_term( $term->term_id, 'client' ); }
-	if ( $term = get_term_by('name', 'Filter Client Y', 'client') ) { wp_delete_term( $term->term_id, 'client' ); }
-	if ( $term = get_term_by('name', 'Filter Project P', 'project') ) { wp_delete_term( $term->term_id, 'project' ); }
-	if ( $term = get_term_by('name', 'Filter Project Q', 'project') ) { wp_delete_term( $term->term_id, 'project' ); }
+    /* -------------------------------------------------------------
+     * TEST 11 – Today Page Cascading Filters
+     * -----------------------------------------------------------*/
+    try {
+        // Cleanup any leftover data from a failed previous run to make test resilient
+        require_once(ABSPATH.'wp-admin/includes/user.php');
+        if ( $existing_user = get_user_by( 'login', 'test_user_filter' ) ) {
+            wp_delete_user( $existing_user->ID );
+        }
+        if ( $term = get_term_by('name', 'Filter Client X', 'client') ) { wp_delete_term( $term->term_id, 'client' ); }
+        if ( $term = get_term_by('name', 'Filter Client Y', 'client') ) { wp_delete_term( $term->term_id, 'client' ); }
+        if ( $term = get_term_by('name', 'Filter Project P', 'project') ) { wp_delete_term( $term->term_id, 'project' ); }
+        if ( $term = get_term_by('name', 'Filter Project Q', 'project') ) { wp_delete_term( $term->term_id, 'project' ); }
 
-	$test_user_id = wp_insert_user( [ 'user_login' => 'test_user_filter', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
-	$client_x = wp_insert_term( 'Filter Client X', 'client' );
-	$client_y = wp_insert_term( 'Filter Client Y', 'client' );
-	$project_p = wp_insert_term( 'Filter Project P', 'project' );
-	$project_q = wp_insert_term( 'Filter Project Q', 'project' );
+        $test_user_id = wp_insert_user( [ 'user_login' => 'test_user_filter', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
+        $client_x = wp_insert_term( 'Filter Client X', 'client' );
+        $client_y = wp_insert_term( 'Filter Client Y', 'client' );
+        $project_p = wp_insert_term( 'Filter Project P', 'project' );
+        $project_q = wp_insert_term( 'Filter Project Q', 'project' );
+        $post_ids_to_delete = [];
 
-	if ( is_wp_error($test_user_id) || is_wp_error($client_x) || is_wp_error($client_y) || is_wp_error($project_p) || is_wp_error($project_q) ) {
-		$results[] = [ 'name' => 'Cascading Filters', 'status' => 'Fail', 'message' => 'Could not create test data (users/terms).' ];
-	} else {
-		$task_p = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Task P', 'post_author' => $test_user_id, 'post_status' => 'publish' ] );
-		wp_set_object_terms( $task_p, $client_x['term_id'], 'client' );
-		wp_set_object_terms( $task_p, $project_p['term_id'], 'project' );
+        if ( is_wp_error($test_user_id) || is_wp_error($client_x) || is_wp_error($client_y) || is_wp_error($project_p) || is_wp_error($project_q) ) {
+            $results[] = [ 'name' => 'Cascading Filters', 'status' => 'Fail', 'message' => 'Could not create test data (users/terms).' ];
+        } else {
+            $task_p = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Task P', 'post_author' => $test_user_id, 'post_status' => 'publish' ] );
+            $post_ids_to_delete[] = $task_p;
+            wp_set_object_terms( $task_p, $client_x['term_id'], 'client' );
+            wp_set_object_terms( $task_p, $project_p['term_id'], 'project' );
+            update_post_meta($task_p, 'ptt_assignee', $test_user_id);
 
-		$task_q = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Task Q', 'post_author' => $test_user_id, 'post_status' => 'publish' ] );
-		wp_set_object_terms( $task_q, $client_y['term_id'], 'client' );
-		wp_set_object_terms( $task_q, $project_q['term_id'], 'project' );
+            $task_q = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Task Q', 'post_author' => $test_user_id, 'post_status' => 'publish' ] );
+            $post_ids_to_delete[] = $task_q;
+            wp_set_object_terms( $task_q, $client_y['term_id'], 'client' );
+            wp_set_object_terms( $task_q, $project_q['term_id'], 'project' );
+            update_post_meta($task_q, 'ptt_assignee', $test_user_id);
 
-		$_POST['nonce'] = wp_create_nonce( 'ptt_ajax_nonce' );
-		
-		$original_user_id = get_current_user_id();
-		wp_set_current_user( $test_user_id );
+            // Temporarily switch to the test user to simulate their view
+            $original_user_id = get_current_user_id();
+            wp_set_current_user( $test_user_id );
+            
+            // Test 1: Get Projects for Client X
+            $_POST['client_id'] = $client_x['term_id'];
+            $response1 = ptt_get_projects_for_client_callback(true);
+            $projects_for_client_x = ($response1['success']) ? wp_list_pluck( $response1['data'], 'id' ) : [];
+            $pass1 = ( count($projects_for_client_x) === 1 && $projects_for_client_x[0] === $project_p['term_id'] );
+            
+            // Test 2: Get Tasks for Client X
+            $_POST['project_id'] = 0; // No specific project
+            $response2 = ptt_get_tasks_for_today_page_callback(true);
+            $tasks_for_client_x = ($response2['success']) ? wp_list_pluck( $response2['data'], 'id' ) : [];
+            $pass2 = ( count($tasks_for_client_x) === 1 && in_array($task_p, $tasks_for_client_x) );
+            
+            // Test 3: Get Tasks for Project Q
+            $_POST['client_id'] = 0; // No specific client
+            $_POST['project_id'] = $project_q['term_id'];
+            $response3 = ptt_get_tasks_for_today_page_callback(true);
+            $tasks_for_project_q = ($response3['success']) ? wp_list_pluck( $response3['data'], 'id' ) : [];
+            $pass3 = ( count($tasks_for_project_q) === 1 && in_array($task_q, $tasks_for_project_q) );
+            
+            // Restore original user and clean up POST variables
+            wp_set_current_user( $original_user_id );
+            unset( $_POST['client_id'], $_POST['project_id'] );
 
-		$_POST['client_id'] = $client_x['term_id'];
-		ob_start();
-		ptt_get_projects_for_client_callback();
-		$response1 = json_decode( ob_get_clean(), true );
-		$projects_for_client_x = wp_list_pluck( $response1['data'], 'id' );
-		$pass1 = ( count($projects_for_client_x) === 1 && $projects_for_client_x[0] === $project_p['term_id'] );
-		
-		$_POST['project_id'] = 0;
-		ob_start();
-		ptt_get_tasks_for_today_page_callback();
-		$response2 = json_decode( ob_get_clean(), true );
-		$tasks_for_client_x = wp_list_pluck( $response2['data'], 'id' );
-		$pass2 = ( count($tasks_for_client_x) === 1 && $tasks_for_client_x[0] === $task_p );
-		
-		$_POST['client_id'] = 0;
-		$_POST['project_id'] = $project_q['term_id'];
-		ob_start();
-		ptt_get_tasks_for_today_page_callback();
-		$response3 = json_decode( ob_get_clean(), true );
-		$tasks_for_project_q = wp_list_pluck( $response3['data'], 'id' );
-		$pass3 = ( count($tasks_for_project_q) === 1 && $tasks_for_project_q[0] === $task_q );
-		
-		wp_set_current_user( $original_user_id );
-		unset( $_POST['nonce'], $_POST['client_id'], $_POST['project_id'] );
+            if ( $pass1 && $pass2 && $pass3 ) {
+                $results[] = [ 'name' => 'Cascading Filters', 'status' => 'Pass', 'message' => 'Successfully filtered projects and tasks.' ];
+            } else {
+                $fail_msg = 'Filter logic failed: ';
+                if (!$pass1) $fail_msg .= 'Projects not filtered by Client. ';
+                if (!$pass2) $fail_msg .= 'Tasks not filtered by Client. ';
+                if (!$pass3) $fail_msg .= 'Tasks not filtered by Project. ';
+                $results[] = [ 'name' => 'Cascading Filters', 'status' => 'Fail', 'message' => trim($fail_msg) ];
+            }
+        }
+    } catch (Throwable $t) {
+        $results[] = [ 'name' => 'Cascading Filters', 'status' => 'Fail', 'message' => 'Caught Exception: ' . $t->getMessage() ];
+    } finally {
+        // Cleanup regardless of success or failure
+        if (isset($original_user_id)) {
+            wp_set_current_user( $original_user_id );
+        }
+        unset( $_POST['client_id'], $_POST['project_id'] );
 
-		if ( $pass1 && $pass2 && $pass3 ) {
-			$results[] = [ 'name' => 'Cascading Filters', 'status' => 'Pass', 'message' => 'Successfully filtered projects and tasks.' ];
-		} else {
-			$fail_msg = 'Filter logic failed: ';
-			if (!$pass1) $fail_msg .= 'Projects not filtered by Client. ';
-			if (!$pass2) $fail_msg .= 'Tasks not filtered by Client. ';
-			if (!$pass3) $fail_msg .= 'Tasks not filtered by Project. ';
-			$results[] = [ 'name' => 'Cascading Filters', 'status' => 'Fail', 'message' => trim($fail_msg) ];
-		}
-		
-		wp_delete_post( $task_p, true );
-		wp_delete_post( $task_q, true );
-		wp_delete_term( $client_x['term_id'], 'client' );
-		wp_delete_term( $client_y['term_id'], 'client' );
-		wp_delete_term( $project_p['term_id'], 'project' );
-		wp_delete_term( $project_q['term_id'], 'project' );
-		wp_delete_user( $test_user_id );
-	}
+        if (!empty($post_ids_to_delete)) {
+            foreach($post_ids_to_delete as $pid) {
+                wp_delete_post( $pid, true );
+            }
+        }
+        if (isset($client_x) && !is_wp_error($client_x)) { wp_delete_term( $client_x['term_id'], 'client' ); }
+        if (isset($client_y) && !is_wp_error($client_y)) { wp_delete_term( $client_y['term_id'], 'client' ); }
+        if (isset($project_p) && !is_wp_error($project_p)) { wp_delete_term( $project_p['term_id'], 'project' ); }
+        if (isset($project_q) && !is_wp_error($project_q)) { wp_delete_term( $project_q['term_id'], 'project' ); }
+        if (isset($test_user_id) && !is_wp_error($test_user_id)) { wp_delete_user( $test_user_id ); }
+    }
+
 
     /* -------------------------------------------------------------*/
 
