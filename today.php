@@ -1,7 +1,7 @@
 <?php
 /**
  * ------------------------------------------------------------------
- * 12.0 ADMIN PAGE & LINKS (Today)
+ * 12.0 ADMIN PAGE & LINKS (Today) via CLAUDE
  * ------------------------------------------------------------------
  *
  * This file registers the "Today" page and renders its markup and

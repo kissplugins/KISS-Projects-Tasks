@@ -4,7 +4,7 @@
 *Release Date: TBD*
 
 ### Changed
-- **Major Refactoring of Today Page**: Complete architectural overhaul for improved modularity and extensibility
+- **Major Refactoring of Today Page** via CLAUDE: Complete architectural overhaul for improved modularity and extensibility
   - Created `today-helpers.php` with three new classes for better code organization:
     - `PTT_Today_Entry_Renderer`: Handles flexible rendering of time entries
     - `PTT_Today_Data_Provider`: Manages data fetching and processing
