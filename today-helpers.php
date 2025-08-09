@@ -1,7 +1,7 @@
 <?php
 /**
  * ------------------------------------------------------------------
- * TODAY PAGE HELPERS
+ * TODAY PAGE HELPERS via Claude
  * ------------------------------------------------------------------
  *
  * This file contains helper functions and classes for the Today page,
