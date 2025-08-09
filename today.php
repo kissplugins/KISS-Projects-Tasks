@@ -7,6 +7,7 @@
  * This file registers the "Today" page and renders its markup and
  * logic for a daily time-tracking dashboard view.
  *
+ * Version: 1.10.0
  * ------------------------------------------------------------------
  */
 
@@ -14,6 +15,9 @@
 if ( ! defined( 'WPINC' ) ) {
 	die;
 }
+
+// Load helper classes
+require_once PTT_PLUGIN_DIR . 'today-helpers.php';
 
 /**
  * Adds the "Today" link under the Tasks CPT menu.
@@ -38,13 +42,22 @@ function ptt_render_today_page_html() {
 	<div class="wrap" id="ptt-today-page-container">
 		<h1>Today</h1>
 
-		<div class="ptt-today-entry-box">
+		<!-- Timer Entry Box -->
+		<div class="ptt-today-entry-box" data-module="timer-entry">
 			<div class="ptt-today-input-group">
-				<input type="text" id="ptt-today-session-title" placeholder="What are you working on?">
-				<select id="ptt-today-task-select" disabled>
+				<input type="text" 
+				       id="ptt-today-session-title" 
+				       placeholder="What are you working on?"
+				       data-field="session-title">
+				
+				<select id="ptt-today-task-select" 
+				        disabled
+				        data-field="task-selector">
 					<option value="">-- Select a Project First --</option>
 				</select>
+				
 				<?php
+				// Project filter dropdown
 				wp_dropdown_categories( [
 					'taxonomy'        => 'project',
 					'name'            => 'ptt-today-project-filter',
@@ -54,46 +67,122 @@ function ptt_render_today_page_html() {
 					'hierarchical'    => true,
 				] );
 				?>
+				
+				<!-- Placeholder for future client filter -->
+				<div id="ptt-today-client-filter-container" style="display: none;">
+					<?php
+					// Ready for future implementation
+					wp_dropdown_categories( [
+						'taxonomy'        => 'client',
+						'name'            => 'ptt-today-client-filter',
+						'id'              => 'ptt-today-client-filter',
+						'show_option_all' => 'All Clients',
+						'hide_empty'      => false,
+						'hierarchical'    => true,
+						'show'            => 0, // Hidden by default
+					] );
+					?>
+				</div>
 			</div>
+			
 			<div class="ptt-today-timer-controls">
-				<div class="ptt-today-timer-display">00:00:00</div>
-				<button type="button" id="ptt-today-start-stop-btn" class="button button-primary">Start</button>
+				<div class="ptt-today-timer-display" data-timer="main">00:00:00</div>
+				<button type="button" 
+				        id="ptt-today-start-stop-btn" 
+				        class="button button-primary"
+				        data-action="toggle-timer">Start</button>
 			</div>
 		</div>
 
-		<div class="ptt-today-entries-area">
+		<!-- Time Entries Area -->
+		<div class="ptt-today-entries-area" data-module="entries-list">
 			<div class="ptt-today-entries-header">
 				<h2>Time Entries</h2>
-				<div class="ptt-today-date-switcher">
-					<select id="ptt-today-date-select">
-						<?php
-						for ( $i = 0; $i < 10; $i++ ) {
-							$date_val  = date( 'Y-m-d', strtotime( "-$i days" ) );
-							$date_text = '';
-							if ( $i === 0 ) {
-								$date_text = 'Today';
-							} elseif ( $i === 1 ) {
-								$date_text = 'Yesterday';
-							} else {
-								$date_text = date( 'l, M j', strtotime( "-$i days" ) );
+				<div class="ptt-today-controls-wrapper">
+					<!-- Date Switcher -->
+					<div class="ptt-today-date-switcher">
+						<button class="ptt-date-nav" data-direction="prev" title="Previous day">
+							<span class="dashicons dashicons-arrow-left-alt2"></span>
+						</button>
+						
+						<select id="ptt-today-date-select" data-field="date-selector">
+							<?php
+							for ( $i = 0; $i < 10; $i++ ) {
+								$date_val  = date( 'Y-m-d', strtotime( "-$i days" ) );
+								$date_text = '';
+								if ( $i === 0 ) {
+									$date_text = 'Today';
+								} elseif ( $i === 1 ) {
+									$date_text = 'Yesterday';
+								} else {
+									$date_text = date( 'l, M j', strtotime( "-$i days" ) );
+								}
+								echo '<option value="' . esc_attr( $date_val ) . '">' . esc_html( $date_text ) . '</option>';
 							}
-							echo '<option value="' . esc_attr( $date_val ) . '">' . esc_html( $date_text ) . '</option>';
-						}
-						?>
-					</select>
-					<span id="ptt-today-total">Total: <strong>00:00</strong></span>
+							?>
+						</select>
+						
+						<button class="ptt-date-nav" data-direction="next" title="Next day">
+							<span class="dashicons dashicons-arrow-right-alt2"></span>
+						</button>
+					</div>
+					
+					<!-- Total Display -->
+					<span id="ptt-today-total" data-field="total-display">
+						Total: <strong>00:00</strong>
+					</span>
+					
+					<!-- View Options (Future) -->
+					<div class="ptt-today-view-options" style="display: none;">
+						<button class="button button-small" data-view="compact">Compact</button>
+						<button class="button button-small" data-view="detailed">Detailed</button>
+					</div>
 				</div>
 			</div>
-			<div id="ptt-today-entries-list">
+			
+			<!-- Entries List Container -->
+			<div id="ptt-today-entries-list" data-container="entries">
 				<div class="ptt-ajax-spinner"></div>
+			</div>
+			
+			<!-- Entry Template (Hidden, for JS cloning) -->
+			<template id="ptt-today-entry-template">
+				<div class="ptt-today-entry" data-entry-id="">
+					<div class="entry-details">
+						<span class="entry-session-title" data-field="session_title"></span>
+						<span class="entry-meta">
+							<span class="entry-task-title" data-field="task_title"></span>
+							&bull; 
+							<span class="entry-project-name" data-field="project_name"></span>
+						</span>
+					</div>
+					<div class="entry-duration" data-field="duration"></div>
+					<div class="entry-actions" style="display: none;">
+						<button class="entry-action-edit" data-action="edit">
+							<span class="dashicons dashicons-edit"></span>
+						</button>
+						<button class="entry-action-delete" data-action="delete">
+							<span class="dashicons dashicons-trash"></span>
+						</button>
+					</div>
 				</div>
+			</template>
 		</div>
 
-		<div id="ptt-today-debug-area" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9;">
+		<!-- Debug Area -->
+		<div id="ptt-today-debug-area" 
+		     style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9;"
+		     data-module="debug">
 			<h3>Debug Info</h3>
-			<div id="ptt-debug-content"></div>
+			<div id="ptt-debug-content" data-container="debug-content"></div>
 		</div>
 
+		<!-- Hidden Data Storage for JS -->
+		<div id="ptt-today-data-storage" style="display: none;">
+			<input type="hidden" id="ptt-current-user-id" value="<?php echo get_current_user_id(); ?>">
+			<input type="hidden" id="ptt-ajax-nonce" value="<?php echo wp_create_nonce( 'ptt_ajax_nonce' ); ?>">
+			<input type="hidden" id="ptt-ajax-url" value="<?php echo admin_url( 'admin-ajax.php' ); ?>">
+		</div>
 	</div>
 	<?php
 }
@@ -109,6 +198,7 @@ function ptt_get_tasks_for_today_page_callback() {
 	}
 
 	$project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
+	$client_id  = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
 	$user_id    = get_current_user_id();
 
 	// Get all tasks for the current user (author or assignee)
@@ -152,15 +242,31 @@ function ptt_get_tasks_for_today_page_callback() {
 			'terms'    => $project_id,
 		];
 	}
+	
+	if ( $client_id > 0 ) {
+		$args['tax_query'][] = [
+			'taxonomy' => 'client',
+			'field'    => 'term_id',
+			'terms'    => $client_id,
+		];
+	}
 
 	$query = new WP_Query( $args );
 	$tasks = [];
 	if ( $query->have_posts() ) {
 		while ( $query->have_posts() ) {
 			$query->the_post();
+			$post_id = get_the_ID();
+			
+			// Get additional metadata for richer dropdown display
+			$project_terms = get_the_terms( $post_id, 'project' );
+			$project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
+			
 			$tasks[] = [
-				'id'    => get_the_ID(),
-				'title' => get_the_title(),
+				'id'           => $post_id,
+				'title'        => get_the_title(),
+				'project_name' => $project_name,
+				'edit_link'    => get_edit_post_link( $post_id ),
 			];
 		}
 		wp_reset_postdata();
@@ -182,6 +288,7 @@ function ptt_today_start_new_session_callback() {
 
 	$post_id       = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
 	$session_title = isset( $_POST['session_title'] ) ? sanitize_text_field( $_POST['session_title'] ) : 'New Session';
+	$session_notes = isset( $_POST['session_notes'] ) ? sanitize_textarea_field( $_POST['session_notes'] ) : '';
 
 	if ( ! $post_id ) {
 		wp_send_json_error( [ 'message' => 'Invalid Task ID.' ] );
@@ -195,6 +302,7 @@ function ptt_today_start_new_session_callback() {
 
 	$new_session = [
 		'session_title'      => $session_title,
+		'session_notes'      => $session_notes,
 		'session_start_time' => current_time( 'mysql', 1 ), // UTC
 	];
 
@@ -204,17 +312,29 @@ function ptt_today_start_new_session_callback() {
 		wp_send_json_error( [ 'message' => 'Failed to create new session.' ] );
 	}
 
+	// Get task metadata for response
+	$task_title = get_the_title( $post_id );
+	$project_terms = get_the_terms( $post_id, 'project' );
+	$project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
+
 	wp_send_json_success( [
-		'message'    => 'Timer started!',
-		'post_id'    => $post_id,
-		'row_index'  => $new_row_index - 1, // add_row returns 1-based index
-		'start_time' => $new_session['session_start_time'],
+		'message'      => 'Timer started!',
+		'post_id'      => $post_id,
+		'row_index'    => $new_row_index - 1, // add_row returns 1-based index
+		'start_time'   => $new_session['session_start_time'],
+		'task_title'   => $task_title,
+		'project_name' => $project_name,
+		'session_data' => [
+			'title' => $session_title,
+			'notes' => $session_notes,
+		],
 	] );
 }
 add_action( 'wp_ajax_ptt_today_start_new_session', 'ptt_today_start_new_session_callback' );
 
 /**
  * AJAX handler to get time entries for a specific day for the current user.
+ * Now uses the modular helper classes for better flexibility.
  */
 function ptt_get_daily_entries_callback() {
 	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
@@ -224,161 +344,177 @@ function ptt_get_daily_entries_callback() {
 
 	$user_id = get_current_user_id();
 	$target_date = isset( $_POST['date'] ) ? sanitize_text_field( $_POST['date'] ) : date( 'Y-m-d' );
-	$all_entries = [];
-	$grand_total_seconds = 0;
-
-	// Get all tasks for the current user to make the query more efficient.
-	$user_task_ids = ptt_get_tasks_for_user( $user_id );
-
-	// If the user has no tasks, we can stop right here.
-	if ( empty( $user_task_ids ) ) {
-		ob_start();
-		echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
-		$html = ob_get_clean();
-		wp_send_json_success( [ 'html' => $html, 'total' => '00:00' ] );
+	$client_id = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
+	$project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
+	
+	// Build filters array
+	$filters = [];
+	if ( $client_id > 0 ) {
+		$filters['client_id'] = $client_id;
 	}
-
-	// Get Term IDs for statuses
-	$status_terms_to_include = [];
-	$status_names = ['Not Started', 'In Progress', 'Completed', 'Blocked'];
-	foreach ($status_names as $status_name) {
-		$term = get_term_by('name', $status_name, 'task_status');
-		if ($term) {
-			$status_terms_to_include[] = $term->term_id;
-		}
+	if ( $project_id > 0 ) {
+		$filters['project_id'] = $project_id;
 	}
-
-	$args = [
-		'post_type'      => 'project_task',
-		'posts_per_page' => -1,
-		'post_status'    => ['publish', 'private'],
-		'post__in'       => $user_task_ids, // The crucial filter
-		'tax_query'      => [
-			'relation' => 'AND',
-			[
-				'taxonomy' => 'task_status',
-				'field'    => 'term_id',
-				'terms'    => $status_terms_to_include,
-			],
-		],
-	];
-
-	$q = new WP_Query( $args );
-
-	if ( $q->have_posts() ) {
-		while ( $q->have_posts() ) {
-			$q->the_post();
-			$post_id = get_the_ID();
-			$sessions = get_field( 'sessions', $post_id );
-
-			if ( ! empty( $sessions ) && is_array( $sessions ) ) {
-				foreach ( $sessions as $session ) {
-					$start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
-					if ( empty( $start_str ) ) {
-						continue;
-					}
-
-					// Validate strtotime before using it
-					$start_ts = strtotime( $start_str );
-					if ( ! $start_ts ) {
-						continue; // Skip if start date is invalid
-					}
-
-					if ( date( 'Y-m-d', $start_ts ) === $target_date ) {
-						$stop_str = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
-						$duration_seconds = 0;
-						$stop_ts = strtotime( $stop_str );
-
-						if ( $start_ts && $stop_ts ) {
-							$duration_seconds = $stop_ts - $start_ts;
-						} elseif ( $start_ts && ! $stop_str ) {
-							// For running timers
-							$duration_seconds = time() - $start_ts;
-						}
-						$grand_total_seconds += $duration_seconds;
-
-						$project_terms = get_the_terms( $post_id, 'project' );
-						$project_name  = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
-
-						$all_entries[] = [
-							'session_title'  => $session['session_title'],
-							'task_title'     => get_the_title(),
-							'project_name'   => $project_name,
-							'start_time'     => $start_ts,
-							'duration'       => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
-							'is_running'     => empty( $stop_str ),
-						];
-					}
-				}
-			}
-		}
-		wp_reset_postdata();
-	}
-
-	// Sort entries by start time descending
-	usort( $all_entries, function( $a, $b ) {
-		return $b['start_time'] <=> $a['start_time'];
-	} );
-
-	// Prepare HTML
-	ob_start();
-	if ( empty( $all_entries ) ) {
-		echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
-	} else {
-		foreach ( $all_entries as $entry ) {
-			$running_class = $entry['is_running'] ? 'running' : '';
-			?>
-			<div class="ptt-today-entry <?php echo $running_class; ?>">
-				<div class="entry-details">
-					<span class="entry-session-title"><?php echo esc_html( $entry['session_title'] ); ?></span>
-					<span class="entry-meta"><?php echo esc_html( $entry['task_title'] ); ?> &bull; <?php echo esc_html( $entry['project_name'] ); ?></span>
-				</div>
-				<div class="entry-duration">
-					<?php echo esc_html( $entry['duration'] ); ?>
-				</div>
-			</div>
-			<?php
-		}
-	}
-	$html = ob_get_clean();
-
-	// Prepare Debug Info for Today page. WARNING: Do not modify or refactor unless specifically requested
-	$debug_info = [];
-	$current_user = wp_get_current_user();
-	$debug_info['user'] = $current_user->user_login . ' (ID: ' . $current_user->ID . ')';
-	$debug_info['date'] = $target_date;
-	$debug_info['queried_statuses'] = implode(', ', $status_names);
-	$debug_info['matched_tasks'] = $q->found_posts;
-	$debug_info['matched_sessions'] = count( $all_entries );
-
-	ob_start();
-	?>
-	<ul>
-		<li><strong>User:</strong> <?php echo esc_html( $debug_info['user'] ); ?></li>
-		<li><strong>Date:</strong> <?php echo esc_html( $debug_info['date'] ); ?></li>
-		<li><strong>Queried Statuses:</strong> <?php echo esc_html( $debug_info['queried_statuses'] ); ?></li>
-		<li><strong>Tasks Found:</strong> <?php echo esc_html( $debug_info['matched_tasks'] ); ?></li>
-		<li><strong>Sessions on this Date:</strong> <?php echo esc_html( $debug_info['matched_sessions'] ); ?></li>
-		<li><strong>Task Query Rule:</strong> Tasks where the current user is the assignee.</li>
-	</ul>
-	<?php
-	/**
-	 * --- Recommendations for Future Debugging ---
-	 * 1. To see the full WP_Query arguments, you could add:
-	 *    <pre><?php print_r( $args ); ?></pre>
-	 * 2. For more complex debugging, consider installing the "Query Monitor" plugin.
-	 * 3. Use browser console logs by passing debug data to JavaScript and using console.log().
-	 */
-	$debug_html = ob_get_clean();
-
-	$total_hours   = floor( $grand_total_seconds / 3600 );
-	$total_minutes = floor( ( $grand_total_seconds / 60 ) % 60 );
-	$total_formatted = sprintf( '%02d:%02d', $total_hours, $total_minutes );
-
-	wp_send_json_success( [ 'html' => $html, 'total' => $total_formatted, 'debug' => $debug_html ] );
+	
+	// Use the new manager class to render entries
+	$result = PTT_Today_Page_Manager::render_entries_list( $user_id, $target_date, $filters );
+	
+	// Get debug info
+	$entries_count = count( $result['entries'] ?? [] );
+	$tasks_count = count( array_unique( array_column( $result['entries'] ?? [], 'post_id' ) ) );
+	$debug_html = PTT_Today_Page_Manager::get_debug_info( $user_id, $target_date, $tasks_count, $entries_count );
+	
+	wp_send_json_success( [
+		'html'    => $result['html'],
+		'total'   => $result['total'],
+		'debug'   => $debug_html,
+		'entries' => $result['entries'], // Include raw data for JS manipulation
+	] );
 }
 add_action( 'wp_ajax_ptt_get_daily_entries', 'ptt_get_daily_entries_callback' );
 
+/**
+ * AJAX handler to update a session's duration (for inline editing).
+ * This is a new handler for future live editing functionality.
+ */
+function ptt_update_session_duration_callback() {
+	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+	if ( ! current_user_can( 'edit_posts' ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	}
+
+	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+	$session_index = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
+	$new_duration = isset( $_POST['duration'] ) ? sanitize_text_field( $_POST['duration'] ) : '';
+
+	if ( ! $post_id || $session_index < 0 || empty( $new_duration ) ) {
+		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+	}
+
+	// Parse duration (expects format like "1.5" for hours or "01:30:00" for time format)
+	$duration_hours = 0;
+	if ( strpos( $new_duration, ':' ) !== false ) {
+		// Time format (HH:MM:SS or HH:MM)
+		$parts = explode( ':', $new_duration );
+		$hours = intval( $parts[0] );
+		$minutes = isset( $parts[1] ) ? intval( $parts[1] ) : 0;
+		$seconds = isset( $parts[2] ) ? intval( $parts[2] ) : 0;
+		$duration_hours = $hours + ( $minutes / 60 ) + ( $seconds / 3600 );
+	} else {
+		// Decimal hours format
+		$duration_hours = floatval( $new_duration );
+	}
+
+	// Update the session's manual duration
+	$updated = update_sub_field( 
+		array( 'sessions', $session_index + 1, 'session_manual_override' ), 
+		true, 
+		$post_id 
+	);
+	
+	if ( $updated ) {
+		update_sub_field( 
+			array( 'sessions', $session_index + 1, 'session_manual_duration' ), 
+			$duration_hours, 
+			$post_id 
+		);
+		
+		// Recalculate total duration
+		ptt_calculate_and_save_duration( $post_id );
+		
+		wp_send_json_success( [
+			'message' => 'Duration updated successfully.',
+			'duration_hours' => $duration_hours,
+			'formatted' => number_format( $duration_hours, 2 ) . ' hrs',
+		] );
+	} else {
+		wp_send_json_error( [ 'message' => 'Failed to update duration.' ] );
+	}
+}
+add_action( 'wp_ajax_ptt_update_session_duration', 'ptt_update_session_duration_callback' );
+
+/**
+ * AJAX handler to update a session's title or notes (for inline editing).
+ * This is a new handler for future live editing functionality.
+ */
+function ptt_update_session_field_callback() {
+	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+	if ( ! current_user_can( 'edit_posts' ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	}
+
+	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+	$session_index = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
+	$field_name = isset( $_POST['field_name'] ) ? sanitize_text_field( $_POST['field_name'] ) : '';
+	$field_value = isset( $_POST['field_value'] ) ? sanitize_text_field( $_POST['field_value'] ) : '';
+
+	if ( ! $post_id || $session_index < 0 || empty( $field_name ) ) {
+		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+	}
+
+	// Map field names to ACF field keys
+	$field_map = [
+		'session_title' => 'session_title',
+		'session_notes' => 'session_notes',
+	];
+
+	if ( ! isset( $field_map[ $field_name ] ) ) {
+		wp_send_json_error( [ 'message' => 'Invalid field name.' ] );
+	}
+
+	$acf_field = $field_map[ $field_name ];
+	
+	// Update the field
+	$updated = update_sub_field( 
+		array( 'sessions', $session_index + 1, $acf_field ), 
+		$field_value, 
+		$post_id 
+	);
+	
+	if ( $updated ) {
+		wp_send_json_success( [
+			'message' => 'Field updated successfully.',
+			'field_name' => $field_name,
+			'field_value' => $field_value,
+		] );
+	} else {
+		wp_send_json_error( [ 'message' => 'Failed to update field.' ] );
+	}
+}
+add_action( 'wp_ajax_ptt_update_session_field', 'ptt_update_session_field_callback' );
+
+/**
+ * AJAX handler to delete a session.
+ * This is a new handler for future functionality.
+ */
+function ptt_delete_session_callback() {
+	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+	if ( ! current_user_can( 'edit_posts' ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	}
+
+	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+	$session_index = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
+
+	if ( ! $post_id || $session_index < 0 ) {
+		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+	}
+
+	// Delete the row
+	$deleted = delete_row( 'sessions', $session_index + 1, $post_id );
+	
+	if ( $deleted ) {
+		// Recalculate total duration
+		ptt_calculate_and_save_duration( $post_id );
+		
+		wp_send_json_success( [
+			'message' => 'Session deleted successfully.',
+		] );
+	} else {
+		wp_send_json_error( [ 'message' => 'Failed to delete session.' ] );
+	}
+}
+add_action( 'wp_ajax_ptt_delete_session', 'ptt_delete_session_callback' );
 
 /**
  * Helper to find any active session across all tasks for a specific user.
