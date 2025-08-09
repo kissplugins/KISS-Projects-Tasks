@@ -95,7 +95,7 @@ function ptt_render_today_page_html() {
 
 /**
  * AJAX handler to get tasks for the Today page dropdown.
- * Fetches tasks that are "Not Started" or "In Progress" and sorts them by last modified.
+ * Fetches tasks that are "Not Started" or "In Progress" for the current user and sorts them by last modified.
  */
 function ptt_get_tasks_for_today_page_callback() {
 	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
@@ -104,6 +104,13 @@ function ptt_get_tasks_for_today_page_callback() {
 	}
 
 	$project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
+	$user_id    = get_current_user_id();
+
+	// Get all tasks for the current user (author or assignee)
+	$user_task_ids = ptt_get_tasks_for_user( $user_id );
+	if ( empty( $user_task_ids ) ) {
+		wp_send_json_success( [] ); // Send empty array if user has no tasks
+	}
 
 	// Get Term IDs for "Not Started" and "In Progress"
 	$status_terms_to_include = [];
@@ -122,6 +129,7 @@ function ptt_get_tasks_for_today_page_callback() {
 		'post_status'    => 'publish',
 		'orderby'        => 'modified', // LIFO
 		'order'          => 'DESC',
+		'post__in'       => $user_task_ids, // Only query user's tasks
 		'tax_query'      => [
 			'relation' => 'AND',
 			[
@@ -201,7 +209,7 @@ function ptt_today_start_new_session_callback() {
 add_action( 'wp_ajax_ptt_today_start_new_session', 'ptt_today_start_new_session_callback' );
 
 /**
- * AJAX handler to get time entries for a specific day.
+ * AJAX handler to get time entries for a specific day for the current user.
  */
 function ptt_get_daily_entries_callback() {
 	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
@@ -209,14 +217,27 @@ function ptt_get_daily_entries_callback() {
 		wp_send_json_error();
 	}
 
+	$user_id = get_current_user_id();
 	$target_date = isset( $_POST['date'] ) ? sanitize_text_field( $_POST['date'] ) : date( 'Y-m-d' );
 	$all_entries = [];
 	$grand_total_seconds = 0;
+
+	// Get all tasks for the current user to make the query more efficient.
+	$user_task_ids = ptt_get_tasks_for_user( $user_id );
+
+	// If the user has no tasks, we can stop right here.
+	if ( empty( $user_task_ids ) ) {
+		ob_start();
+		echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
+		$html = ob_get_clean();
+		wp_send_json_success( [ 'html' => $html, 'total' => '00:00' ] );
+	}
 
 	$args = [
 		'post_type'      => 'project_task',
 		'posts_per_page' => -1,
 		'post_status'    => 'publish',
+		'post__in'       => $user_task_ids, // The crucial filter
 	];
 
 	$q = new WP_Query( $args );
@@ -230,15 +251,26 @@ function ptt_get_daily_entries_callback() {
 			if ( ! empty( $sessions ) && is_array( $sessions ) ) {
 				foreach ( $sessions as $session ) {
 					$start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
-					if ( $start_str && date( 'Y-m-d', strtotime( $start_str ) ) === $target_date ) {
+					if ( empty( $start_str ) ) {
+						continue;
+					}
+
+					// Validate strtotime before using it
+					$start_ts = strtotime( $start_str );
+					if ( ! $start_ts ) {
+						continue; // Skip if start date is invalid
+					}
+
+					if ( date( 'Y-m-d', $start_ts ) === $target_date ) {
 						$stop_str = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
 						$duration_seconds = 0;
+						$stop_ts = strtotime( $stop_str );
 
-						if ( $start_str && $stop_str ) {
-							$duration_seconds = strtotime( $stop_str ) - strtotime( $start_str );
-						} elseif ( $start_str && ! $stop_str ) {
+						if ( $start_ts && $stop_ts ) {
+							$duration_seconds = $stop_ts - $start_ts;
+						} elseif ( $start_ts && ! $stop_str ) {
 							// For running timers
-							$duration_seconds = time() - strtotime( $start_str );
+							$duration_seconds = time() - $start_ts;
 						}
 						$grand_total_seconds += $duration_seconds;
 
@@ -249,7 +281,7 @@ function ptt_get_daily_entries_callback() {
 							'session_title'  => $session['session_title'],
 							'task_title'     => get_the_title(),
 							'project_name'   => $project_name,
-							'start_time'     => strtotime( $start_str ),
+							'start_time'     => $start_ts,
 							'duration'       => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
 							'is_running'     => empty( $stop_str ),
 						];
@@ -303,30 +335,29 @@ add_action( 'wp_ajax_ptt_get_daily_entries', 'ptt_get_daily_entries_callback' );
  * @return array|false An array with post_id and index of the active session, or false.
  */
 function ptt_get_active_session_index_for_user( $user_id ) {
+	$user_task_ids = ptt_get_tasks_for_user( $user_id );
+	if ( empty( $user_task_ids ) ) {
+		return false;
+	}
+
 	$args = [
 		'post_type'      => 'project_task',
 		'posts_per_page' => -1,
-		'author'         => $user_id, // Check tasks created by the user
-		'meta_query'     => [
-			[
-				'key'     => 'ptt_assignee', // Also check tasks assigned to the user
-				'value'   => $user_id,
-				'compare' => '=',
-			],
-			'relation' => 'OR',
-		],
+		'post__in'       => $user_task_ids,
+		'fields'         => 'ids', // We only need the IDs
 	];
+
 	$query = new WP_Query( $args );
+
 	if ( $query->have_posts() ) {
-		while ( $query->have_posts() ) {
-			$query->the_post();
-			$index = ptt_get_active_session_index( get_the_ID() );
+		foreach ( $query->posts as $post_id ) {
+			$index = ptt_get_active_session_index( $post_id );
 			if ( $index !== false ) {
-				wp_reset_postdata();
-				return [ 'post_id' => get_the_ID(), 'index' => $index ];
+				// No need to reset postdata as we are only using IDs
+				return [ 'post_id' => $post_id, 'index' => $index ];
 			}
 		}
 	}
-	wp_reset_postdata();
+
 	return false;
 }

@@ -2,7 +2,14 @@
 
 All notable changes to the "KISS - Project & Task Time Tracker" plugin will be documented in this file.
 
-* ## Version 1.9.0
+## 1.9.0 - 2025-08-08
+
+* **Feature**: The "Today" page is now user-specific, showing only tasks assigned to or authored by the current user.
+* **Feature**: Added a new `helpers.php` file for common utility functions, improving code organization.
+* **Fix**: Hardened the daily time entry logic to prevent potential errors from invalid date strings.
+* **Dev**: Added a new self-test (`Test 10`) to verify user data isolation on the Today page and prevent future regressions.
+
+* ## Version 1.8.9
 * - **Feature**: Added new "Today" admin page for a daily dashboard view.
 * - **Feature**: The "Today" page includes a quick-start timer to create new sessions for existing tasks.
 * - **Feature**: Task dropdown on the "Today" page is filtered for "Not Started" or "In Progress" tasks and sorted by most recently modified (LIFO).
