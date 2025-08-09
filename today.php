@@ -305,6 +305,7 @@ function ptt_get_daily_entries_callback() {
 							'task_title'     => get_the_title(),
 							'project_name'   => $project_name,
 							'start_time'     => $start_ts,
+							'stop_time'      => $stop_ts, // Added stop_time
 							'duration'       => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
 							'is_running'     => empty( $stop_str ),
 						];
@@ -334,7 +335,9 @@ function ptt_get_daily_entries_callback() {
 					<span class="entry-meta"><?php echo esc_html( $entry['task_title'] ); ?> &bull; <?php echo esc_html( $entry['project_name'] ); ?></span>
 				</div>
 				<div class="entry-duration">
-					<?php echo esc_html( $entry['duration'] ); ?>
+					<?php echo esc_html( date( 'g:i:s A', $entry['start_time'] ) ); ?> |
+					<?php echo $entry['is_running'] ? 'Now' : esc_html( date( 'g:i:s A', $entry['stop_time'] ) ); ?> |
+					SUB-TOTAL: <?php echo esc_html( $entry['duration'] ); ?>
 				</div>
 			</div>
 			<?php
@@ -373,7 +376,8 @@ function ptt_get_daily_entries_callback() {
 
 	$total_hours   = floor( $grand_total_seconds / 3600 );
 	$total_minutes = floor( ( $grand_total_seconds / 60 ) % 60 );
-	$total_formatted = sprintf( '%02d:%02d', $total_hours, $total_minutes );
+	$total_seconds_remainder = $grand_total_seconds % 60; // Calculate remaining seconds
+	$total_formatted = sprintf( '%02d:%02d:%02d', $total_hours, $total_minutes, $total_seconds_remainder ); // Include seconds
 
 	wp_send_json_success( [ 'html' => $html, 'total' => $total_formatted, 'debug' => $debug_html ] );
 }
