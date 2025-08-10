@@ -1,5 +1,20 @@
 # Changelog
 
+## Version 1.10.4 - Session Move UI
+- Add new Move Session Test to Self Test.
+- Update Reports to account for manual time entry assuming on same date as task.
+
+### Added
+- Task name on Today page is now a dropdown of tasks within the same project and client.
+- Move and Cancel buttons allow reassigning a session to a different task.
+
+## Version 1.10.3 - Session Reassignment Logic
+*Release Date: TBD*
+
+### Added
+- Backend function and AJAX handler to move a work session between tasks.
+- Self-test coverage for session reassignment.
+
 ## Version 1.10.2 - Today Page Refinements
 *Release Date: TBD*
 
