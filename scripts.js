@@ -122,10 +122,44 @@ jQuery(document).ready(function ($) {
 
 	        if (window.acf && typeof window.acf.addAction === 'function') {
 	            window.acf.addAction('submit_success', function($form, result) {
-	                try { sessionStorage.setItem('ptt_after_save_refresh', '1'); } catch (e) {}
+	                try {
+	                    sessionStorage.setItem('ptt_after_save_refresh', '1');
+	                    sessionStorage.setItem('ptt_scroll_after_save', '1');
+	                } catch (e) {}
 	                window.location.reload();
 	            });
+
+	        // After reload from a save, if flagged, scroll to the bottom near the Sessions repeater
+	        try {
+	            if (sessionStorage.getItem('ptt_scroll_after_save') === '1') {
+	                sessionStorage.removeItem('ptt_scroll_after_save');
+	                setTimeout(function(){
+	                    const $field = $('.acf-field[data-key="field_ptt_sessions"]');
+	                    if ($field.length) {
+	                        // Scroll so the actions (Add/Update) area is visible
+	                        const $actions = $field.find('.acf-actions').last();
+	                        const target = $actions.length ? $actions.offset().top : $field.offset().top + $field.outerHeight();
+	                        $('html, body').animate({ scrollTop: target - 80 }, 400);
+	                    } else {
+	                        // Fallback: scroll to bottom
+	                        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+	                    }
+	                }, 250);
+	            }
+	        } catch (e) {}
+
 	        }
+
+	        // Backup: set scroll flag when WP Publish/Update is clicked or form submits
+	        if ($('body').hasClass('post-type-project_task')) {
+	            $(document).on('click', '#publish, #save-post', function(){
+	                try { sessionStorage.setItem('ptt_scroll_after_save', '1'); } catch (e) {}
+	            });
+	            $('#post').on('submit', function(){
+	                try { sessionStorage.setItem('ptt_scroll_after_save', '1'); } catch (e) {}
+	            });
+	        }
+
 	    }
 
 
