@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 1.10.8 - Auto-Timestamping Manual Sessions
+Feature: Manual session entries that are missing a start time will now be automatically timestamped at the moment the task is saved. This improves data accuracy for reporting.
+
+Dev: The self-test for manual sessions has been updated to validate the new auto-timestamping functionality.
+
+## Version 1.10.7 - Regression Test
+Dev: Added a new self-test to ensure that manual time sessions without a specific start date are correctly handled in reports.
+
+## Version 1.10.6 - Reporting Fix for Manual Sessions
+Fix: The "Single Day" report now correctly includes manual time sessions that do not have a specific start date by attributing them to the parent task's creation date.
+
+## Version 1.10.5 - Reporting Calculation Fix
+Fix: Corrected a logic error in the "Single Day" report view that was causing incorrect daily durations to be calculated and displayed. The report now accurately sums the durations of only the work sessions that occurred on the selected day.
+
 ## Version 1.10.4 - Session Move UI
 - Add new Move Session Test to Self Test.
 - Update Reports to account for manual time entry assuming on same date as task.
@@ -9,7 +23,6 @@
 - Move and Cancel buttons allow reassigning a session to a different task.
 
 ## Version 1.10.3 - Session Reassignment Logic
-*Release Date: TBD*
 
 ### Added
 - Backend function and AJAX handler to move a work session between tasks.
@@ -35,7 +48,6 @@
 - Session row layout now shows "Start", "End" and "Sub-total" values.
 
 ## Version 1.10.0 - Today Page Refactoring
-*Release Date: TBD*
 
 ### Changed
 - **Major Refactoring of Today Page** via CLAUDE: Complete architectural overhaul for improved modularity and extensibility
