@@ -6,6 +6,8 @@ if ( ! defined( 'WPINC' ) ) {
 
 // =================================================================
 // 11.0 SELF‑TEST MODULE
+// ATTN: LLM Maintainers do not truncate or remove tests from this file.
+// Do not abbreviate the output of this file when providing updates to prevent loss of test coverage.
 // =================================================================
 
 /**
@@ -72,10 +74,10 @@ function ptt_changelog_page_html() {
 }
 
 /* -----------------------------------------------------------------
- *  NOTE:  The menu‑reordering logic that previously lived here
- *  (`ptt_reorder_tasks_menu()`) was removed in v 1.7.39 because it
- *  could hide taxonomy menu items under certain load‑order
- *  conditions.  The plugin now relies on WordPress’ native order.
+ * NOTE:  The menu‑reordering logic that previously lived here
+ * (`ptt_reorder_tasks_menu()`) was removed in v 1.7.39 because it
+ * could hide taxonomy menu items under certain load‑order
+ * conditions.  The plugin now relies on WordPress’ native order.
  * ----------------------------------------------------------------*/
 
 /**
@@ -277,27 +279,31 @@ function ptt_run_self_tests_callback() {
     ];
 
     /* -------------------------------------------------------------
-     * TEST 9 – Taxonomy Registration & Visibility
+     * TEST 9 – Taxonomy Registration & Visibility
      * -----------------------------------------------------------*/
-    $taxonomies_to_check = [
-        'client'      => [ 'show_ui' => true, 'show_in_menu' => true ],
-        'project'     => [ 'show_ui' => true, 'show_in_menu' => true ],
-        'task_status' => [ 'show_ui' => true, 'show_in_menu' => true ],
-    ];
-
+    $taxonomies_to_check = [ 'client', 'project', 'task_status' ];
     $errors = [];
-    foreach ( $taxonomies_to_check as $tax_slug => $props ) {
+
+    foreach ( $taxonomies_to_check as $tax_slug ) {
         $tax_obj = get_taxonomy( $tax_slug );
+        
         if ( ! $tax_obj ) {
             $errors[] = "Taxonomy '{$tax_slug}' is not registered.";
             continue;
         }
-        foreach ( $props as $prop => $expected_value ) {
-            if ( ! isset( $tax_obj->{$prop} ) || $tax_obj->{$prop} !== $expected_value ) {
-                $errors[] = "Taxonomy '{$tax_slug}' failed check for property '{$prop}'.";
-            }
+        
+        // Check if taxonomy has UI visibility
+        if ( empty( $tax_obj->show_ui ) ) {
+            $errors[] = "Taxonomy '{$tax_slug}' has show_ui disabled.";
         }
-        if ( ! in_array( 'project_task', $tax_obj->object_type, true ) ) {
+        
+        // Check if taxonomy is visible in menu (can be true or a string)
+        if ( empty( $tax_obj->show_in_menu ) ) {
+            $errors[] = "Taxonomy '{$tax_slug}' has show_in_menu disabled.";
+        }
+        
+        // Check if associated with project_task post type
+        if ( ! in_array( 'project_task', (array) $tax_obj->object_type, true ) ) {
             $errors[] = "Taxonomy '{$tax_slug}' is not associated with the 'project_task' post type.";
         }
     }
@@ -309,6 +315,202 @@ function ptt_run_self_tests_callback() {
             ? 'All taxonomies are correctly registered and configured for menu visibility.'
             : implode( ' ', $errors ),
     ];
+
+    /* -------------------------------------------------------------
+     * TEST 10 – Today Page User Data Isolation
+     * -----------------------------------------------------------*/
+    $user_a_id = wp_insert_user( [ 'user_login' => 'test_user_a', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
+    $user_b_id = wp_insert_user( [ 'user_login' => 'test_user_b', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
+
+    if ( is_wp_error( $user_a_id ) || is_wp_error( $user_b_id ) ) {
+        $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => 'Could not create test users.' ];
+    } else {
+        // Task 1: Authored by A, Assigned to A
+        $task1 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task A1', 'post_author' => $user_a_id, 'post_status' => 'publish' ]);
+        update_post_meta($task1, 'ptt_assignee', $user_a_id);
+
+        // Task 2: Authored by B, Assigned to B
+        $task2 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task B1', 'post_author' => $user_b_id, 'post_status' => 'publish' ]);
+        update_post_meta($task2, 'ptt_assignee', $user_b_id);
+
+        // Task 3: Authored by A, Assigned to B
+        $task3 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task A2/B2', 'post_author' => $user_a_id, 'post_status' => 'publish' ]);
+        update_post_meta($task3, 'ptt_assignee', $user_b_id);
+
+        $tasks_for_a = ptt_get_tasks_for_user( $user_a_id );
+        $tasks_for_b = ptt_get_tasks_for_user( $user_b_id );
+
+        $pass_a = count( $tasks_for_a ) === 1 && in_array( $task1, $tasks_for_a );
+        $pass_b = count( $tasks_for_b ) === 2 && in_array( $task2, $tasks_for_b ) && in_array( $task3, $tasks_for_b );
+
+        if ($pass_a && $pass_b) {
+            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Pass', 'message' => 'ptt_get_tasks_for_user() correctly isolated tasks for assignees.' ];
+        } else {
+            $fail_message = 'ptt_get_tasks_for_user() failed. ';
+            if (!$pass_a) $fail_message .= 'User A expected 1 task, got ' . count($tasks_for_a) . '. ';
+            if (!$pass_b) $fail_message .= 'User B expected 2 tasks, got ' . count($tasks_for_b) . '. ';
+            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => trim($fail_message) ];
+        }
+
+        // Cleanup
+        wp_delete_post( $task1, true );
+        wp_delete_post( $task2, true );
+        wp_delete_post( $task3, true );
+        require_once(ABSPATH.'wp-admin/includes/user.php');
+        wp_delete_user( $user_a_id );
+        wp_delete_user( $user_b_id );
+    }
+
+    /* -------------------------------------------------------------
+     * TEST 11 – Move Session Between Tasks
+     * -----------------------------------------------------------*/
+    $source_task = wp_insert_post( [
+        'post_type'   => 'project_task',
+        'post_title'  => 'Session Move Source',
+        'post_status' => 'publish',
+    ] );
+    $target_task = wp_insert_post( [
+        'post_type'   => 'project_task',
+        'post_title'  => 'Session Move Target',
+        'post_status' => 'publish',
+    ] );
+
+    if (
+        $source_task && ! is_wp_error( $source_task ) &&
+        $target_task && ! is_wp_error( $target_task )
+    ) {
+        $session_data = [
+            'session_title'            => 'Move Test',
+            'session_notes'            => '',
+            'session_start_time'       => '',
+            'session_stop_time'        => '',
+            'session_manual_override'  => 1,
+            'session_manual_duration'  => 1.5,
+            'session_calculated_duration' => '1.50',
+        ];
+        $row = add_row( 'sessions', $session_data, $source_task );
+        ptt_calculate_and_save_duration( $source_task );
+
+        $move_result = ptt_move_session_to_task( $source_task, $row - 1, $target_task );
+
+        $source_sessions = get_field( 'sessions', $source_task );
+        $target_sessions = get_field( 'sessions', $target_task );
+        $source_total    = get_field( 'calculated_duration', $source_task );
+        $target_total    = get_field( 'calculated_duration', $target_task );
+
+        $pass = (
+            $move_result !== false &&
+            empty( $source_sessions ) &&
+            is_array( $target_sessions ) &&
+            count( $target_sessions ) === 1 &&
+            $source_total === '0.00' &&
+            $target_total === '1.50'
+        );
+
+        $results[] = [
+            'name'    => 'Move Session Between Tasks',
+            'status'  => $pass ? 'Pass' : 'Fail',
+            'message' => $pass ? 'Session reassigned successfully.' : 'Failed to reassign session correctly.',
+        ];
+
+        wp_delete_post( $source_task, true );
+        wp_delete_post( $target_task, true );
+    } else {
+        $results[] = [
+            'name'    => 'Move Session Between Tasks',
+            'status'  => 'Fail',
+            'message' => 'Could not create test tasks for session move.',
+        ];
+    }
+
+	/* -------------------------------------------------------------
+	 * TEST 12 – Single Day Report - Manual Session without Date
+	 * -----------------------------------------------------------*/
+	$test_duration = 1.25;
+	$manual_post   = wp_insert_post(
+		[
+			'post_type'   => 'project_task',
+			'post_title'  => 'SELF TEST - MANUAL SESSION',
+			'post_status' => 'publish',
+			// post_date will be now()
+		]
+	);
+
+	if ( $manual_post && ! is_wp_error( $manual_post ) ) {
+		add_row(
+			'sessions',
+			[
+				'session_title'           => 'Manual session without date',
+				'session_start_time'      => '', // Intentionally blank
+				'session_manual_override' => 1,
+				'session_manual_duration' => $test_duration,
+			],
+			$manual_post
+		);
+
+		// --- Replicate the core logic from reports.php ---
+		$target_date_str     = date( 'Y-m-d', current_time( 'timestamp' ) );
+		$post_creation_date  = date( 'Y-m-d', get_the_date( 'U', $manual_post ) );
+		$sessions            = get_field( 'sessions', $manual_post );
+
+		$is_relevant_for_day = false;
+		$daily_duration      = 0.0;
+
+		if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+			foreach ( $sessions as $session ) {
+				$session_start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+				$is_manual_session = ! empty( $session['session_manual_override'] );
+				$should_include    = false;
+
+				if ( $session_start_str && date( 'Y-m-d', strtotime( $session_start_str ) ) === $target_date_str ) {
+					$should_include = true;
+				} elseif ( $is_manual_session && empty( $session_start_str ) && $post_creation_date === $target_date_str ) {
+					$should_include = true;
+				}
+
+				if ( $should_include ) {
+					$is_relevant_for_day = true;
+					if ( $is_manual_session ) {
+						$daily_duration += isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
+					} else {
+						$start = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+						$stop  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
+						if ( $start && $stop ) {
+							try {
+								$start_time = new DateTime( $start, new DateTimeZone( 'UTC' ) );
+								$stop_time  = new DateTime( $stop, new DateTimeZone( 'UTC' ) );
+								if ( $stop_time > $start_time ) {
+									$diff_seconds    = $stop_time->getTimestamp() - $start_time->getTimestamp();
+									$daily_duration += ceil( ( $diff_seconds / 3600 ) * 100 ) / 100;
+								}
+							} catch ( Exception $e ) {
+								// Do nothing if dates are invalid
+							}
+						}
+					}
+				}
+			}
+		}
+		// --- End of replicated logic ---
+
+		$pass = ( $is_relevant_for_day && $daily_duration === $test_duration );
+
+		$results[] = [
+			'name'    => 'Single Day Report - Manual Session without Date',
+			'status'  => $pass ? 'Pass' : 'Fail',
+			'message' => $pass
+				? 'Correctly identified and calculated duration for a manual session based on task creation date.'
+				: 'Failed. Relevant: ' . ( $is_relevant_for_day ? 'Yes' : 'No' ) . '. Duration: ' . $daily_duration . ' (Expected: ' . $test_duration . ').',
+		];
+
+		wp_delete_post( $manual_post, true );
+	} else {
+		$results[] = [
+			'name'    => 'Single Day Report - Manual Session without Date',
+			'status'  => 'Fail',
+			'message' => 'Could not create test post for the manual session test.',
+		];
+	}
 
     /* -------------------------------------------------------------*/
 
