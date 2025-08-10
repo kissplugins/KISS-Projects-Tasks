@@ -433,24 +433,30 @@ function ptt_run_self_tests_callback() {
 	);
 
 	if ( $timestamp_post && ! is_wp_error( $timestamp_post ) ) {
-		$session_row = [
-			'session_title'           => 'Manual session to be timestamped',
-			'session_start_time'      => '', // Intentionally blank
-			'session_manual_override' => 1,
-			'session_manual_duration' => 0.5,
+		// Add a manual session without timestamps using add_row
+		$session_data = [
+			'session_title'            => 'Manual session to be timestamped',
+			'session_notes'            => '',
+			'session_start_time'       => '', // Intentionally blank
+			'session_stop_time'        => '',
+			'session_manual_override'  => 1,
+			'session_manual_duration'  => 0.5,
+			'session_calculated_duration' => '',
 		];
 
-		// This call saves the initial data, then triggers the filter we are testing.
-		update_field( 'sessions', [ $session_row ], $timestamp_post );
+		// Use add_row which will trigger our filter
+		$row_added = add_row( 'sessions', $session_data, $timestamp_post );
 
-		// Retrieve the saved data to verify the filter worked.
+		// Retrieve the saved data to verify the filter worked
 		$saved_sessions = get_field( 'sessions', $timestamp_post );
 
 		$pass         = false;
 		$fail_message = 'An unknown error occurred during verification.';
 		$debug_data   = '';
 
-		if ( empty( $saved_sessions ) || ! is_array( $saved_sessions ) ) {
+		if ( ! $row_added ) {
+			$fail_message = 'Failed at step 0: add_row() returned false.';
+		} elseif ( empty( $saved_sessions ) || ! is_array( $saved_sessions ) ) {
 			$fail_message = 'Failed at step 1: The session data was not saved or was empty after retrieval.';
 		} else {
 			$first_session = $saved_sessions[0];
@@ -458,8 +464,10 @@ function ptt_run_self_tests_callback() {
 
 			if ( empty( $first_session['session_start_time'] ) ) {
 				$fail_message = 'Failed at step 2: The session start time was not automatically populated.';
+			} elseif ( empty( $first_session['session_stop_time'] ) ) {
+				$fail_message = 'Failed at step 3: The session stop time was not automatically populated.';
 			} elseif ( $first_session['session_start_time'] !== $first_session['session_stop_time'] ) {
-				$fail_message = 'Failed at step 3: The session start and stop times were populated but do not match.';
+				$fail_message = 'Failed at step 4: The session start and stop times were populated but do not match.';
 			} else {
 				$pass = true;
 			}

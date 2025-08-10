@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.10.12
+ * Version:           1.10.15
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', ' 1.10.12' );
+define( 'PTT_VERSION', ' 1.10.15' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -487,15 +487,23 @@ function ptt_timestamp_manual_sessions( $value, $post_id, $field ) {
 				continue;
 			}
 			
-			$is_manual      = ! empty( $row['field_ptt_session_manual_override'] );
-			$has_start_time = ! empty( $row['field_ptt_session_start_time'] );
+			// Check for manual override - ACF can pass either field keys or field names
+			$is_manual = ! empty( $row['field_ptt_session_manual_override'] )
+					|| ! empty( $row['session_manual_override'] );
+			
+			// Check if start time already exists
+			$has_start_time = ! empty( $row['field_ptt_session_start_time'] )
+					|| ! empty( $row['session_start_time'] );
 
 			if ( $is_manual && ! $has_start_time ) {
 				if ( null === $current_time ) {
 					$current_time = current_time( 'mysql', 1 ); // UTC
 				}
+				// Set both field keys and names to ensure compatibility
 				$row['field_ptt_session_start_time'] = $current_time;
 				$row['field_ptt_session_stop_time']  = $current_time;
+				$row['session_start_time']           = $current_time;
+				$row['session_stop_time']            = $current_time;
 			}
 		}
 	}
@@ -556,114 +564,6 @@ add_action( 'wp_enqueue_scripts', 'ptt_enqueue_assets' );
 // =================================================================
 // 6.0 CORE TIME CALCULATION LOGIC
 // =================================================================
-
-/**
- * Calculates duration between start and stop time and saves it to a custom field.
- *
- * @param int $post_id The ID of the post to calculate.
- * @return float The calculated duration in decimal hours.
- */
-function ptt_calculate_and_save_duration( $post_id ) {
-    $sessions = get_field( 'sessions', $post_id );
-    $duration = 0.00;
-
-    if ( ! empty( $sessions ) ) {
-        $duration = ptt_get_total_sessions_duration( $post_id );
-    } else {
-        $manual_override = get_field( 'manual_override', $post_id );
-
-        if ( $manual_override ) {
-            $manual_duration = get_field( 'manual_duration', $post_id );
-            $duration        = $manual_duration ? (float) $manual_duration : 0.00;
-        } else {
-            $start_time_str = get_field( 'start_time', $post_id );
-            $stop_time_str  = get_field( 'stop_time', $post_id );
-
-            if ( $start_time_str && $stop_time_str ) {
-                try {
-                    // Always use UTC for calculations to avoid timezone issues.
-                    $start_time = new DateTime( $start_time_str, new DateTimeZone('UTC') );
-                    $stop_time  = new DateTime( $stop_time_str, new DateTimeZone('UTC') );
-
-                    if ( $stop_time > $start_time ) {
-                        $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
-                        $duration_hours = $diff_seconds / 3600;
-                        $duration       = ceil( $duration_hours * 100 ) / 100;
-                    }
-                } catch ( Exception $e ) {
-                    $duration = 0.00;
-                }
-            }
-        }
-    }
-
-    $formatted_duration = number_format( (float) $duration, 2, '.', '' );
-    update_field( 'calculated_duration', $formatted_duration, $post_id );
-
-    return $formatted_duration;
-}
-
-/**
- * Returns the index of any active session for a task.
- *
- * @param int $post_id The task ID.
- * @return int|false The active session index or false if none.
- */
-function ptt_get_active_session_index( $post_id ) {
-    $sessions = get_field( 'sessions', $post_id );
-    if ( ! empty( $sessions ) && is_array( $sessions ) ) {
-        foreach ( $sessions as $index => $session ) {
-            if ( ! empty( $session['session_start_time'] ) && empty( $session['session_stop_time'] ) ) {
-                return $index;
-            }
-        }
-    }
-    return false;
-}
-
-/**
- * Calculates and saves duration for a specific session row.
- *
- * @param int $post_id The task ID.
- * @param int $index   Session index (0 based).
- * @return string      Formatted duration hours.
- */
-function ptt_calculate_session_duration( $post_id, $index ) {
-    $sessions = get_field( 'sessions', $post_id );
-    if ( empty( $sessions ) || ! isset( $sessions[ $index ] ) ) {
-        return '0.00';
-    }
-
-    $session = $sessions[ $index ];
-
-    if ( ! empty( $session['session_manual_override'] ) ) {
-        $duration = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.00;
-    } else {
-        $start_time_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
-        $stop_time_str  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
-        $duration       = 0.00;
-
-        if ( $start_time_str && $stop_time_str ) {
-            try {
-                // Always use UTC for calculations
-                $start_time = new DateTime( $start_time_str, new DateTimeZone('UTC') );
-                $stop_time  = new DateTime( $stop_time_str, new DateTimeZone('UTC') );
-
-                if ( $stop_time > $start_time ) {
-                    $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
-                    $duration_hours = $diff_seconds / 3600;
-                    $duration       = ceil( $duration_hours * 100 ) / 100;
-                }
-            } catch ( Exception $e ) {
-                $duration = 0.00;
-            }
-        }
-    }
-
-    $formatted = number_format( (float) $duration, 2, '.', '' );
-    update_sub_field( array( 'sessions', $index + 1, 'session_calculated_duration' ), $formatted, $post_id );
-    return $formatted;
-}
 
 /**
  * Calculates the total duration of all sessions for a task.
@@ -1214,4 +1114,112 @@ function ptt_add_settings_link( $links ) {
     array_unshift( $links, $settings_link );
     return $links;
 }
-add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'ptt_add_settings_link' );
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'ptt_add_settings_link' ); duration between start and stop time and saves it to a custom field.
+ *
+ * @param int $post_id The ID of the post to calculate.
+ * @return float The calculated duration in decimal hours.
+ */
+function ptt_calculate_and_save_duration( $post_id ) {
+    $sessions = get_field( 'sessions', $post_id );
+    $duration = 0.00;
+
+    if ( ! empty( $sessions ) ) {
+        $duration = ptt_get_total_sessions_duration( $post_id );
+    } else {
+        $manual_override = get_field( 'manual_override', $post_id );
+
+        if ( $manual_override ) {
+            $manual_duration = get_field( 'manual_duration', $post_id );
+            $duration        = $manual_duration ? (float) $manual_duration : 0.00;
+        } else {
+            $start_time_str = get_field( 'start_time', $post_id );
+            $stop_time_str  = get_field( 'stop_time', $post_id );
+
+            if ( $start_time_str && $stop_time_str ) {
+                try {
+                    // Always use UTC for calculations to avoid timezone issues.
+                    $start_time = new DateTime( $start_time_str, new DateTimeZone('UTC') );
+                    $stop_time  = new DateTime( $stop_time_str, new DateTimeZone('UTC') );
+
+                    if ( $stop_time > $start_time ) {
+                        $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
+                        $duration_hours = $diff_seconds / 3600;
+                        $duration       = ceil( $duration_hours * 100 ) / 100;
+                    }
+                } catch ( Exception $e ) {
+                    $duration = 0.00;
+                }
+            }
+        }
+    }
+
+    $formatted_duration = number_format( (float) $duration, 2, '.', '' );
+    update_field( 'calculated_duration', $formatted_duration, $post_id );
+
+    return $formatted_duration;
+}
+
+/**
+ * Returns the index of any active session for a task.
+ *
+ * @param int $post_id The task ID.
+ * @return int|false The active session index or false if none.
+ */
+function ptt_get_active_session_index( $post_id ) {
+    $sessions = get_field( 'sessions', $post_id );
+    if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+        foreach ( $sessions as $index => $session ) {
+            if ( ! empty( $session['session_start_time'] ) && empty( $session['session_stop_time'] ) ) {
+                return $index;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Calculates and saves duration for a specific session row.
+ *
+ * @param int $post_id The task ID.
+ * @param int $index   Session index (0 based).
+ * @return string      Formatted duration hours.
+ */
+function ptt_calculate_session_duration( $post_id, $index ) {
+    $sessions = get_field( 'sessions', $post_id );
+    if ( empty( $sessions ) || ! isset( $sessions[ $index ] ) ) {
+        return '0.00';
+    }
+
+    $session = $sessions[ $index ];
+
+    if ( ! empty( $session['session_manual_override'] ) ) {
+        $duration = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.00;
+    } else {
+        $start_time_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+        $stop_time_str  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
+        $duration       = 0.00;
+
+        if ( $start_time_str && $stop_time_str ) {
+            try {
+                // Always use UTC for calculations
+                $start_time = new DateTime( $start_time_str, new DateTimeZone('UTC') );
+                $stop_time  = new DateTime( $stop_time_str, new DateTimeZone('UTC') );
+
+                if ( $stop_time > $start_time ) {
+                    $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
+                    $duration_hours = $diff_seconds / 3600;
+                    $duration       = ceil( $duration_hours * 100 ) / 100;
+                }
+            } catch ( Exception $e ) {
+                $duration = 0.00;
+            }
+        }
+    }
+
+    $formatted = number_format( (float) $duration, 2, '.', '' );
+    update_sub_field( array( 'sessions', $index + 1, 'session_calculated_duration' ), $formatted, $post_id );
+    return $formatted;
+}
+
+/**
+ * Calculates
