@@ -62,7 +62,7 @@ function ptt_activate() {
         );
         wp_insert_post( $post_data );
     }
-    
+
     // Flush rewrite rules.
     flush_rewrite_rules();
 }
@@ -433,7 +433,7 @@ function ptt_register_acf_fields() {
         'label_placement' => 'top',
         'instruction_placement' => 'label',
     ) );
-    
+
     // Field Group for Projects (Taxonomy)
     acf_add_local_field_group(array(
         'key' => 'group_ptt_project_fields',
@@ -486,11 +486,11 @@ function ptt_timestamp_manual_sessions( $value, $post_id, $field ) {
 			if ( ! is_array( $row ) ) {
 				continue;
 			}
-			
+
 			// Check for manual override - ACF can pass either field keys or field names
 			$is_manual = ! empty( $row['field_ptt_session_manual_override'] )
 					|| ! empty( $row['session_manual_override'] );
-			
+
 			// Check if start time already exists
 			$has_start_time = ! empty( $row['field_ptt_session_start_time'] )
 					|| ! empty( $row['session_start_time'] );
@@ -510,14 +510,17 @@ function ptt_timestamp_manual_sessions( $value, $post_id, $field ) {
 	return $value;
 }
 add_filter( 'acf/update_value/key=field_ptt_sessions', 'ptt_timestamp_manual_sessions', 10, 3 );
+// Also hook by field name to cover cases where field keys differ (e.g., ACF UI vs local JSON)
+add_filter( 'acf/update_value/name=sessions', 'ptt_timestamp_manual_sessions', 10, 3 );
+
 
 
 function ptt_activate_kanban_additions() {
     // Existing activation code...
-    
+
     // Add rewrite rules for Kanban
     ptt_kanban_rewrite_rule();
-    
+
     // Flush rewrite rules (this should already be in your activation)
     flush_rewrite_rules();
 }
@@ -542,7 +545,7 @@ function ptt_enqueue_assets() {
 
     // Main JS file (now in root)
     wp_enqueue_script( 'ptt-scripts', PTT_PLUGIN_URL . 'scripts.js', $deps, PTT_VERSION, true );
-    
+
     // Localize script to pass data like nonces and AJAX URL
     wp_localize_script( 'ptt-scripts', 'ptt_ajax_object', [
         'ajax_url'              => admin_url( 'admin-ajax.php' ),
@@ -716,6 +719,43 @@ function ptt_get_total_sessions_duration( $post_id ) {
 
 
 /**
+ * Ensure manual sessions without a start time get start/stop timestamps set to now (UTC).
+ * Safe to call multiple times; only fills missing start times.
+ *
+ * @param int $post_id
+ */
+function ptt_ensure_manual_session_timestamps( $post_id ) {
+    if ( get_post_type( $post_id ) !== 'project_task' ) {
+        return;
+    }
+
+    $sessions = get_field( 'sessions', $post_id );
+    if ( empty( $sessions ) || ! is_array( $sessions ) ) {
+        return;
+    }
+
+    $now = null; // lazy load
+
+    foreach ( $sessions as $i => $session ) {
+        $is_manual = ! empty( $session['session_manual_override'] );
+        $has_start = ! empty( $session['session_start_time'] );
+
+        if ( $is_manual && ! $has_start ) {
+            if ( null === $now ) {
+                $now = current_time( 'mysql', 1 ); // UTC
+            }
+            // ACF sub field indexes are 1-based
+            $row_index = $i + 1;
+            update_sub_field( array( 'sessions', $row_index, 'session_start_time' ), $now, $post_id );
+            update_sub_field( array( 'sessions', $row_index, 'session_stop_time' ),  $now, $post_id );
+            // Also update our in-memory copy so subsequent logic sees the value
+            $sessions[ $i ]['session_start_time'] = $now;
+            $sessions[ $i ]['session_stop_time']  = $now;
+        }
+    }
+}
+
+/**
  * Recalculates duration whenever a task post is saved.
  * Hooks into ACF's save_post action for reliability.
  *
@@ -723,6 +763,9 @@ function ptt_get_total_sessions_duration( $post_id ) {
  */
 function ptt_recalculate_on_save( $post_id ) {
     if ( get_post_type( $post_id ) === 'project_task' ) {
+        // Safety net: ensure manual sessions get timestamps when saving in admin
+        ptt_ensure_manual_session_timestamps( $post_id );
+
         $sessions = get_field( 'sessions', $post_id );
         if ( ! empty( $sessions ) ) {
             foreach ( array_keys( $sessions ) as $index ) {
@@ -939,11 +982,11 @@ function ptt_has_active_task( $user_id, $exclude_post_id = 0 ) {
     }
 
     $query = new WP_Query( $args );
-    
+
     if ( $query->have_posts() ) {
         return $query->posts[0];
     }
-    
+
     return 0;
 }
 
@@ -967,7 +1010,7 @@ function ptt_start_timer_callback() {
     $user_id = get_current_user_id();
     $active_task_id = ptt_has_active_task( $user_id, $post_id );
     if ( $active_task_id > 0 ) {
-        wp_send_json_error( [ 
+        wp_send_json_error( [
             'message' => 'You have another task running. Please stop it before starting a new one.',
             'active_task_id' => $active_task_id
         ] );
@@ -977,7 +1020,7 @@ function ptt_start_timer_callback() {
     update_field( 'start_time', $current_time, $post_id );
     update_field( 'stop_time', '', $post_id ); // Clear any previous stop time
     update_field( 'calculated_duration', '0.00', $post_id ); // Reset duration
-    
+
     wp_update_post( ['ID' => $post_id, 'post_author' => $user_id] );
 
     $status_terms = get_the_terms( $post_id, 'task_status' );
@@ -1037,7 +1080,7 @@ function ptt_stop_timer_callback() {
     if ( ! $post_id ) {
         wp_send_json_error( [ 'message' => 'Invalid Post ID.' ] );
     }
-    
+
     $current_time = current_time( 'mysql', 1 ); // Use UTC time
     update_field( 'stop_time', $current_time, $post_id );
 
@@ -1068,7 +1111,7 @@ function ptt_force_stop_timer_callback() {
 
     $current_time = current_time( 'mysql', 1 ); // Use UTC time
     update_field( 'stop_time', $current_time, $post_id );
-    
+
     $duration = ptt_calculate_and_save_duration( $post_id );
 
     wp_send_json_success( [
@@ -1096,7 +1139,7 @@ function ptt_save_manual_time_callback() {
     if ( ! $post_id || $manual_hours <= 0 ) {
          wp_send_json_error( [ 'message' => 'Invalid data.' ] );
     }
-    
+
     update_field( 'manual_override', true, $post_id );
     update_field( 'manual_duration', $manual_hours, $post_id );
 
@@ -1105,7 +1148,7 @@ function ptt_save_manual_time_callback() {
         $start_time = current_time( 'mysql', 1 ); // Use UTC time
         update_field( 'start_time', $start_time, $post_id );
     }
-    
+
     $duration = ptt_calculate_and_save_duration( $post_id );
 
     wp_send_json_success( [
@@ -1224,4 +1267,3 @@ function ptt_add_settings_link( $links ) {
 }
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'ptt_add_settings_link' );
 
-        

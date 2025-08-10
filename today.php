@@ -470,22 +470,30 @@ function ptt_update_session_duration_callback() {
 	}
 
 	// Update the session's manual duration
-	$updated = update_sub_field( 
-		array( 'sessions', $session_index + 1, 'session_manual_override' ), 
-		true, 
-		$post_id 
+	$updated = update_sub_field(
+		array( 'sessions', $session_index + 1, 'session_manual_override' ),
+		true,
+		$post_id
 	);
-	
+
 	if ( $updated ) {
-		update_sub_field( 
-			array( 'sessions', $session_index + 1, 'session_manual_duration' ), 
-			$duration_hours, 
-			$post_id 
+		update_sub_field(
+			array( 'sessions', $session_index + 1, 'session_manual_duration' ),
+			$duration_hours,
+			$post_id
 		);
-		
+
+		// Ensure timestamps are set for manual sessions without start/end
+		$now = current_time( 'mysql', 1 ); // UTC
+		$start_val = get_sub_field( array( 'sessions', $session_index + 1, 'session_start_time' ), $post_id );
+		if ( empty( $start_val ) ) {
+			update_sub_field( array( 'sessions', $session_index + 1, 'session_start_time' ), $now, $post_id );
+			update_sub_field( array( 'sessions', $session_index + 1, 'session_stop_time' ),  $now, $post_id );
+		}
+
 		// Recalculate total duration
 		ptt_calculate_and_save_duration( $post_id );
-		
+
 		wp_send_json_success( [
 			'message' => 'Duration updated successfully.',
 			'duration_hours' => $duration_hours,
