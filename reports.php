@@ -578,39 +578,46 @@ function ptt_display_report_results() {
 		if ( $q->have_posts() ) {
 			while ( $q->have_posts() ) {
 				$q->the_post();
-				$post_id          = get_the_ID();
-				$sort_timestamp   = PHP_INT_MAX;
-				$is_relevant      = false;
-				$daily_duration   = 0.0;
-				$sessions         = get_field( 'sessions', $post_id );
+				$post_id            = get_the_ID();
+				$sessions           = get_field( 'sessions', $post_id );
+				$post_creation_date = date( 'Y-m-d', get_the_date( 'U', $post_id ) );
 
-				// Determine relevance from creation date first
-				if ( date( 'Y-m-d', get_the_date( 'U' ) ) === $target_date_str ) {
-					$is_relevant    = true;
-					$sort_timestamp = get_the_date( 'U' );
-				}
+				$is_relevant_for_day = false;
+				$daily_duration      = 0.0;
+				$sort_timestamp      = PHP_INT_MAX;
 
-				// If sessions exist, they are the primary source of truth for duration and can also determine relevance.
 				if ( ! empty( $sessions ) && is_array( $sessions ) ) {
-					$session_duration_today = 0.0;
-					$has_session_today      = false;
+					// Modern task with sessions.
 					foreach ( $sessions as $session ) {
 						$session_start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+						$is_manual_session = ! empty( $session['session_manual_override'] );
+						$session_duration  = 0.0;
+						$should_include    = false;
+
 						if ( $session_start_str && date( 'Y-m-d', strtotime( $session_start_str ) ) === $target_date_str ) {
-							$has_session_today = true;
+							// Case 1: Session has a start date that matches the report day.
+							$should_include = true;
 							$sort_timestamp = min( $sort_timestamp, strtotime( $session_start_str ) );
+						} elseif ( $is_manual_session && empty( $session_start_str ) && $post_creation_date === $target_date_str ) {
+							// Case 2: Session is manual, has no start date, and the task was created on the report day.
+							$should_include = true;
+							$sort_timestamp = min( $sort_timestamp, get_the_date( 'U', $post_id ) );
+						}
+
+						if ( $should_include ) {
+							$is_relevant_for_day = true; // Mark the parent task as relevant for the day.
 
 							// Calculate duration for this specific session.
-							$session_duration = 0.0;
-							if ( ! empty( $session['session_manual_override'] ) ) {
+							if ( $is_manual_session ) {
 								$session_duration = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
 							} else {
+								// This block is for timer-based sessions that match the date.
 								$start = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
 								$stop  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
 								if ( $start && $stop ) {
 									try {
-										$start_time = new DateTime( $start, new DateTimeZone('UTC') );
-										$stop_time  = new DateTime( $stop, new DateTimeZone('UTC') );
+										$start_time       = new DateTime( $start, new DateTimeZone( 'UTC' ) );
+										$stop_time        = new DateTime( $stop, new DateTimeZone( 'UTC' ) );
 										if ( $stop_time > $start_time ) {
 											$diff_seconds     = $stop_time->getTimestamp() - $start_time->getTimestamp();
 											$duration_hours   = $diff_seconds / 3600;
@@ -621,28 +628,26 @@ function ptt_display_report_results() {
 									}
 								}
 							}
-							$session_duration_today += $session_duration;
+							$daily_duration += $session_duration;
 						}
 					}
-
-					if ( $has_session_today ) {
-						$is_relevant    = true;
-						$daily_duration = $session_duration_today;
+				} else {
+					// Legacy task without any sessions. Relevance is determined by creation date.
+					if ( $post_creation_date === $target_date_str ) {
+						$is_relevant_for_day = true;
+						$sort_timestamp      = get_the_date( 'U', $post_id );
+						$daily_duration      = (float) get_field( 'calculated_duration', $post_id );
 					}
-				} elseif ( $is_relevant ) {
-					// No sessions, but relevant by post_date (for legacy manual entries).
-					$daily_duration = (float) get_field( 'calculated_duration', $post_id );
 				}
 
-
-				if ( $is_relevant ) {
+				if ( $is_relevant_for_day ) {
 					$client_terms  = get_the_terms( $post_id, 'client' );
 					$project_terms = get_the_terms( $post_id, 'project' );
 
 					$daily_tasks[] = [
 						'id'             => $post_id,
 						'title'          => get_the_title(),
-                                       'assignee_name'  => ptt_get_assignee_name( $post_id ),
+						'assignee_name'  => ptt_get_assignee_name( $post_id ),
 						'client_name'    => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
 						'project_name'   => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
 						'sort_timestamp' => $sort_timestamp,

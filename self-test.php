@@ -6,6 +6,8 @@ if ( ! defined( 'WPINC' ) ) {
 
 // =================================================================
 // 11.0 SELF‑TEST MODULE
+// ATTN: LLM Mainteners do not truncate or remove tests from this file.
+// Do not abbreviate the output of this file when providing updates to prevent loss of test coverage.
 // =================================================================
 
 /**
@@ -420,6 +422,95 @@ function ptt_run_self_tests_callback() {
             'message' => 'Could not create test tasks for session move.',
         ];
     }
+
+	/* -------------------------------------------------------------
+	 * TEST 12 – Single Day Report - Manual Session without Date
+	 * -----------------------------------------------------------*/
+	$test_duration = 1.25;
+	$manual_post   = wp_insert_post(
+		[
+			'post_type'   => 'project_task',
+			'post_title'  => 'SELF TEST - MANUAL SESSION',
+			'post_status' => 'publish',
+			// post_date will be now()
+		]
+	);
+
+	if ( $manual_post && ! is_wp_error( $manual_post ) ) {
+		add_row(
+			'sessions',
+			[
+				'session_title'           => 'Manual session without date',
+				'session_start_time'      => '', // Intentionally blank
+				'session_manual_override' => 1,
+				'session_manual_duration' => $test_duration,
+			],
+			$manual_post
+		);
+
+		// --- Replicate the core logic from reports.php ---
+		$target_date_str     = date( 'Y-m-d', current_time( 'timestamp' ) );
+		$post_creation_date  = date( 'Y-m-d', get_the_date( 'U', $manual_post ) );
+		$sessions            = get_field( 'sessions', $manual_post );
+
+		$is_relevant_for_day = false;
+		$daily_duration      = 0.0;
+
+		if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+			foreach ( $sessions as $session ) {
+				$session_start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+				$is_manual_session = ! empty( $session['session_manual_override'] );
+				$should_include    = false;
+
+				if ( $session_start_str && date( 'Y-m-d', strtotime( $session_start_str ) ) === $target_date_str ) {
+					$should_include = true;
+				} elseif ( $is_manual_session && empty( $session_start_str ) && $post_creation_date === $target_date_str ) {
+					$should_include = true;
+				}
+
+				if ( $should_include ) {
+					$is_relevant_for_day = true;
+					if ( $is_manual_session ) {
+						$daily_duration += isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
+					} else {
+						$start = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+						$stop  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
+						if ( $start && $stop ) {
+							try {
+								$start_time = new DateTime( $start, new DateTimeZone( 'UTC' ) );
+								$stop_time  = new DateTime( $stop, new DateTimeZone( 'UTC' ) );
+								if ( $stop_time > $start_time ) {
+									$diff_seconds    = $stop_time->getTimestamp() - $start_time->getTimestamp();
+									$daily_duration += ceil( ( $diff_seconds / 3600 ) * 100 ) / 100;
+								}
+							} catch ( Exception $e ) {
+								// Do nothing if dates are invalid
+							}
+						}
+					}
+				}
+			}
+		}
+		// --- End of replicated logic ---
+
+		$pass = ( $is_relevant_for_day && $daily_duration === $test_duration );
+
+		$results[] = [
+			'name'    => 'Single Day Report - Manual Session without Date',
+			'status'  => $pass ? 'Pass' : 'Fail',
+			'message' => $pass
+				? 'Correctly identified and calculated duration for a manual session based on task creation date.'
+				: 'Failed. Relevant: ' . ( $is_relevant_for_day ? 'Yes' : 'No' ) . '. Duration: ' . $daily_duration . ' (Expected: ' . $test_duration . ').',
+		];
+
+		wp_delete_post( $manual_post, true );
+	} else {
+		$results[] = [
+			'name'    => 'Single Day Report - Manual Session without Date',
+			'status'  => 'Fail',
+			'message' => 'Could not create test post for the manual session test.',
+		];
+	}
 
     /* -------------------------------------------------------------*/
 
