@@ -64,27 +64,63 @@ class PTT_Today_Entry_Renderer {
 			<span class="entry-session-title" data-field="session_title">
 				<?php echo esc_html( $entry['session_title'] ); ?>
 			</span>
-			<span class="entry-meta">
-				<span class="entry-task-title" data-field="task_title">
-					<?php if ( ! empty( $entry['edit_link'] ) ) : ?>
-						<a href="<?php echo esc_url( $entry['edit_link'] ); ?>" class="entry-task-link" target="_blank">
-							<?php echo esc_html( $entry['task_title'] ); ?>
-						</a>
-					<?php else : ?>
-						<?php echo esc_html( $entry['task_title'] ); ?>
-					<?php endif; ?>
-				</span>
-				&bull; 
-				<span class="entry-project-name" data-field="project_name">
-					<?php echo esc_html( $entry['project_name'] ); ?>
-				</span>
-				<?php if ( ! empty( $entry['client_name'] ) ) : ?>
-					&bull; 
-					<span class="entry-client-name" data-field="client_name">
-						<?php echo esc_html( $entry['client_name'] ); ?>
-					</span>
-				<?php endif; ?>
-			</span>
+                       <span class="entry-meta">
+                               <?php
+                               $project_id   = $entry['project_id'] ?? 0;
+                               $client_id    = $entry['client_id'] ?? 0;
+                               $user_task_ids = ptt_get_tasks_for_user( get_current_user_id() );
+
+                               $task_args = [
+                                       'post_type'      => 'project_task',
+                                       'posts_per_page' => 100,
+                                       'post_status'    => 'publish',
+                                       'orderby'        => 'date',
+                                       'order'          => 'DESC',
+                                       'post__in'       => $user_task_ids,
+                                       'tax_query'      => [
+                                               'relation' => 'AND',
+                                               [
+                                                       'taxonomy' => 'project',
+                                                       'field'    => 'term_id',
+                                                       'terms'    => $project_id,
+                                               ],
+                                       ],
+                               ];
+
+                               if ( $client_id ) {
+                                       $task_args['tax_query'][] = [
+                                               'taxonomy' => 'client',
+                                               'field'    => 'term_id',
+                                               'terms'    => $client_id,
+                                       ];
+                               }
+
+                               $tasks_query = new WP_Query( $task_args );
+                               ?>
+                               <select class="ptt-entry-task-selector" data-original-task="<?php echo esc_attr( $entry['post_id'] ); ?>">
+                                       <?php
+                                       if ( $tasks_query->have_posts() ) {
+                                               while ( $tasks_query->have_posts() ) {
+                                                       $tasks_query->the_post();
+                                                       echo '<option value="' . esc_attr( get_the_ID() ) . '"' . selected( get_the_ID(), $entry['post_id'], false ) . '>' . esc_html( get_the_title() ) . '</option>';
+                                               }
+                                               wp_reset_postdata();
+                                       }
+                                       ?>
+                               </select>
+                               <button type="button" class="button button-small ptt-move-session-btn" style="display:none;">Move</button>
+                               <button type="button" class="button button-small ptt-cancel-move-btn" style="display:none;">Cancel</button>
+                               &bull;
+                               <span class="entry-project-name" data-field="project_name">
+                                       <?php echo esc_html( $entry['project_name'] ); ?>
+                               </span>
+                               <?php if ( ! empty( $entry['client_name'] ) ) : ?>
+                                       &bull;
+                                       <span class="entry-client-name" data-field="client_name">
+                                               <?php echo esc_html( $entry['client_name'] ); ?>
+                                       </span>
+                               <?php endif; ?>
+                       </span>
 			<?php if ( ! empty( $entry['session_notes'] ) ) : ?>
 				<span class="entry-notes" data-field="session_notes">
 					<?php echo esc_html( $entry['session_notes'] ); ?>
@@ -245,11 +281,13 @@ class PTT_Today_Data_Provider {
 		
 		// Get task metadata
 		$task_title = get_the_title( $post_id );
-		$project_terms = get_the_terms( $post_id, 'project' );
-		$project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
-		$client_terms = get_the_terms( $post_id, 'client' );
-		$client_name = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '';
-		$edit_link = get_edit_post_link( $post_id );
+               $project_terms = get_the_terms( $post_id, 'project' );
+               $project_id = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->term_id : 0;
+               $project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
+               $client_terms = get_the_terms( $post_id, 'client' );
+               $client_id = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->term_id : 0;
+               $client_name = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '';
+               $edit_link = get_edit_post_link( $post_id );
 		
 		foreach ( $sessions as $index => $session ) {
 			$start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
@@ -280,9 +318,11 @@ class PTT_Today_Data_Provider {
 					'session_index'    => $index,
 					'session_title'    => $session['session_title'] ?? '',
 					'session_notes'    => $session['session_notes'] ?? '',
-					'task_title'       => $task_title,
-					'project_name'     => $project_name,
-					'client_name'      => $client_name,
+                                       'task_title'       => $task_title,
+                                       'project_name'     => $project_name,
+                                       'client_name'      => $client_name,
+                                       'project_id'       => $project_id,
+                                       'client_id'        => $client_id,
 					'start_time'       => $start_ts,
 					'stop_time'        => $stop_ts,
 					'duration_seconds' => $duration_seconds,
