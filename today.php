@@ -7,7 +7,7 @@
  * This file registers the "Today" page and renders its markup and
  * logic for a daily time-tracking dashboard view.
  *
- * Version: 1.10.2
+ * Version: 1.10.3
  * ------------------------------------------------------------------
  */
 
@@ -577,6 +577,72 @@ function ptt_delete_session_callback() {
 	}
 }
 add_action( 'wp_ajax_ptt_delete_session', 'ptt_delete_session_callback' );
+
+/**
+ * Moves a session from one task to another.
+ *
+ * @param int $source_post_id Source task ID.
+ * @param int $session_index  Index of the session to move (0 based).
+ * @param int $target_post_id Target task ID.
+ * @return int|false          New session index on target task, or false on failure.
+ */
+function ptt_move_session_to_task( $source_post_id, $session_index, $target_post_id ) {
+        if ( ! $source_post_id || ! $target_post_id || $session_index < 0 ) {
+                return false;
+        }
+
+        $sessions = get_field( 'sessions', $source_post_id );
+        if ( empty( $sessions ) || ! isset( $sessions[ $session_index ] ) ) {
+                return false;
+        }
+
+        $session = $sessions[ $session_index ];
+        if ( isset( $session['session_timer_controls'] ) ) {
+                unset( $session['session_timer_controls'] );
+        }
+
+        $new_row_index = add_row( 'sessions', $session, $target_post_id );
+        if ( ! $new_row_index ) {
+                return false;
+        }
+
+        delete_row( 'sessions', $session_index + 1, $source_post_id );
+
+        ptt_calculate_and_save_duration( $source_post_id );
+        ptt_calculate_and_save_duration( $target_post_id );
+
+        return (int) $new_row_index - 1;
+}
+
+/**
+ * AJAX handler to move a session between tasks.
+ */
+function ptt_move_session_callback() {
+        check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+        if ( ! current_user_can( 'edit_posts' ) ) {
+                wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+        }
+
+        $post_id        = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+        $session_index  = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
+        $target_post_id = isset( $_POST['target_post_id'] ) ? intval( $_POST['target_post_id'] ) : 0;
+
+        if ( ! $post_id || $session_index < 0 || ! $target_post_id ) {
+                wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+        }
+
+        $new_index = ptt_move_session_to_task( $post_id, $session_index, $target_post_id );
+
+        if ( $new_index !== false ) {
+                wp_send_json_success( [
+                        'message'   => 'Session moved successfully.',
+                        'new_index' => $new_index,
+                ] );
+        } else {
+                wp_send_json_error( [ 'message' => 'Failed to move session.' ] );
+        }
+}
+add_action( 'wp_ajax_ptt_move_session', 'ptt_move_session_callback' );
 
 /**
  * Helper to find any active session across all tasks for a specific user.

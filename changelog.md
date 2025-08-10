@@ -1,5 +1,12 @@
 # Changelog
 
+## Version 1.10.3 - Session Reassignment Logic
+*Release Date: TBD*
+
+### Added
+- Backend function and AJAX handler to move a work session between tasks.
+- Self-test coverage for session reassignment.
+
 ## Version 1.10.2 - Today Page Refinements
 *Release Date: TBD*
 
