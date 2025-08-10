@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.10.13
+ * Version:           1.10.14
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', ' 1.10.13' );
+define( 'PTT_VERSION', ' 1.10.14' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -487,16 +487,21 @@ function ptt_timestamp_manual_sessions( $value, $post_id, $field ) {
 				continue;
 			}
 			
-			$is_manual      = ! empty( $row['field_ptt_session_manual_override'] );
-			$has_start_time = ! empty( $row['field_ptt_session_start_time'] );
+                        $is_manual = ! empty( $row['field_ptt_session_manual_override'] )
+                                || ! empty( $row['session_manual_override'] );
+                        $has_start_time = ! empty( $row['field_ptt_session_start_time'] )
+                                || ! empty( $row['session_start_time'] );
 
-			if ( $is_manual && ! $has_start_time ) {
-				if ( null === $current_time ) {
-					$current_time = current_time( 'mysql', 1 ); // UTC
-				}
-				$row['field_ptt_session_start_time'] = $current_time;
-				$row['field_ptt_session_stop_time']  = $current_time;
-			}
+                        if ( $is_manual && ! $has_start_time ) {
+                                if ( null === $current_time ) {
+                                        $current_time = current_time( 'mysql', 1 ); // UTC
+                                }
+                                // Support both field keys and names in the incoming data.
+                                $row['field_ptt_session_start_time'] = $current_time;
+                                $row['field_ptt_session_stop_time']  = $current_time;
+                                $row['session_start_time']           = $current_time;
+                                $row['session_stop_time']            = $current_time;
+                        }
 		}
 	}
 	return $value;

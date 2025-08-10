@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 1.10.14 - Timestamp manual sessions by field name or key
+Fix: Ensure manual session start and stop times are populated whether ACF passes subfields by key or by name.
+
 ## Version 1.10.13 - Self-Test Timestamp Correction
 Fix: Updated manual session auto-timestamping self-test to use ACF field keys so manual durations are timestamped correctly.
 
