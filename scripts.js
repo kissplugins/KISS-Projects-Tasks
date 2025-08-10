@@ -1118,7 +1118,56 @@ jQuery(document).ready(function ($) {
                     if (response.data.debug) {
                         $('#ptt-debug-content').html(response.data.debug);
                     }
+                    initializeEntryTaskSelectors();
                 }
+            });
+        }
+
+        function initializeEntryTaskSelectors() {
+            $entriesList.find('.ptt-entry-task-selector').each(function() {
+                const $select = $(this);
+                const $entry = $select.closest('.ptt-today-entry');
+                const $moveBtn = $select.siblings('.ptt-move-session-btn');
+                const $cancelBtn = $select.siblings('.ptt-cancel-move-btn');
+                const original = String($select.data('original-task'));
+
+                $select.on('change', function() {
+                    if ($select.val() && $select.val() !== original) {
+                        $moveBtn.show();
+                        $cancelBtn.show();
+                    } else {
+                        $moveBtn.hide();
+                        $cancelBtn.hide();
+                    }
+                });
+
+                $cancelBtn.on('click', function() {
+                    $select.val(original);
+                    $moveBtn.hide();
+                    $cancelBtn.hide();
+                });
+
+                $moveBtn.on('click', function() {
+                    const targetId = $select.val();
+                    $moveBtn.prop('disabled', true).text('Moving...');
+                    $.post(ptt_ajax_object.ajax_url, {
+                        action: 'ptt_move_session',
+                        nonce: ptt_ajax_object.nonce,
+                        post_id: $entry.data('post-id'),
+                        session_index: $entry.data('session-index'),
+                        target_post_id: targetId
+                    }).done(function(response){
+                        if (response.success) {
+                            loadDailyEntries();
+                        } else {
+                            alert(response.data.message || 'Move failed.');
+                        }
+                    }).fail(function(){
+                        alert('Move failed.');
+                    }).always(function(){
+                        $moveBtn.prop('disabled', false).text('Move');
+                    });
+                });
             });
         }
         

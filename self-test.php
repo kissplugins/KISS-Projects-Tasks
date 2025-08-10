@@ -359,6 +359,68 @@ function ptt_run_self_tests_callback() {
         wp_delete_user( $user_b_id );
     }
 
+    /* -------------------------------------------------------------
+     * TEST 11 – Move Session Between Tasks
+     * -----------------------------------------------------------*/
+    $source_task = wp_insert_post( [
+        'post_type'   => 'project_task',
+        'post_title'  => 'Session Move Source',
+        'post_status' => 'publish',
+    ] );
+    $target_task = wp_insert_post( [
+        'post_type'   => 'project_task',
+        'post_title'  => 'Session Move Target',
+        'post_status' => 'publish',
+    ] );
+
+    if (
+        $source_task && ! is_wp_error( $source_task ) &&
+        $target_task && ! is_wp_error( $target_task )
+    ) {
+        $session_data = [
+            'session_title'            => 'Move Test',
+            'session_notes'            => '',
+            'session_start_time'       => '',
+            'session_stop_time'        => '',
+            'session_manual_override'  => 1,
+            'session_manual_duration'  => 1.5,
+            'session_calculated_duration' => '1.50',
+        ];
+        $row = add_row( 'sessions', $session_data, $source_task );
+        ptt_calculate_and_save_duration( $source_task );
+
+        $move_result = ptt_move_session_to_task( $source_task, $row - 1, $target_task );
+
+        $source_sessions = get_field( 'sessions', $source_task );
+        $target_sessions = get_field( 'sessions', $target_task );
+        $source_total    = get_field( 'calculated_duration', $source_task );
+        $target_total    = get_field( 'calculated_duration', $target_task );
+
+        $pass = (
+            $move_result !== false &&
+            empty( $source_sessions ) &&
+            is_array( $target_sessions ) &&
+            count( $target_sessions ) === 1 &&
+            $source_total === '0.00' &&
+            $target_total === '1.50'
+        );
+
+        $results[] = [
+            'name'    => 'Move Session Between Tasks',
+            'status'  => $pass ? 'Pass' : 'Fail',
+            'message' => $pass ? 'Session reassigned successfully.' : 'Failed to reassign session correctly.',
+        ];
+
+        wp_delete_post( $source_task, true );
+        wp_delete_post( $target_task, true );
+    } else {
+        $results[] = [
+            'name'    => 'Move Session Between Tasks',
+            'status'  => 'Fail',
+            'message' => 'Could not create test tasks for session move.',
+        ];
+    }
+
     /* -------------------------------------------------------------*/
 
     $timestamp = current_time( 'timestamp' );
