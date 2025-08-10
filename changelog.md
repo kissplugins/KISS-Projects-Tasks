@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 1.10.13 - Self-Test Timestamp Correction
+Fix: Updated manual session auto-timestamping self-test to use ACF field keys so manual durations are timestamped correctly.
+
 ## Version 1.10.8 - Auto-Timestamping Manual Sessions
 Feature: Manual session entries that are missing a start time will now be automatically timestamped at the moment the task is saved. This improves data accuracy for reporting.
 

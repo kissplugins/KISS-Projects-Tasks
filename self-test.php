@@ -433,15 +433,18 @@ function ptt_run_self_tests_callback() {
 	);
 
 	if ( $timestamp_post && ! is_wp_error( $timestamp_post ) ) {
-		$session_row = [
-			'session_title'           => 'Manual session to be timestamped',
-			'session_start_time'      => '', // Intentionally blank
-			'session_manual_override' => 1,
-			'session_manual_duration' => 0.5,
-		];
+                $session_row = [
+                        'field_ptt_session_title'           => 'Manual session to be timestamped',
+                        'field_ptt_session_notes'           => '',
+                        'field_ptt_session_start_time'      => '', // Intentionally blank
+                        'field_ptt_session_stop_time'       => '',
+                        'field_ptt_session_manual_override' => 1,
+                        'field_ptt_session_manual_duration' => 0.5,
+                        'field_ptt_session_calculated_duration' => '',
+                ];
 
-		// This call saves the initial data, then triggers the filter we are testing.
-		update_field( 'sessions', [ $session_row ], $timestamp_post );
+                // This call saves the initial data, then triggers the filter we are testing.
+                update_field( 'field_ptt_sessions', [ $session_row ], $timestamp_post );
 
 		// Retrieve the saved data to verify the filter worked.
 		$saved_sessions = get_field( 'sessions', $timestamp_post );
