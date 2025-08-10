@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.10.7
+ * Version:           1.10.12
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.10.7' );
+define( 'PTT_VERSION', ' 1.10.12' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -468,6 +468,41 @@ function ptt_register_acf_fields() {
     ));
 }
 add_action( 'acf/init', 'ptt_register_acf_fields' );
+
+/**
+ * Automatically timestamps manual sessions that don't have a start time.
+ * Hooks into the ACF update process to modify the value before saving.
+ *
+ * @param array $value   The new repeater value.
+ * @param int   $post_id The post ID.
+ * @param array $field   The field object.
+ * @return array The modified repeater value.
+ */
+function ptt_timestamp_manual_sessions( $value, $post_id, $field ) {
+	if ( ! empty( $value ) && is_array( $value ) ) {
+		$current_time = null; // Lazy-load time
+
+		foreach ( $value as $i => &$row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			
+			$is_manual      = ! empty( $row['field_ptt_session_manual_override'] );
+			$has_start_time = ! empty( $row['field_ptt_session_start_time'] );
+
+			if ( $is_manual && ! $has_start_time ) {
+				if ( null === $current_time ) {
+					$current_time = current_time( 'mysql', 1 ); // UTC
+				}
+				$row['field_ptt_session_start_time'] = $current_time;
+				$row['field_ptt_session_stop_time']  = $current_time;
+			}
+		}
+	}
+	return $value;
+}
+add_filter( 'acf/update_value/key=field_ptt_sessions', 'ptt_timestamp_manual_sessions', 10, 3 );
+
 
 function ptt_activate_kanban_additions() {
     // Existing activation code...
