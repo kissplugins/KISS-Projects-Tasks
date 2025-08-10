@@ -1,7 +1,8 @@
 # Changelog
 
 ## Version 1.10.4 - Session Move UI
-*Release Date: TBD*
+- Add new Move Session Test to Self Test.
+- Update Reports to account for manual time entry assuming on same date as task.
 
 ### Added
 - Task name on Today page is now a dropdown of tasks within the same project and client.

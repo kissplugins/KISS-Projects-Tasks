@@ -6,7 +6,7 @@ if ( ! defined( 'WPINC' ) ) {
 
 // =================================================================
 // 11.0 SELF‑TEST MODULE
-// ATTN: LLM Mainteners do not truncate or remove tests from this file.
+// ATTN: LLM Maintainers do not truncate or remove tests from this file.
 // Do not abbreviate the output of this file when providing updates to prevent loss of test coverage.
 // =================================================================
 
