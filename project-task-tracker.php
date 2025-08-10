@@ -735,6 +735,7 @@ function ptt_ensure_manual_session_timestamps( $post_id ) {
     }
 
     $now = null; // lazy load
+    $did_update = false;
 
     foreach ( $sessions as $i => $session ) {
         $is_manual = ! empty( $session['session_manual_override'] );
@@ -744,14 +745,20 @@ function ptt_ensure_manual_session_timestamps( $post_id ) {
             if ( null === $now ) {
                 $now = current_time( 'mysql', 1 ); // UTC
             }
-            // ACF sub field indexes are 1-based
+            // Update via keys (best effort)
             $row_index = $i + 1;
-            update_sub_field( array( 'sessions', $row_index, 'session_start_time' ), $now, $post_id );
-            update_sub_field( array( 'sessions', $row_index, 'session_stop_time' ),  $now, $post_id );
-            // Also update our in-memory copy so subsequent logic sees the value
+            update_sub_field( array( 'field_ptt_sessions', $row_index, 'field_ptt_session_start_time' ), $now, $post_id );
+            update_sub_field( array( 'field_ptt_sessions', $row_index, 'field_ptt_session_stop_time' ),  $now, $post_id );
+            // Update in-memory (names) so we can persist via update_field as a fallback
             $sessions[ $i ]['session_start_time'] = $now;
             $sessions[ $i ]['session_stop_time']  = $now;
+            $did_update = true;
         }
+    }
+
+    // Fallback/persistence: write the modified structure back to ACF
+    if ( $did_update ) {
+        update_field( 'sessions', $sessions, $post_id );
     }
 }
 

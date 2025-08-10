@@ -400,6 +400,13 @@ function ptt_get_daily_entries_callback() {
                         $end_num    = $entry['stop_time'] ? wp_date( 'h:i:s', $entry['stop_time'] ) : '--:--:--';
                         $end_ampm   = $entry['stop_time'] ? wp_date( 'A', $entry['stop_time'] ) : '';
 
+                        // Prefer manual override display: if manual, show start time and hide end time indicator
+                        $is_manual = ! empty( $entry['is_manual'] );
+                        if ( $is_manual ) {
+                            $end_num = '';
+                            $end_ampm = '';
+                        }
+
                         $subtotal   = gmdate( 'H:i:s', $entry['duration_seconds'] ?? 0 );
 
                         ob_start();
@@ -409,7 +416,9 @@ function ptt_get_daily_entries_callback() {
                              data-duration-seconds="<?php echo esc_attr( $entry['duration_seconds'] ?? 0 ); ?>"
                              <?php echo $editable_attr; ?>>
                                 Start: <span class="ptt-time-display"><?php echo esc_html( $start_num ); ?></span> <?php echo esc_html( $start_ampm ); ?> |
+                                <?php if ( ! $is_manual ) : ?>
                                 End: <span class="ptt-time-display"><?php echo esc_html( $end_num ); ?></span> <?php echo esc_html( $end_ampm ); ?> |
+                                <?php endif; ?>
                                 Sub-total: <span class="ptt-time-display"><?php echo esc_html( $subtotal ); ?></span>
                         </div>
                         <?php
@@ -424,7 +433,7 @@ function ptt_get_daily_entries_callback() {
         // Get debug info
         $entries_count = count( $entries );
         $tasks_count   = count( array_unique( array_column( $entries, 'post_id' ) ) );
-        $debug_html    = PTT_Today_Page_Manager::get_debug_info( $user_id, $target_date, $tasks_count, $entries_count );
+        $debug_html    = PTT_Today_Page_Manager::get_debug_info( $user_id, $target_date, $tasks_count, $entries_count, $entries );
 
         wp_send_json_success(
                 [
