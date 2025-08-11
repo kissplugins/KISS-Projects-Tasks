@@ -3,7 +3,7 @@ jQuery(document).ready(function ($) {
 
     // Session recovery - store active task in localStorage
     const PTT_STORAGE_KEY = 'ptt_active_task';
-    
+
     function saveActiveTaskToStorage(postId, taskName, startTime) {
         if (postId) {
             localStorage.setItem(PTT_STORAGE_KEY, JSON.stringify({
@@ -14,11 +14,11 @@ jQuery(document).ready(function ($) {
             }));
         }
     }
-    
+
     function clearActiveTaskFromStorage() {
         localStorage.removeItem(PTT_STORAGE_KEY);
     }
-    
+
     function getActiveTaskFromStorage() {
         const stored = localStorage.getItem(PTT_STORAGE_KEY);
         if (stored) {
@@ -111,6 +111,58 @@ jQuery(document).ready(function ($) {
     // --- END DEBUGGING INFO ---
 
 
+	    // Auto-refresh editor after ACF saves so server-side timestamps are visible immediately
+	    if ($('body').hasClass('post-type-project_task')) {
+	        // Clear refresh guard on load
+	        try {
+	            if (sessionStorage.getItem('ptt_after_save_refresh') === '1') {
+	                sessionStorage.removeItem('ptt_after_save_refresh');
+	            }
+	        } catch (e) {}
+
+	        if (window.acf && typeof window.acf.addAction === 'function') {
+	            window.acf.addAction('submit_success', function($form, result) {
+	                try {
+	                    sessionStorage.setItem('ptt_after_save_refresh', '1');
+	                    sessionStorage.setItem('ptt_scroll_after_save', '1');
+	                } catch (e) {}
+	                window.location.reload();
+	            });
+
+	        // After reload from a save, if flagged, scroll to the bottom near the Sessions repeater
+	        try {
+	            if (sessionStorage.getItem('ptt_scroll_after_save') === '1') {
+	                sessionStorage.removeItem('ptt_scroll_after_save');
+	                setTimeout(function(){
+	                    const $field = $('.acf-field[data-key="field_ptt_sessions"]');
+	                    if ($field.length) {
+	                        // Scroll so the actions (Add/Update) area is visible
+	                        const $actions = $field.find('.acf-actions').last();
+	                        const target = $actions.length ? $actions.offset().top : $field.offset().top + $field.outerHeight();
+	                        $('html, body').animate({ scrollTop: target - 80 }, 400);
+	                    } else {
+	                        // Fallback: scroll to bottom
+	                        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+	                    }
+	                }, 250);
+	            }
+	        } catch (e) {}
+
+	        }
+
+	        // Backup: set scroll flag when WP Publish/Update is clicked or form submits
+	        if ($('body').hasClass('post-type-project_task')) {
+	            $(document).on('click', '#publish, #save-post', function(){
+	                try { sessionStorage.setItem('ptt_scroll_after_save', '1'); } catch (e) {}
+	            });
+	            $('#post').on('submit', function(){
+	                try { sessionStorage.setItem('ptt_scroll_after_save', '1'); } catch (e) {}
+	            });
+	        }
+
+	    }
+
+
     // Add "Use Today's Date" button next to the title input
     if ($('body').hasClass('post-type-project_task') && ($('body').hasClass('post-new-php') || $('body').hasClass('post-php'))) {
         const $titlewrap = $('#titlewrap');
@@ -124,20 +176,20 @@ jQuery(document).ready(function ($) {
                 const $titleInput = $('#title');
                 const currentTitle = $titleInput.val();
                 let newTitle = today + ' - ' + currentTitle;
-                
+
                 if ( !currentTitle.trim() ) {
                     newTitle = today + ' - ';
                 } else if (currentTitle.includes(today)) {
                     // Don't add if date is already there
-                    return; 
+                    return;
                 }
-                
+
                 $titleInput.val(newTitle);
                 $('#title-prompt-text').addClass('screen-reader-text');
             });
         }
     }
-    
+
     /**
      * Reusable live timer function for session rows.
      */
@@ -179,7 +231,7 @@ jQuery(document).ready(function ($) {
             const formattedHours = ('0' + hours).slice(-2);
             const formattedMinutes = ('0' + minutes).slice(-2);
             const formattedSeconds = ('0' + seconds).slice(-2);
-            
+
             let timeString = `${formattedHours}<span class="colon">:</span>${formattedMinutes}<span class="colon">:</span>${formattedSeconds}`;
             if (isNegative) {
                 timeString = '-' + timeString;
@@ -191,7 +243,7 @@ jQuery(document).ready(function ($) {
         const intervalId = setInterval(updateTimer, 1000); // Update every second
         $container.data('timerIntervalId', intervalId);
     }
-    
+
     function stopLiveTimer($container) {
         if ($container.data('timerIntervalId')) {
             clearInterval($container.data('timerIntervalId'));
@@ -227,7 +279,7 @@ jQuery(document).ready(function ($) {
                     <div class="ptt-ajax-spinner" style="display: none; margin-left: 8px;"></div>
                 </div>`;
             $container.find('.acf-input').html(controlsHtml);
-            
+
             const $controls = $container.find('.ptt-session-controls');
             const $startButton = $controls.find('.ptt-session-start');
             const $stopButton = $controls.find('.ptt-session-stop');
@@ -246,6 +298,46 @@ jQuery(document).ready(function ($) {
                     $message.hide();
                     manageLiveTimer($controls, startVal);
                 } else if (startVal && stopVal) { // Stopped
+
+	    // Add an "Update" button next to the Add Session button that triggers the WP Update/Save
+	    function addUpdateButtonToSessionsRepeater($context) {
+	        $context = $context || $(document);
+	        const $field = $context.find('.acf-field[data-key="field_ptt_sessions"]').first();
+	        if (!$field.length) return;
+
+	        // Prefer to append into the ACF actions area
+	        const $actions = $field.find('.acf-actions').first();
+	        if ($actions.length) {
+	            if ($actions.find('.ptt-session-update-btn').length === 0) {
+	                const $btn = $('<button type="button" class="button button-secondary ptt-session-update-btn" style="margin-left:8px;">Update</button>');
+	                $actions.append($btn);
+	            }
+	            return;
+	        }
+
+	        // Fallback: place after the Add Row button if actions container is not found
+	        const $addBtn = $field.find('[data-event="add-row"], [data-name="add-row"]').last();
+	        if ($addBtn.length && $addBtn.next('.ptt-session-update-btn').length === 0) {
+	            const $btn = $('<button type="button" class="button button-secondary ptt-session-update-btn" style="margin-left:8px;">Update</button>');
+	            $addBtn.after($btn);
+	        }
+	    }
+
+	    // Initialize on load and when ACF appends new content
+	    addUpdateButtonToSessionsRepeater();
+	    if (window.acf) {
+	        window.acf.addAction('append', function($el){ addUpdateButtonToSessionsRepeater($el); });
+	        window.acf.addAction('ready', function($el){ addUpdateButtonToSessionsRepeater($el); });
+	    }
+
+	    // Click handler: replicate the Publish/Update button
+	    $(document).on('click', '.ptt-session-update-btn', function(e){
+	        e.preventDefault();
+	        const $btn = $(this);
+	        $btn.prop('disabled', true).text('Updating...');
+	        $('#publish').trigger('click');
+	    });
+
                     $startButton.hide();
                     $activeDisplay.hide();
                     const duration = parseFloat($durationInput.val() || 0).toFixed(2);
@@ -256,11 +348,11 @@ jQuery(document).ready(function ($) {
                     $message.hide();
                 }
             }
-            
+
             updateUIState();
         });
     }
-    
+
     // Initialise existing rows
     initSessionRows();
 
@@ -326,11 +418,11 @@ jQuery(document).ready(function ($) {
                 stopLiveTimer($controls);
                 $row.find('[data-key="field_ptt_session_stop_time"] input').val(response.data.stop_time).trigger('change');
                 $row.find('[data-key="field_ptt_session_calculated_duration"] input').val(response.data.duration).trigger('change');
-                
+
                 $controls.find('.ptt-session-active-timer').hide();
                 const $message = $controls.find('.ptt-session-message');
                 $message.text(`Session stopped. Duration: ${response.data.duration} hrs.`).show();
-                
+
                 // Trigger save post to update total duration
                 $('#publish').trigger('click');
             } else {
@@ -383,7 +475,7 @@ jQuery(document).ready(function ($) {
         function checkActiveTask() {
             // First, check localStorage for recovery
             const storedTask = getActiveTaskFromStorage();
-            
+
             $.post(ptt_ajax_object.ajax_url, {
                 action: 'ptt_get_active_task_info',
                 nonce: ptt_ajax_object.nonce
@@ -429,7 +521,7 @@ jQuery(document).ready(function ($) {
                 }
             });
         }
-        
+
         // Check for active task on page load
         checkActiveTask();
 
@@ -445,7 +537,7 @@ jQuery(document).ready(function ($) {
             const updateTimer = () => {
                 const now = new Date();
                 const diff = now - startTime;
-                
+
                 const hours = Math.floor(diff / 3600000);
                 const minutes = Math.floor((diff % 3600000) / 60000);
 
@@ -475,21 +567,21 @@ jQuery(document).ready(function ($) {
             if (taskBudgetHours > 0) {
                 const now = new Date();
                 const suggestedEndTime = new Date(now.getTime() + taskBudgetHours * 60 * 60 * 1000);
-                
+
                 let hours = suggestedEndTime.getHours();
                 const minutes = suggestedEndTime.getMinutes();
                 const ampm = hours >= 12 ? 'PM' : 'AM';
-                
+
                 hours = hours % 12;
                 hours = hours ? hours : 12; // The hour '0' should be '12'
-                
+
                 let formattedTime = String(hours);
-                
+
                 if (minutes > 0) {
                     const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
                     formattedTime += `:${formattedMinutes}`;
                 }
-                
+
                 formattedTime += ` ${ampm}`;
                 budgetString += ` (Suggested end time at approx. ${formattedTime})`;
             }
@@ -532,7 +624,7 @@ jQuery(document).ready(function ($) {
                 } else {
                     options = '<option value="">No un-started tasks found</option>';
                 }
-                
+
                 options += '<option value="new">-- Create New Task --</option>';
                 $taskSelect.html(options).prop('disabled', false);
 
@@ -589,7 +681,7 @@ jQuery(document).ready(function ($) {
                 showMessage($messageContainer, 'Please select a Client, Project, and Task.', true);
                 return;
             }
-    
+
             if (task === 'new' && !taskName.trim()) {
                 showMessage($messageContainer, 'Please enter a name for the new task.', true);
                 return;
@@ -597,7 +689,7 @@ jQuery(document).ready(function ($) {
 
             const $button = $('#ptt-frontend-start-btn');
             const selectedTaskId = $taskSelect.val();
-            
+
             showSpinner($newTaskForm);
             $button.prop('disabled', true);
 
@@ -667,7 +759,7 @@ jQuery(document).ready(function ($) {
             const postId = $link.data('postid');
 
             $link.text('Stopping...');
-            
+
             $.post(ptt_ajax_object.ajax_url, {
                 action: 'ptt_stop_timer',
                 nonce: ptt_ajax_object.nonce,
@@ -694,15 +786,15 @@ jQuery(document).ready(function ($) {
             if (activeTimerInterval) clearInterval(activeTimerInterval);
             const $button = $(this);
             const postId = $button.data('postid');
-            
+
             if (!postId) {
                 showMessage($messageContainer, 'Error: No task ID found. Please refresh the page.', true);
                 return;
             }
-            
+
             showSpinner($activeTaskDisplay);
             $button.prop('disabled', true);
-            
+
             $.post(ptt_ajax_object.ajax_url, {
                 action: 'ptt_stop_timer',
                 nonce: ptt_ajax_object.nonce,
@@ -752,19 +844,19 @@ jQuery(document).ready(function ($) {
             if (!confirm('Force stop will immediately end this timer. Are you sure?')) {
                 return;
             }
-            
+
             const $button = $(this);
             const postId = $button.data('postid') || $('#ptt-frontend-stop-btn').data('postid');
-            
+
             if (!postId) {
                 showMessage($messageContainer, 'Error: No task ID found. Please refresh the page.', true);
                 return;
             }
-            
+
             showSpinner($activeTaskDisplay);
             $button.prop('disabled', true);
             $('#ptt-frontend-stop-btn').prop('disabled', true);
-            
+
             $.post(ptt_ajax_object.ajax_url, {
                 action: 'ptt_force_stop_timer',
                 nonce: ptt_ajax_object.nonce,
@@ -814,27 +906,27 @@ jQuery(document).ready(function ($) {
 
         $('#ptt-save-manual-entry').on('click', function(e) {
             e.preventDefault();
-            
+
             const $button = $(this);
             const manualHours = parseFloat($('#ptt_manual_hours').val());
             const selectedTaskId = $taskSelect.val();
             const createNew = selectedTaskId === 'new';
-            
+
             // Validation
             if (isNaN(manualHours) || manualHours <= 0) {
                 showMessage($messageContainer, 'Please enter a valid time greater than 0.', true);
                 return;
             }
-            
+
             const client = $('#ptt_client').val();
             const project = $projectSelect.val();
             const task = $taskSelect.val();
-            
+
             if (!client || !project || !task) {
                 showMessage($messageContainer, 'Please select a Client, Project, and Task.', true);
                 return;
             }
-            
+
             if (createNew) {
                 const taskName = $('#ptt_task_name').val();
                 if (!taskName.trim()) {
@@ -842,7 +934,7 @@ jQuery(document).ready(function ($) {
                     return;
                 }
             }
-            
+
             // Prepare data
             let formData = {
                 action: 'ptt_frontend_manual_time',
@@ -850,7 +942,7 @@ jQuery(document).ready(function ($) {
                 manual_hours: manualHours,
                 create_new: createNew
             };
-            
+
             if (createNew) {
                 formData.client = client;
                 formData.project = project;
@@ -859,10 +951,10 @@ jQuery(document).ready(function ($) {
             } else {
                 formData.task_id = selectedTaskId;
             }
-            
+
             $button.prop('disabled', true);
             showSpinner($('#ptt-manual-time-section'));
-            
+
             $.post(ptt_ajax_object.ajax_url, formData)
                 .done(function(response) {
                     if (response.success) {
@@ -936,10 +1028,10 @@ jQuery(document).ready(function ($) {
         e.preventDefault();
         const today = new Date();
         const day = today.getDay(); // Sunday - 0, Monday - 1, ..., Saturday - 6
-        
+
         const sunday = new Date(today);
         sunday.setDate(today.getDate() - day);
-        
+
         const saturday = new Date(today);
         saturday.setDate(today.getDate() - day + 6);
 
@@ -951,10 +1043,10 @@ jQuery(document).ready(function ($) {
         e.preventDefault();
         const today = new Date();
         const day = today.getDay();
-        
+
         const lastSunday = new Date(today);
         lastSunday.setDate(today.getDate() - day - 7);
-        
+
         const lastSaturday = new Date(today);
         lastSaturday.setDate(today.getDate() - day - 1);
 
@@ -1003,7 +1095,7 @@ jQuery(document).ready(function ($) {
         const $dateSelect = $('#ptt-today-date-select');
         const $entriesList = $('#ptt-today-entries-list');
         const $totalDisplay = $('#ptt-today-total strong');
-        
+
         let activeTimerInterval = null;
 
         // Fetch tasks when project filter changes
@@ -1032,7 +1124,7 @@ jQuery(document).ready(function ($) {
         $startStopBtn.on('click', function() {
             const $btn = $(this);
             const isRunning = $btn.hasClass('running');
-            
+
             if (isRunning) {
                 // --- STOP TIMER ---
                 const postId = $btn.data('postid');
@@ -1170,7 +1262,7 @@ jQuery(document).ready(function ($) {
                 });
             });
         }
-        
+
         function startTodayPageTimer(startTimeStr) {
             if (activeTimerInterval) clearInterval(activeTimerInterval);
             const startTime = new Date(startTimeStr.replace(' ', 'T') + 'Z');
@@ -1195,6 +1287,127 @@ jQuery(document).ready(function ($) {
             activeTimerInterval = null;
             $timerDisplay.text('00:00:00');
         }
+
+        // Handle "Start Timer" button clicks from Today page entries
+        $entriesList.on('click', '.ptt-start-timer-btn', function(e) {
+            e.preventDefault();
+            const $btn = $(this);
+            const postId = $btn.data('post-id');
+
+            if (!postId) {
+                alert('Invalid task ID.');
+                return;
+            }
+
+            // Check if there's already an active timer
+            if ($startStopBtn.hasClass('running')) {
+                alert('You have an active timer running. Please stop it before starting a new one.');
+                return;
+            }
+
+            $btn.prop('disabled', true).text('Starting...');
+
+            $.post(ptt_ajax_object.ajax_url, {
+                action: 'ptt_today_start_timer',
+                nonce: ptt_ajax_object.nonce,
+                post_id: postId
+            }).done(function(response) {
+                if (response.success) {
+                    // Update the main timer controls
+                    $sessionTitle.val(response.data.session_title).prop('disabled', true);
+                    $taskSelect.val(postId).prop('disabled', true);
+                    $projectFilter.prop('disabled', true);
+                    $startStopBtn.addClass('running').text('Stop').removeClass('button-primary').addClass('button-secondary');
+                    $startStopBtn.data('postid', response.data.post_id);
+                    $startStopBtn.data('rowindex', response.data.session_index);
+
+                    // Start the timer display
+                    startTodayPageTimer(response.data.start_time);
+
+                    // Refresh the entries list
+                    loadDailyEntries();
+
+                    // Show success message
+                    alert(response.data.message);
+                } else {
+                    alert(response.data.message || 'Could not start timer.');
+                }
+            }).fail(function() {
+                alert('Network error. Please try again.');
+            }).always(function() {
+                $btn.prop('disabled', false).text('Start Timer');
+            });
+        });
+
+        // Handle "Edit Task" button clicks (these are just links, but we can add analytics if needed)
+        $entriesList.on('click', '.ptt-edit-task-btn', function(e) {
+            // The link will open naturally, but we can track this action if needed
+            console.log('Edit task clicked for post ID:', $(this).closest('.ptt-today-entry').data('post-id'));
+        });
+
+        // Handle "Add Another Session" button clicks
+        $entriesList.on('click', '.ptt-add-session-btn', function(e) {
+            e.preventDefault();
+            const $btn = $(this);
+            const postId = $btn.data('post-id');
+            const taskTitle = $btn.data('task-title');
+            const projectName = $btn.data('project-name');
+            const projectId = $btn.data('project-id');
+
+            if (!postId) {
+                alert('Invalid task ID.');
+                return;
+            }
+
+            // Check if there's already an active timer
+            if ($startStopBtn.hasClass('running')) {
+                alert('You have an active timer running. Please stop it before starting a new session.');
+                return;
+            }
+
+            // Populate the session title
+            const currentTime = new Date();
+            const timeString = currentTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: true});
+            const sessionTitle = `Session ${timeString}`;
+            $sessionTitle.val(sessionTitle);
+
+            // Function to select the task once project is loaded
+            const selectTask = () => {
+                $taskSelect.val(postId);
+                if ($taskSelect.val() === postId.toString()) {
+                    // Success! Task is now selected
+                    $sessionTitle.focus().select();
+                } else {
+                    // Task still not found, show helpful message
+                    alert(`Task "${taskTitle}" prepared. You may need to select the correct project manually.`);
+                    $sessionTitle.focus();
+                }
+            };
+
+            // Check if correct project is already selected
+            if ($projectFilter.val() === projectId.toString() && projectId) {
+                // Project already selected, just select the task
+                selectTask();
+            } else if (projectId) {
+                // Need to select the correct project first
+                $projectFilter.val(projectId);
+
+                // Trigger project change and wait for tasks to load
+                $projectFilter.trigger('change');
+
+                // Wait a moment for AJAX to complete, then select task
+                setTimeout(selectTask, 500);
+            } else {
+                // No project ID available, just focus on session title
+                $sessionTitle.focus().select();
+                alert(`Session prepared for "${taskTitle}". Please select the correct project and task.`);
+            }
+
+            // Scroll to top so user can see the populated form
+            $('html, body').animate({
+                scrollTop: $('#ptt-today-page-container').offset().top
+            }, 300);
+        });
 
         // Initial load
         $projectFilter.trigger('change');
