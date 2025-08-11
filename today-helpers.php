@@ -629,12 +629,14 @@ class PTT_Today_Page_Manager {
 					<li><strong>User Filter:</strong> Only tasks where the current user is the assignee (ptt_assignee)</li>
 					<li><strong>Date Scenarios:</strong> Tasks that match ANY of the following for the target date:
 						<ul>
-							<li>Tasks created/published on the target date</li>
-							<li>Tasks with parent-level time tracking (start_time) on the target date</li>
-							<li>Tasks with session-level time tracking (session_start_time) on the target date</li>
+							<li><strong>Tasks Created:</strong> Tasks created/published on the target date</li>
+							<li><strong>Parent-Level Time:</strong> Tasks with legacy parent-level time tracking (start_time) on the target date
+								<br><em>Note: Parent-level timer fields are hidden in UI but preserved for calculations</em></li>
+							<li><strong>Session-Level Time:</strong> Tasks with session-level time tracking (session_start_time) on the target date</li>
 						</ul>
 					</li>
-					<li><strong>Note:</strong> Tasks created by the user but assigned to others are NOT shown (use Reports or All Tasks for that)</li>
+					<li><strong>Workflow:</strong> Use action buttons (Start Timer, Add Another Session, Edit Task) for seamless time tracking</li>
+					<li><strong>Data Access:</strong> Tasks created by the user but assigned to others are NOT shown (use Reports or All Tasks for broader data)</li>
 				</ul>
 			</li>
 			<hr />
