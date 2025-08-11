@@ -1166,6 +1166,35 @@ function ptt_save_manual_time_callback() {
 add_action( 'wp_ajax_ptt_save_manual_time', 'ptt_save_manual_time_callback' );
 
 /**
+ * Disable parent-level timer AJAX handlers.
+ * These are hidden from the UI but we disable the handlers for security.
+ */
+function ptt_disable_parent_level_timer_handlers() {
+    // Remove parent-level timer actions
+    remove_action( 'wp_ajax_ptt_start_timer', 'ptt_start_timer_callback' );
+    remove_action( 'wp_ajax_ptt_stop_timer', 'ptt_stop_timer_callback' );
+    remove_action( 'wp_ajax_ptt_save_manual_time', 'ptt_save_manual_time_callback' );
+    remove_action( 'wp_ajax_ptt_force_stop_timer', 'ptt_force_stop_timer_callback' );
+}
+// Uncomment the line below to disable parent-level timer handlers
+// add_action( 'init', 'ptt_disable_parent_level_timer_handlers', 20 );
+
+/**
+ * Add admin notice about hidden parent-level timer fields.
+ */
+function ptt_parent_timer_hidden_notice() {
+    $screen = get_current_screen();
+    if ( $screen && $screen->post_type === 'project_task' && ( $screen->base === 'post' || $screen->base === 'edit' ) ) {
+        echo '<div class="notice notice-info is-dismissible">';
+        echo '<p><strong>Project Task Tracker:</strong> Parent-level timer and manual time entry fields are now hidden. ';
+        echo 'Please use the <strong>Sessions</strong> section below for all time tracking. ';
+        echo 'Existing parent-level time data is preserved for calculations.</p>';
+        echo '</div>';
+    }
+}
+add_action( 'admin_notices', 'ptt_parent_timer_hidden_notice' );
+
+/**
  * AJAX handler to start a session timer.
  */
 function ptt_start_session_timer_callback() {

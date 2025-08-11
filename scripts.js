@@ -1288,6 +1288,127 @@ jQuery(document).ready(function ($) {
             $timerDisplay.text('00:00:00');
         }
 
+        // Handle "Start Timer" button clicks from Today page entries
+        $entriesList.on('click', '.ptt-start-timer-btn', function(e) {
+            e.preventDefault();
+            const $btn = $(this);
+            const postId = $btn.data('post-id');
+
+            if (!postId) {
+                alert('Invalid task ID.');
+                return;
+            }
+
+            // Check if there's already an active timer
+            if ($startStopBtn.hasClass('running')) {
+                alert('You have an active timer running. Please stop it before starting a new one.');
+                return;
+            }
+
+            $btn.prop('disabled', true).text('Starting...');
+
+            $.post(ptt_ajax_object.ajax_url, {
+                action: 'ptt_today_start_timer',
+                nonce: ptt_ajax_object.nonce,
+                post_id: postId
+            }).done(function(response) {
+                if (response.success) {
+                    // Update the main timer controls
+                    $sessionTitle.val(response.data.session_title).prop('disabled', true);
+                    $taskSelect.val(postId).prop('disabled', true);
+                    $projectFilter.prop('disabled', true);
+                    $startStopBtn.addClass('running').text('Stop').removeClass('button-primary').addClass('button-secondary');
+                    $startStopBtn.data('postid', response.data.post_id);
+                    $startStopBtn.data('rowindex', response.data.session_index);
+
+                    // Start the timer display
+                    startTodayPageTimer(response.data.start_time);
+
+                    // Refresh the entries list
+                    loadDailyEntries();
+
+                    // Show success message
+                    alert(response.data.message);
+                } else {
+                    alert(response.data.message || 'Could not start timer.');
+                }
+            }).fail(function() {
+                alert('Network error. Please try again.');
+            }).always(function() {
+                $btn.prop('disabled', false).text('Start Timer');
+            });
+        });
+
+        // Handle "Edit Task" button clicks (these are just links, but we can add analytics if needed)
+        $entriesList.on('click', '.ptt-edit-task-btn', function(e) {
+            // The link will open naturally, but we can track this action if needed
+            console.log('Edit task clicked for post ID:', $(this).closest('.ptt-today-entry').data('post-id'));
+        });
+
+        // Handle "Add Another Session" button clicks
+        $entriesList.on('click', '.ptt-add-session-btn', function(e) {
+            e.preventDefault();
+            const $btn = $(this);
+            const postId = $btn.data('post-id');
+            const taskTitle = $btn.data('task-title');
+            const projectName = $btn.data('project-name');
+            const projectId = $btn.data('project-id');
+
+            if (!postId) {
+                alert('Invalid task ID.');
+                return;
+            }
+
+            // Check if there's already an active timer
+            if ($startStopBtn.hasClass('running')) {
+                alert('You have an active timer running. Please stop it before starting a new session.');
+                return;
+            }
+
+            // Populate the session title
+            const currentTime = new Date();
+            const timeString = currentTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: true});
+            const sessionTitle = `Session ${timeString}`;
+            $sessionTitle.val(sessionTitle);
+
+            // Function to select the task once project is loaded
+            const selectTask = () => {
+                $taskSelect.val(postId);
+                if ($taskSelect.val() === postId.toString()) {
+                    // Success! Task is now selected
+                    $sessionTitle.focus().select();
+                } else {
+                    // Task still not found, show helpful message
+                    alert(`Task "${taskTitle}" prepared. You may need to select the correct project manually.`);
+                    $sessionTitle.focus();
+                }
+            };
+
+            // Check if correct project is already selected
+            if ($projectFilter.val() === projectId.toString() && projectId) {
+                // Project already selected, just select the task
+                selectTask();
+            } else if (projectId) {
+                // Need to select the correct project first
+                $projectFilter.val(projectId);
+
+                // Trigger project change and wait for tasks to load
+                $projectFilter.trigger('change');
+
+                // Wait a moment for AJAX to complete, then select task
+                setTimeout(selectTask, 500);
+            } else {
+                // No project ID available, just focus on session title
+                $sessionTitle.focus().select();
+                alert(`Session prepared for "${taskTitle}". Please select the correct project and task.`);
+            }
+
+            // Scroll to top so user can see the populated form
+            $('html, body').animate({
+                scrollTop: $('#ptt-today-page-container').offset().top
+            }, 300);
+        });
+
         // Initial load
         $projectFilter.trigger('change');
         loadDailyEntries();

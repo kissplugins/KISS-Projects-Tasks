@@ -1,3 +1,5 @@
+Hide Parent Level Time Entry and Timer - Done
+
 Yes, I see a few excellent opportunities to improve the self-tests by using the main plugin’s functions for more integrated and meaningful results.
 The current test suite does a good job of testing core WordPress functions within the plugin’s context (e.g., can a post be created, can meta be saved). However, we can make it more powerful by directly testing the plugin’s own data processing and helper functions.
 —

@@ -982,9 +982,10 @@
 #ptt-today-page-container .ptt-today-entry {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     padding: 12px 0;
     border-bottom: 1px solid #e0e0e0;
+    gap: 12px;
 }
 #ptt-today-page-container .ptt-today-entry:last-child {
     border-bottom: none;
@@ -1066,6 +1067,119 @@
     background-color: #f6f7f7;
 }
 
+/* Entry Actions */
+#ptt-today-page-container .entry-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: 12px;
+}
+
+#ptt-today-page-container .entry-actions .button {
+    font-size: 12px;
+    padding: 4px 8px;
+    height: auto;
+    line-height: 1.2;
+    min-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-decoration: none;
+}
+
+#ptt-today-page-container .entry-actions .button .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    line-height: 1;
+}
+
+#ptt-today-page-container .entry-actions .ptt-start-timer-btn {
+    background: #00a32a;
+    border-color: #00a32a;
+    color: #fff;
+}
+
+#ptt-today-page-container .entry-actions .ptt-start-timer-btn:hover {
+    background: #008a20;
+    border-color: #008a20;
+}
+
+#ptt-today-page-container .entry-actions .ptt-start-timer-btn:disabled {
+    background: #c3c4c7;
+    border-color: #c3c4c7;
+    color: #a7aaad;
+}
+
+#ptt-today-page-container .entry-actions .ptt-add-session-btn {
+    background: #2271b1;
+    border-color: #2271b1;
+    color: #fff;
+}
+
+#ptt-today-page-container .entry-actions .ptt-add-session-btn:hover {
+    background: #135e96;
+    border-color: #135e96;
+}
+
+#ptt-today-page-container .entry-actions .ptt-add-session-btn:disabled {
+    background: #c3c4c7;
+    border-color: #c3c4c7;
+    color: #a7aaad;
+}
+
+#ptt-today-page-container .entry-actions .ptt-edit-task-btn {
+    background: #f6f7f7;
+    border-color: #c3c4c7;
+    color: #2c3338;
+}
+
+#ptt-today-page-container .entry-actions .ptt-edit-task-btn:hover {
+    background: #f0f0f1;
+    border-color: #8c8f94;
+}
+
+/* Responsive adjustments for entry layout */
+#ptt-today-page-container .entry-details {
+    flex: 1;
+    min-width: 0; /* Allow text to wrap */
+}
+
+#ptt-today-page-container .entry-duration {
+    flex-shrink: 0;
+    min-width: 120px;
+    text-align: right;
+}
+
+#ptt-today-page-container .entry-actions {
+    flex-shrink: 0;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    #ptt-today-page-container .ptt-today-entry {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    #ptt-today-page-container .entry-duration {
+        text-align: left;
+        min-width: auto;
+    }
+
+    #ptt-today-page-container .entry-actions {
+        justify-content: flex-start;
+        margin-left: 0;
+    }
+
+    /* Smaller buttons on mobile */
+    #ptt-today-page-container .entry-actions .button {
+        font-size: 11px;
+        padding: 3px 6px;
+        min-height: 24px;
+    }
+}
 
 /* Editable Fields */
 #ptt-today-page-container .entry-duration[data-editable="true"] {
@@ -1257,6 +1371,40 @@
 #ptt-today-page-container [data-editable="true"]:focus {
     outline: 2px solid #2271b1;
     outline-offset: 2px;
+}
+
+/* =========================================
+ * HIDE PARENT-LEVEL TIME TRACKING FIELDS
+ * =========================================
+ * Hide the parent-level timer and manual time entry fields
+ * while preserving backend functionality for fallback calculations.
+ *
+ * To re-enable these fields, simply comment out or remove the CSS rules below.
+ * The backend functionality remains intact for existing data and calculations.
+ */
+
+/* Hide parent-level Start Time field */
+.acf-field[data-key="field_ptt_start_time"],
+.acf-field[data-name="start_time"] {
+    display: none !important;
+}
+
+/* Hide parent-level Stop Time field */
+.acf-field[data-key="field_ptt_stop_time"],
+.acf-field[data-name="stop_time"] {
+    display: none !important;
+}
+
+/* Hide parent-level Manual Time Entry toggle */
+.acf-field[data-key="field_ptt_manual_override"],
+.acf-field[data-name="manual_override"] {
+    display: none !important;
+}
+
+/* Hide parent-level Manual Duration field */
+.acf-field[data-key="field_ptt_manual_duration"],
+.acf-field[data-name="manual_duration"] {
+    display: none !important;
 }
 
 /* Print Styles */

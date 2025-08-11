@@ -221,7 +221,7 @@ function ptt_get_tasks_for_today_page_callback() {
 	$client_id  = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
 	$user_id    = get_current_user_id();
 
-	// Get all tasks for the current user (author or assignee)
+	// Get all tasks assigned to the current user
 	$user_task_ids = ptt_get_tasks_for_user( $user_id );
 	if ( empty( $user_task_ids ) ) {
 		wp_send_json_success( [] ); // Send empty array if user has no tasks
@@ -696,3 +696,72 @@ function ptt_get_active_session_index_for_user( $user_id ) {
 
 	return false;
 }
+
+/**
+ * AJAX handler to start a timer from the Today page.
+ * Creates a new session with auto-generated title and starts timing.
+ */
+function ptt_today_start_timer_callback() {
+	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+	if ( ! current_user_can( 'edit_posts' ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	}
+
+	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+	if ( ! $post_id ) {
+		wp_send_json_error( [ 'message' => 'Invalid task ID.' ] );
+	}
+
+	// Check if user has any active sessions
+	$active_session = ptt_get_active_session_index_for_user( get_current_user_id() );
+	if ( $active_session ) {
+		wp_send_json_error( [
+			'message' => 'You have an active timer running. Please stop it before starting a new one.',
+			'active_task_id' => $active_session['post_id']
+		] );
+	}
+
+	// Generate session title with current time
+	$current_time = current_time( 'mysql', 1 ); // UTC
+	$display_time = wp_date( 'g:i A', strtotime( $current_time ) ); // Local time for display
+	$task_title = get_the_title( $post_id );
+	$session_title = 'Session ' . $display_time;
+
+	// Create new session
+	$session_data = [
+		'session_title' => $session_title,
+		'session_notes' => '',
+		'session_start_time' => $current_time,
+		'session_stop_time' => '',
+		'session_manual_override' => false,
+		'session_manual_duration' => 0,
+		'session_calculated_duration' => '0.00',
+	];
+
+	// Add the session to the task
+	$sessions = get_field( 'sessions', $post_id ) ?: [];
+	$sessions[] = $session_data;
+	update_field( 'sessions', $sessions, $post_id );
+
+	// Get the new session index (last one added)
+	$session_index = count( $sessions ) - 1;
+
+	// Recalculate duration
+	ptt_calculate_and_save_duration( $post_id );
+
+	// Get task info for response
+	$task_title = get_the_title( $post_id );
+	$project_terms = get_the_terms( $post_id, 'project' );
+	$project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
+
+	wp_send_json_success( [
+		'message' => 'Timer started for new session!',
+		'post_id' => $post_id,
+		'session_index' => $session_index,
+		'session_title' => $session_title,
+		'task_title' => $task_title,
+		'project_name' => $project_name,
+		'start_time' => $current_time,
+	] );
+}
+add_action( 'wp_ajax_ptt_today_start_timer', 'ptt_today_start_timer_callback' );

@@ -45,6 +45,7 @@ class PTT_Today_Entry_Renderer {
 
 			<?php echo self::render_entry_details( $entry ); ?>
 			<?php echo self::render_entry_duration( $entry ); ?>
+			<?php echo self::render_entry_actions( $entry ); ?>
 
 		</div>
 		<?php
@@ -156,6 +157,57 @@ class PTT_Today_Entry_Renderer {
 		     data-duration-seconds="<?php echo esc_attr( $entry['duration_seconds'] ?? 0 ); ?>"
 		     <?php echo $editable_attr; ?>>
 			<?php echo esc_html( $entry['duration'] ); ?>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	/**
+	 * Renders the actions section of an entry.
+	 *
+	 * @param array $entry Entry data.
+	 * @return string HTML output.
+	 */
+	private static function render_entry_actions( $entry ) {
+		$session_index = $entry['session_index'] ?? 0;
+		$is_task_level_entry = ( $session_index === -1 );
+		$post_id = $entry['post_id'] ?? 0;
+		$edit_link = $entry['edit_link'] ?? '';
+		$is_running = ! empty( $entry['is_running'] );
+
+		ob_start();
+		?>
+		<div class="entry-actions">
+			<?php if ( $is_task_level_entry && ! $is_running ) : ?>
+				<!-- Start Timer button for task-level entries without active sessions -->
+				<button type="button"
+				        class="button button-small ptt-start-timer-btn"
+				        data-post-id="<?php echo esc_attr( $post_id ); ?>"
+				        data-action="start-timer">
+					<span class="dashicons dashicons-controls-play"></span> Start Timer
+				</button>
+			<?php elseif ( ! $is_task_level_entry && ! $is_running ) : ?>
+				<!-- Add Another Session button for completed session entries -->
+				<button type="button"
+				        class="button button-small ptt-add-session-btn"
+				        data-post-id="<?php echo esc_attr( $post_id ); ?>"
+				        data-task-title="<?php echo esc_attr( $entry['task_title'] ?? '' ); ?>"
+				        data-project-name="<?php echo esc_attr( $entry['project_name'] ?? '' ); ?>"
+				        data-project-id="<?php echo esc_attr( $entry['project_id'] ?? '' ); ?>"
+				        data-action="add-session">
+					<span class="dashicons dashicons-plus-alt"></span> Add Another Session
+				</button>
+			<?php endif; ?>
+
+			<!-- Edit Task button for all entries -->
+			<?php if ( $edit_link ) : ?>
+				<a href="<?php echo esc_url( $edit_link ); ?>"
+				   class="button button-small ptt-edit-task-btn"
+				   target="_blank"
+				   title="Edit Task">
+					<span class="dashicons dashicons-edit"></span> Edit Task
+				</a>
+			<?php endif; ?>
 		</div>
 		<?php
 		return ob_get_clean();
@@ -574,10 +626,15 @@ class PTT_Today_Page_Manager {
 			</li>
 			<li><strong>Task Query Rules:</strong>
 				<ul>
-					<li>Tasks where the current user is the author OR assignee</li>
-					<li>Tasks created/published on the target date</li>
-					<li>Tasks with parent-level time tracking (start_time) on the target date</li>
-					<li>Tasks with session-level time tracking (session_start_time) on the target date</li>
+					<li><strong>User Filter:</strong> Only tasks where the current user is the assignee (ptt_assignee)</li>
+					<li><strong>Date Scenarios:</strong> Tasks that match ANY of the following for the target date:
+						<ul>
+							<li>Tasks created/published on the target date</li>
+							<li>Tasks with parent-level time tracking (start_time) on the target date</li>
+							<li>Tasks with session-level time tracking (session_start_time) on the target date</li>
+						</ul>
+					</li>
+					<li><strong>Note:</strong> Tasks created by the user but assigned to others are NOT shown (use Reports or All Tasks for that)</li>
 				</ul>
 			</li>
 			<hr />

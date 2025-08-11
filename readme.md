@@ -149,7 +149,7 @@ The Today page will show a task if **any** of these conditions are met:
 - The task was created/published on the selected date
 - The task has parent-level time tracking (`start_time`) on the selected date
 - The task has any session with `session_start_time` on the selected date
-- The current user is either the task author OR the assigned user (`ptt_assignee`)
+- The current user is the assigned user (`ptt_assignee`) - tasks you created for others are not shown
 
 #### Debug Information
 
