@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 1.11.16
+- **Collapisble Debug Panel on Today Page**:  Less noise on screen
+
 ## Version 1.11.15
 - **Extensive Self Test**: A lot of data model/structure tests were added to help prevent code regression/modifications to the core functionality
 
