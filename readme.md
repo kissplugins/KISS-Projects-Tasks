@@ -41,7 +41,12 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 * **Dynamic Task Loading:** Users can select from pre-defined, un-started tasks or create a new one on the fly.
 * **Budget Display:** The maximum allocated budget for a selected task is clearly displayed to the user.
 
-### Reporting & Admin Tools
+### Daily Activity & Reporting
+* **Today Page:** A comprehensive daily view showing all task-related activities for any selected date:
+    * **Smart Query Logic:** Automatically shows tasks created on the date, tasks with time tracking, and individual work sessions
+    * **Multiple Entry Types:** Displays task creation, parent-level time tracking, and session-level time tracking
+    * **Date Navigation:** Easy navigation between days with descriptive labels and arrow controls
+    * **Debug Information:** Detailed breakdown of query results and entry types for transparency
 * **Reports Dashboard:** A dedicated "Reports" page in the admin area.
 * **Filterable Data:** Filter reports by user, client, project, status, and custom date ranges.
 * **Multiple View Modes:** Use the toggle switch to select a view:
@@ -95,7 +100,66 @@ This is useful if you forgot to start a timer and need to log time after the fac
 3.  Enter the time spent in decimal format (e.g., `1.5` for 1 hour and 30 minutes, `0.25` for 15 minutes).
 4.  Save the task by clicking **"Update"**. The manually entered duration will be added to the task's total.
 
-### 3. Viewing Reports
+### 3. Using the Today Page
+
+The **Today** page provides a comprehensive daily view of your tasks and time tracking activities. It's designed to show you everything relevant for a specific date, whether you're tracking time or just want to see what tasks were created.
+
+#### Accessing the Today Page
+
+1.  Navigate to **Tasks → Today** from the admin menu.
+2.  The page will load showing today's activities by default.
+
+#### What Appears on the Today Page
+
+The Today page uses intelligent query logic to show tasks based on **three scenarios**:
+
+1. **Tasks Created/Published on the Selected Date**
+   - Any task that was created or published on the target date will appear
+   - Shows as "created: [Task Title]" entries
+   - Useful for seeing what new work was assigned on a specific day
+   - No time tracking required - the task just needs to exist
+
+2. **Parent-Level Time Tracking**
+   - Tasks where you used the main task timer (the older single-timer system)
+   - Tasks with `start_time`, `stop_time`, or `manual_duration` fields matching the target date
+   - Shows as "parent_time: [Task Title]" entries
+   - Includes both timer-based and manually entered time at the task level
+
+3. **Session-Level Time Tracking**
+   - Individual work sessions within tasks that occurred on the target date
+   - Shows with the actual session title you entered (e.g., "Initial research", "Bug fixes")
+   - This is the most common type when using the modern multi-session system
+
+#### Using the Date Selector
+
+- **Date Dropdown**: Select from the last 10 days using descriptive labels ("Today", "Yesterday", or day names)
+- **Navigation Arrows**: Use the left/right arrows to quickly move between days
+- **Automatic Loading**: The page updates automatically when you change the date
+
+#### Understanding Entry Types
+
+- **Task-Level Entries**: Show "Task-level entry" and represent the task itself (cannot be moved between tasks)
+- **Session Entries**: Show a task selector dropdown and can be moved between tasks if needed
+- **Time Display**: Shows start time, end time (if applicable), and duration for each entry
+- **Manual Entries**: Manual time entries show only start time and duration (no end time)
+
+#### Query Rules Summary
+
+The Today page will show a task if **any** of these conditions are met:
+- The task was created/published on the selected date
+- The task has parent-level time tracking (`start_time`) on the selected date
+- The task has any session with `session_start_time` on the selected date
+- The current user is either the task author OR the assigned user (`ptt_assignee`)
+
+#### Debug Information
+
+The debug panel at the bottom shows:
+- Total number of tasks and entries found
+- Breakdown by entry type (created, parent_time, session)
+- Complete query rules explanation
+- Raw data for troubleshooting
+
+### 4. Viewing Reports
 
 1.  Navigate to **Tasks → Reports** from the admin menu.
 2.  Use the view mode toggle to select between "Classic", "Task Focused", or "Single Day".
@@ -126,6 +190,17 @@ A: The main notes for a task are pulled from the large content editor of the "Ta
 
 **Q: What does "Over Budget" in the reports mean?**
 A: The total time tracked for the task has exceeded the hours you set in the "Maximum Budget" field. The system first checks for a task-specific budget. If one is not set, it falls back to the budget of the parent project. If the text is red, you've gone over the allocated time.
+
+**Q: What's the difference between the Today page and the Single Day report?**
+A: While both show daily information, they serve different purposes:
+* **Today Page:** Shows all task-related activities for a date, including tasks that were simply created/published that day (even without time tracking). It's designed for daily workflow management.
+* **Single Day Report:** Focuses specifically on time tracking data and calculations for reporting purposes. It shows tasks that had actual work sessions on the selected day.
+
+**Q: Why do I see "created: Task Name" entries on the Today page?**
+A: These entries appear when a task was created or published on the selected date, even if no time has been tracked yet. This helps you see what new work was assigned or created on a specific day. You can start tracking time on these tasks by editing them and adding sessions.
+
+**Q: What does "Task-level entry" mean on the Today page?**
+A: This indicates an entry that represents the task itself (either because it was created on that date or has parent-level time tracking). Unlike session entries, these cannot be moved between tasks since they represent the task as a whole rather than a specific work session.
 
 ***
 

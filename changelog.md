@@ -1,5 +1,35 @@
 # Changelog
 
+## Version 1.10.9 - Enhanced Today Page Query Logic
+*Release Date: 2025-01-11*
+
+### Enhanced
+- **Today Page Query Expansion**: The Today page now shows tasks based on three comprehensive scenarios:
+  1. **Tasks Created/Published on Target Date**: Tasks that were created or published on the selected date now appear automatically
+  2. **Parent-Level Time Tracking**: Tasks with parent-level time fields (`start_time`, `stop_time`, `manual_duration`) that match the target date
+  3. **Session-Level Time Tracking**: Individual sessions within tasks that have `session_start_time` matching the target date (existing functionality)
+
+### Added
+- **Enhanced Debug Information**: Debug panel now shows detailed breakdown of entry types and explains all query rules
+- **Entry Type Classification**: Entries are now categorized and labeled as:
+  - "created: [Task Title]" for tasks published on the target date
+  - "parent_time: [Task Title]" for tasks with parent-level time tracking
+  - Session titles for individual session entries
+- **Improved User Interface**: Task-level entries show "Task-level entry" instead of session controls since they represent the task itself
+- **Better User Messaging**: Updated "No time entries recorded" to "No tasks or time entries found" to reflect expanded functionality
+
+### Technical Changes
+- **New Method**: `PTT_Today_Data_Provider::process_task_for_date()` - Comprehensive method that checks all three scenarios
+- **Refactored**: `process_task_sessions()` method - Now a focused helper for session-specific processing
+- **Enhanced**: Entry rendering logic to handle both task-level and session-level entries appropriately
+- **Updated**: Debug output to show counts for each entry type and comprehensive query rules
+
+### Developer Notes
+- All existing functionality remains backward compatible
+- New logic ensures tasks appear on Today page even without time tracking sessions
+- Entry structure includes `entry_type` array for future filtering and display options
+- Session index of -1 indicates task-level entries vs. session-level entries
+
 ## Version 1.10.8 - Auto-Timestamping Manual Sessions
 Feature: Manual session entries that are missing a start time will now be automatically timestamped at the moment the task is saved. This improves data accuracy for reporting.
 

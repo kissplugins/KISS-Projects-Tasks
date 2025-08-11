@@ -385,7 +385,7 @@ function ptt_get_daily_entries_callback() {
 
         ob_start();
         if ( empty( $entries ) ) {
-                echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
+                echo '<div class="ptt-today-no-entries">No tasks or time entries found for this day.</div>';
         } else {
                 echo '<div class="ptt-today-entries-wrapper" data-date="' . esc_attr( $target_date ) . '">';
                 foreach ( $entries as $entry ) {
