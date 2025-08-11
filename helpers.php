@@ -16,11 +16,11 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 /**
- * Gets all task post IDs for a specific user.
+ * Gets all task post IDs assigned to a specific user.
  *
- * A task belongs to a user if they are the post_author OR if they
- * are the ptt_assignee meta value. This provides a single, efficient
- * way to retrieve all relevant tasks for a user.
+ * A task belongs to a user if they are the ptt_assignee meta value.
+ * This ensures users only see tasks that are actually assigned to them,
+ * not tasks they created for others.
  *
  * @param int $user_id The ID of the user.
  * @return array An array of task post IDs. Returns an empty array if no tasks are found.

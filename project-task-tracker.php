@@ -735,6 +735,7 @@ function ptt_ensure_manual_session_timestamps( $post_id ) {
     }
 
     $now = null; // lazy load
+    $did_update = false;
 
     foreach ( $sessions as $i => $session ) {
         $is_manual = ! empty( $session['session_manual_override'] );
@@ -744,14 +745,20 @@ function ptt_ensure_manual_session_timestamps( $post_id ) {
             if ( null === $now ) {
                 $now = current_time( 'mysql', 1 ); // UTC
             }
-            // ACF sub field indexes are 1-based
+            // Update via keys (best effort)
             $row_index = $i + 1;
-            update_sub_field( array( 'sessions', $row_index, 'session_start_time' ), $now, $post_id );
-            update_sub_field( array( 'sessions', $row_index, 'session_stop_time' ),  $now, $post_id );
-            // Also update our in-memory copy so subsequent logic sees the value
+            update_sub_field( array( 'field_ptt_sessions', $row_index, 'field_ptt_session_start_time' ), $now, $post_id );
+            update_sub_field( array( 'field_ptt_sessions', $row_index, 'field_ptt_session_stop_time' ),  $now, $post_id );
+            // Update in-memory (names) so we can persist via update_field as a fallback
             $sessions[ $i ]['session_start_time'] = $now;
             $sessions[ $i ]['session_stop_time']  = $now;
+            $did_update = true;
         }
+    }
+
+    // Fallback/persistence: write the modified structure back to ACF
+    if ( $did_update ) {
+        update_field( 'sessions', $sessions, $post_id );
     }
 }
 
@@ -1157,6 +1164,35 @@ function ptt_save_manual_time_callback() {
     ] );
 }
 add_action( 'wp_ajax_ptt_save_manual_time', 'ptt_save_manual_time_callback' );
+
+/**
+ * Disable parent-level timer AJAX handlers.
+ * These are hidden from the UI but we disable the handlers for security.
+ */
+function ptt_disable_parent_level_timer_handlers() {
+    // Remove parent-level timer actions
+    remove_action( 'wp_ajax_ptt_start_timer', 'ptt_start_timer_callback' );
+    remove_action( 'wp_ajax_ptt_stop_timer', 'ptt_stop_timer_callback' );
+    remove_action( 'wp_ajax_ptt_save_manual_time', 'ptt_save_manual_time_callback' );
+    remove_action( 'wp_ajax_ptt_force_stop_timer', 'ptt_force_stop_timer_callback' );
+}
+// Uncomment the line below to disable parent-level timer handlers
+// add_action( 'init', 'ptt_disable_parent_level_timer_handlers', 20 );
+
+/**
+ * Add admin notice about hidden parent-level timer fields.
+ */
+function ptt_parent_timer_hidden_notice() {
+    $screen = get_current_screen();
+    if ( $screen && $screen->post_type === 'project_task' && ( $screen->base === 'post' || $screen->base === 'edit' ) ) {
+        echo '<div class="notice notice-info is-dismissible">';
+        echo '<p><strong>Project Task Tracker:</strong> Parent-level timer and manual time entry fields are now hidden. ';
+        echo 'Please use the <strong>Sessions</strong> section below for all time tracking. ';
+        echo 'Existing parent-level time data is preserved for calculations.</p>';
+        echo '</div>';
+    }
+}
+add_action( 'admin_notices', 'ptt_parent_timer_hidden_notice' );
 
 /**
  * AJAX handler to start a session timer.

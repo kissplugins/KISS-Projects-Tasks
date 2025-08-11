@@ -221,7 +221,7 @@ function ptt_get_tasks_for_today_page_callback() {
 	$client_id  = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
 	$user_id    = get_current_user_id();
 
-	// Get all tasks for the current user (author or assignee)
+	// Get all tasks assigned to the current user
 	$user_task_ids = ptt_get_tasks_for_user( $user_id );
 	if ( empty( $user_task_ids ) ) {
 		wp_send_json_success( [] ); // Send empty array if user has no tasks
@@ -385,7 +385,7 @@ function ptt_get_daily_entries_callback() {
 
         ob_start();
         if ( empty( $entries ) ) {
-                echo '<div class="ptt-today-no-entries">No time entries recorded for this day.</div>';
+                echo '<div class="ptt-today-no-entries">No tasks or time entries found for this day.</div>';
         } else {
                 echo '<div class="ptt-today-entries-wrapper" data-date="' . esc_attr( $target_date ) . '">';
                 foreach ( $entries as $entry ) {
@@ -400,6 +400,13 @@ function ptt_get_daily_entries_callback() {
                         $end_num    = $entry['stop_time'] ? wp_date( 'h:i:s', $entry['stop_time'] ) : '--:--:--';
                         $end_ampm   = $entry['stop_time'] ? wp_date( 'A', $entry['stop_time'] ) : '';
 
+                        // Prefer manual override display: if manual, show start time and hide end time indicator
+                        $is_manual = ! empty( $entry['is_manual'] );
+                        if ( $is_manual ) {
+                            $end_num = '';
+                            $end_ampm = '';
+                        }
+
                         $subtotal   = gmdate( 'H:i:s', $entry['duration_seconds'] ?? 0 );
 
                         ob_start();
@@ -409,7 +416,9 @@ function ptt_get_daily_entries_callback() {
                              data-duration-seconds="<?php echo esc_attr( $entry['duration_seconds'] ?? 0 ); ?>"
                              <?php echo $editable_attr; ?>>
                                 Start: <span class="ptt-time-display"><?php echo esc_html( $start_num ); ?></span> <?php echo esc_html( $start_ampm ); ?> |
+                                <?php if ( ! $is_manual ) : ?>
                                 End: <span class="ptt-time-display"><?php echo esc_html( $end_num ); ?></span> <?php echo esc_html( $end_ampm ); ?> |
+                                <?php endif; ?>
                                 Sub-total: <span class="ptt-time-display"><?php echo esc_html( $subtotal ); ?></span>
                         </div>
                         <?php
@@ -424,7 +433,7 @@ function ptt_get_daily_entries_callback() {
         // Get debug info
         $entries_count = count( $entries );
         $tasks_count   = count( array_unique( array_column( $entries, 'post_id' ) ) );
-        $debug_html    = PTT_Today_Page_Manager::get_debug_info( $user_id, $target_date, $tasks_count, $entries_count );
+        $debug_html    = PTT_Today_Page_Manager::get_debug_info( $user_id, $target_date, $tasks_count, $entries_count, $entries );
 
         wp_send_json_success(
                 [
@@ -687,3 +696,72 @@ function ptt_get_active_session_index_for_user( $user_id ) {
 
 	return false;
 }
+
+/**
+ * AJAX handler to start a timer from the Today page.
+ * Creates a new session with auto-generated title and starts timing.
+ */
+function ptt_today_start_timer_callback() {
+	check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+	if ( ! current_user_can( 'edit_posts' ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	}
+
+	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+	if ( ! $post_id ) {
+		wp_send_json_error( [ 'message' => 'Invalid task ID.' ] );
+	}
+
+	// Check if user has any active sessions
+	$active_session = ptt_get_active_session_index_for_user( get_current_user_id() );
+	if ( $active_session ) {
+		wp_send_json_error( [
+			'message' => 'You have an active timer running. Please stop it before starting a new one.',
+			'active_task_id' => $active_session['post_id']
+		] );
+	}
+
+	// Generate session title with current time
+	$current_time = current_time( 'mysql', 1 ); // UTC
+	$display_time = wp_date( 'g:i A', strtotime( $current_time ) ); // Local time for display
+	$task_title = get_the_title( $post_id );
+	$session_title = 'Session ' . $display_time;
+
+	// Create new session
+	$session_data = [
+		'session_title' => $session_title,
+		'session_notes' => '',
+		'session_start_time' => $current_time,
+		'session_stop_time' => '',
+		'session_manual_override' => false,
+		'session_manual_duration' => 0,
+		'session_calculated_duration' => '0.00',
+	];
+
+	// Add the session to the task
+	$sessions = get_field( 'sessions', $post_id ) ?: [];
+	$sessions[] = $session_data;
+	update_field( 'sessions', $sessions, $post_id );
+
+	// Get the new session index (last one added)
+	$session_index = count( $sessions ) - 1;
+
+	// Recalculate duration
+	ptt_calculate_and_save_duration( $post_id );
+
+	// Get task info for response
+	$task_title = get_the_title( $post_id );
+	$project_terms = get_the_terms( $post_id, 'project' );
+	$project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
+
+	wp_send_json_success( [
+		'message' => 'Timer started for new session!',
+		'post_id' => $post_id,
+		'session_index' => $session_index,
+		'session_title' => $session_title,
+		'task_title' => $task_title,
+		'project_name' => $project_name,
+		'start_time' => $current_time,
+	] );
+}
+add_action( 'wp_ajax_ptt_today_start_timer', 'ptt_today_start_timer_callback' );

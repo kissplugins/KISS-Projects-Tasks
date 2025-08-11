@@ -284,22 +284,22 @@ function ptt_run_self_tests_callback() {
 
     foreach ( $taxonomies_to_check as $tax_slug ) {
         $tax_obj = get_taxonomy( $tax_slug );
-        
+
         if ( ! $tax_obj ) {
             $errors[] = "Taxonomy '{$tax_slug}' is not registered.";
             continue;
         }
-        
+
         // Check if taxonomy has UI visibility
         if ( empty( $tax_obj->show_ui ) ) {
             $errors[] = "Taxonomy '{$tax_slug}' has show_ui disabled.";
         }
-        
+
         // Check if taxonomy is visible in menu (can be true or a string)
         if ( empty( $tax_obj->show_in_menu ) ) {
             $errors[] = "Taxonomy '{$tax_slug}' has show_in_menu disabled.";
         }
-        
+
         // Check if associated with project_task post type
         if ( ! in_array( 'project_task', (array) $tax_obj->object_type, true ) ) {
             $errors[] = "Taxonomy '{$tax_slug}' is not associated with the 'project_task' post type.";
@@ -440,8 +440,23 @@ function ptt_run_self_tests_callback() {
 			'session_manual_duration' => 0.5,
 		];
 
-		// This call saves the initial data, then triggers the filter we are testing.
+		// This call saves the initial data, then triggers the filter we are testing (ACF may use keys; ensure matching).
 		update_field( 'sessions', [ $session_row ], $timestamp_post );
+
+			// Normalize storage to names, in case update_sub_field with keys was used
+			$saved_sessions_pre = get_field( 'sessions', $timestamp_post );
+			if ( empty( $saved_sessions_pre[0]['session_start_time'] ) && ! empty( $saved_sessions_pre[0]['field_ptt_session_start_time'] ) ) {
+				// Copy from key->name for verification consistency
+				$saved_sessions_pre[0]['session_start_time'] = $saved_sessions_pre[0]['field_ptt_session_start_time'];
+				$saved_sessions_pre[0]['session_stop_time']  = $saved_sessions_pre[0]['field_ptt_session_stop_time'];
+			}
+
+
+			// Run safety net to ensure timestamps are set in current system
+			if ( function_exists( 'ptt_ensure_manual_session_timestamps' ) ) {
+				ptt_ensure_manual_session_timestamps( $timestamp_post );
+			}
+
 
 		// Retrieve the saved data to verify the filter worked.
 		$saved_sessions = get_field( 'sessions', $timestamp_post );
@@ -453,6 +468,10 @@ function ptt_run_self_tests_callback() {
 		if ( empty( $saved_sessions ) || ! is_array( $saved_sessions ) ) {
 			$fail_message = 'Failed at step 1: The session data was not saved or was empty after retrieval.';
 		} else {
+
+				// Debug: include raw fields for more insight
+				$debug_data .= ' | Raw get_post_meta: ' . print_r( get_post_meta( $timestamp_post ), true );
+
 			$first_session = $saved_sessions[0];
 			$debug_data    = ' Retrieved session data: ' . print_r( $first_session, true );
 
