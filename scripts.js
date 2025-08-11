@@ -1416,6 +1416,49 @@ jQuery(document).ready(function ($) {
 
     /**
      * ---------------------------------------------------------------
+     * DEBUG PANEL TOGGLE
+     * ---------------------------------------------------------------
+     */
+
+    // Initialize debug panel state from localStorage
+    function initDebugPanel() {
+        const $toggle = $('.ptt-debug-toggle');
+        const $content = $('.ptt-debug-panel-content');
+        const savedState = localStorage.getItem('ptt_debug_panel_expanded');
+
+        if (savedState === 'true') {
+            $content.show();
+            $toggle.attr('aria-expanded', 'true');
+        }
+    }
+
+    // Handle debug panel toggle
+    $('.ptt-debug-toggle').on('click', function(e) {
+        e.preventDefault();
+        const $toggle = $(this);
+        const $content = $('.ptt-debug-panel-content');
+        const isExpanded = $toggle.attr('aria-expanded') === 'true';
+
+        if (isExpanded) {
+            // Collapse
+            $content.slideUp(200);
+            $toggle.attr('aria-expanded', 'false');
+            localStorage.setItem('ptt_debug_panel_expanded', 'false');
+        } else {
+            // Expand
+            $content.slideDown(200);
+            $toggle.attr('aria-expanded', 'true');
+            localStorage.setItem('ptt_debug_panel_expanded', 'true');
+        }
+    });
+
+    // Initialize debug panel on page load
+    if ($('.ptt-debug-panel').length > 0) {
+        initDebugPanel();
+    }
+
+    /**
+     * ---------------------------------------------------------------
      * SELF-TEST MODULE
      * ---------------------------------------------------------------
      */

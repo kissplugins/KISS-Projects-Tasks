@@ -190,11 +190,15 @@ function ptt_render_today_page_html() {
                </div>
 
 		<!-- Debug Area -->
-		<div id="ptt-today-debug-area" 
-		     style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background: #f9f9f9;"
-		     data-module="debug">
-			<h3>Debug Info</h3>
-			<div id="ptt-debug-content" data-container="debug-content"></div>
+		<div id="ptt-today-debug-area" class="ptt-debug-panel" data-module="debug">
+			<div class="ptt-debug-panel-header">
+				<button type="button" class="ptt-debug-toggle button-link" aria-expanded="false">
+					<span class="dashicons dashicons-arrow-right-alt2"></span>
+					<span class="ptt-debug-title">Debug Information</span>
+					<span class="ptt-debug-subtitle">(Click to expand)</span>
+				</button>
+			</div>
+			<div id="ptt-debug-content" class="ptt-debug-panel-content" data-container="debug-content" style="display: none;"></div>
 		</div>
 
 		<!-- Hidden Data Storage for JS -->
