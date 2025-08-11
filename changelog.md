@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 1.11.15
+- **Extensive Self Test**: A lot of data model/structure tests were added to help prevent code regression/modifications to the core functionality
+
 ## Version 1.11.0 - Today Page Workflow Enhancements & Parent-Level Timer Cleanup
 *Release Date: 2025-01-11*
 
@@ -16,6 +19,7 @@
 - **"Edit Task" Button**: Added "Edit Task" button for all entries
   - Opens WordPress post editor in new tab
   - Available for both task-level and session-level entries
+
 
 ### Enhanced
 - **Today Page User Filtering**: Clarified that Today page only shows tasks assigned to current user (ptt_assignee)
