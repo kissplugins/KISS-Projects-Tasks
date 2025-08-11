@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.10.15
+ * Version:           1.11.15
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.10.15' );
+define( 'PTT_VERSION', '1.11.15' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -1178,21 +1178,6 @@ function ptt_disable_parent_level_timer_handlers() {
 }
 // Uncomment the line below to disable parent-level timer handlers
 // add_action( 'init', 'ptt_disable_parent_level_timer_handlers', 20 );
-
-/**
- * Add admin notice about hidden parent-level timer fields.
- */
-function ptt_parent_timer_hidden_notice() {
-    $screen = get_current_screen();
-    if ( $screen && $screen->post_type === 'project_task' && ( $screen->base === 'post' || $screen->base === 'edit' ) ) {
-        echo '<div class="notice notice-info is-dismissible">';
-        echo '<p><strong>Project Task Tracker:</strong> Parent-level timer and manual time entry fields are now hidden. ';
-        echo 'Please use the <strong>Sessions</strong> section below for all time tracking. ';
-        echo 'Existing parent-level time data is preserved for calculations.</p>';
-        echo '</div>';
-    }
-}
-add_action( 'admin_notices', 'ptt_parent_timer_hidden_notice' );
 
 /**
  * AJAX handler to start a session timer.
