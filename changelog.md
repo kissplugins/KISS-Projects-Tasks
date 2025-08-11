@@ -16,6 +16,7 @@
 - **"Edit Task" Button**: Added "Edit Task" button for all entries
   - Opens WordPress post editor in new tab
   - Available for both task-level and session-level entries
+- **Extensive Self Test**: A lot of data model/structure tests to help prevent code regression/modifications to the core functionality
 
 ### Enhanced
 - **Today Page User Filtering**: Clarified that Today page only shows tasks assigned to current user (ptt_assignee)
