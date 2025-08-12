@@ -169,13 +169,21 @@
 }
 
 .ptt-task-budget {
-    color: #f44336; /* Red */
-    font-weight: bold;
-    padding: 10px;
-    background-color: #ffebee;
-    border: 1px solid #f44336;
-    border-radius: 4px;
-    margin-bottom: 15px;
+}
+
+/* Quick Start badge */
+.ptt-badge-quick-start {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 6px;
+    font-size: 11px;
+    border-radius: 10px;
+    background: #f0f6fc;
+    color: #1d5aa6;
+    border: 1px solid #b6d4fe;
+    vertical-align: middle;
+}
+
     text-align: center;
 }
 

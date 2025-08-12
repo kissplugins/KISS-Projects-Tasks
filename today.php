@@ -7,7 +7,7 @@
  * This file registers the "Today" page and renders its markup and
  * logic for a daily time-tracking dashboard view.
  *
- * Version: 1.10.4
+ * Version: 1.12.0
  * ------------------------------------------------------------------
  */
 
@@ -58,17 +58,17 @@ function ptt_render_today_page_html() {
 		<!-- Timer Entry Box -->
 		<div class="ptt-today-entry-box" data-module="timer-entry">
 			<div class="ptt-today-input-group">
-				<input type="text" 
-				       id="ptt-today-session-title" 
+				<input type="text"
+				       id="ptt-today-session-title"
 				       placeholder="What are you working on?"
 				       data-field="session-title">
-				
-				<select id="ptt-today-task-select" 
+
+				<select id="ptt-today-task-select"
 				        disabled
 				        data-field="task-selector">
 					<option value="">-- Select a Project First --</option>
 				</select>
-				
+
 				<?php
 				// Project filter dropdown
 				wp_dropdown_categories( [
@@ -80,28 +80,26 @@ function ptt_render_today_page_html() {
 					'hierarchical'    => true,
 				] );
 				?>
-				
-				<!-- Placeholder for future client filter -->
-				<div id="ptt-today-client-filter-container" style="display: none;">
+
+				<!-- Client filter (required for Quick Start) -->
+				<div id="ptt-today-client-filter-container">
 					<?php
-					// Ready for future implementation
 					wp_dropdown_categories( [
 						'taxonomy'        => 'client',
 						'name'            => 'ptt-today-client-filter',
 						'id'              => 'ptt-today-client-filter',
-						'show_option_all' => 'All Clients',
+						'show_option_all' => 'Filter by Client...',
 						'hide_empty'      => false,
 						'hierarchical'    => true,
-						'show'            => 0, // Hidden by default
 					] );
 					?>
 				</div>
 			</div>
-			
+
 			<div class="ptt-today-timer-controls">
 				<div class="ptt-today-timer-display ptt-time-display" data-timer="main">00:00:00</div>
-				<button type="button" 
-				        id="ptt-today-start-stop-btn" 
+				<button type="button"
+				        id="ptt-today-start-stop-btn"
 				        class="button button-primary"
 				        data-action="toggle-timer">Start</button>
 			</div>
@@ -131,12 +129,12 @@ function ptt_render_today_page_html() {
 							?>
 						</select>
 					</div>
-					
+
 					<!-- Total Display -->
                                         <span id="ptt-today-total" data-field="total-display">
                                                 <span class="ptt-muted-label">Total</span> <strong class="ptt-time-display">00:00:00</strong>
                                         </span>
-					
+
 					<!-- View Options (Future) -->
 					<div class="ptt-today-view-options" style="display: none;">
 						<button class="button button-small" data-view="compact">Compact</button>
@@ -144,12 +142,12 @@ function ptt_render_today_page_html() {
 					</div>
 				</div>
 			</div>
-			
+
 			<!-- Entries List Container -->
 			<div id="ptt-today-entries-list" data-container="entries">
 				<div class="ptt-ajax-spinner"></div>
 			</div>
-			
+
 			<!-- Entry Template (Hidden, for JS cloning) -->
                        <template id="ptt-today-entry-template">
                                <div class="ptt-today-entry" data-entry-id="" data-post-id="" data-session-index="">
@@ -253,7 +251,7 @@ function ptt_get_tasks_for_today_page_callback() {
 			'terms'    => $project_id,
 		];
 	}
-	
+
 	if ( $client_id > 0 ) {
 		$args['tax_query'][] = [
 			'taxonomy' => 'client',
@@ -268,11 +266,11 @@ function ptt_get_tasks_for_today_page_callback() {
 		while ( $query->have_posts() ) {
 			$query->the_post();
 			$post_id = get_the_ID();
-			
+
 			// Get additional metadata for richer dropdown display
 			$project_terms = get_the_terms( $post_id, 'project' );
 			$project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
-			
+
 			$tasks[] = [
 				'id'           => $post_id,
 				'title'        => get_the_title(),
@@ -360,7 +358,7 @@ function ptt_get_daily_entries_callback() {
 	$target_date = isset( $_POST['date'] ) ? sanitize_text_field( $_POST['date'] ) : date( 'Y-m-d' );
 	$client_id = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
 	$project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
-	
+
 	// Build filters array
 	$filters = [];
 	if ( $client_id > 0 ) {
@@ -369,7 +367,7 @@ function ptt_get_daily_entries_callback() {
 	if ( $project_id > 0 ) {
 		$filters['project_id'] = $project_id;
 	}
-	
+
         // Fetch entries and build custom HTML with start/end times
         $entries = PTT_Today_Data_Provider::get_daily_entries( $user_id, $target_date, $filters );
         $total   = PTT_Today_Data_Provider::calculate_total_duration( $entries );
@@ -535,14 +533,14 @@ function ptt_update_session_field_callback() {
 	}
 
 	$acf_field = $field_map[ $field_name ];
-	
+
 	// Update the field
-	$updated = update_sub_field( 
-		array( 'sessions', $session_index + 1, $acf_field ), 
-		$field_value, 
-		$post_id 
+	$updated = update_sub_field(
+		array( 'sessions', $session_index + 1, $acf_field ),
+		$field_value,
+		$post_id
 	);
-	
+
 	if ( $updated ) {
 		wp_send_json_success( [
 			'message' => 'Field updated successfully.',
@@ -574,11 +572,11 @@ function ptt_delete_session_callback() {
 
 	// Delete the row
 	$deleted = delete_row( 'sessions', $session_index + 1, $post_id );
-	
+
 	if ( $deleted ) {
 		// Recalculate total duration
 		ptt_calculate_and_save_duration( $post_id );
-		
+
 		wp_send_json_success( [
 			'message' => 'Session deleted successfully.',
 		] );
@@ -756,3 +754,142 @@ function ptt_today_start_timer_callback() {
 	] );
 }
 add_action( 'wp_ajax_ptt_today_start_timer', 'ptt_today_start_timer_callback' );
+
+/**
+ * AJAX: Quick Start a session by client only. Creates/uses placeholder project/task for the user.
+ */
+function ptt_today_quick_start_callback() {
+    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
+    if ( ! current_user_can( 'edit_posts' ) ) {
+        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+    }
+
+    $client_id = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
+    if ( ! $client_id ) {
+        wp_send_json_error( [ 'message' => 'Client is required.' ] );
+    }
+
+    $user_id = get_current_user_id();
+
+    // Stop any other running session for the current user first.
+    $active_session = ptt_get_active_session_index_for_user( $user_id );
+    if ( $active_session ) {
+        ptt_stop_session( $active_session['post_id'], $active_session['index'] );
+    }
+
+    // Ensure Quick Start project exists
+    $placeholder_project_id = ptt_get_or_create_quick_start_project();
+    if ( ! $placeholder_project_id ) {
+        wp_send_json_error( [ 'message' => 'Could not create Quick Start project.' ] );
+    }
+
+    // Ensure daily quick-start task exists for this user and client
+    $placeholder_task_id = ptt_get_or_create_daily_quick_start_task( $user_id, $placeholder_project_id, $client_id );
+    if ( ! $placeholder_task_id ) {
+        wp_send_json_error( [ 'message' => 'Could not create quick-start task.' ] );
+    }
+
+    // Create session with auto title
+    $title = sprintf( 'Started %s - %s', wp_date( 'g:i A' ), wp_date( 'M. j' ) );
+    $new_session = [
+        'session_title'      => $title,
+        'session_notes'      => '',
+        'session_start_time' => current_time( 'mysql', 1 ), // UTC
+    ];
+
+    $new_row_index = add_row( 'sessions', $new_session, $placeholder_task_id );
+    if ( ! $new_row_index ) {
+        wp_send_json_error( [ 'message' => 'Failed to create new session.' ] );
+    }
+
+    // Response data
+    $project_terms = get_the_terms( $placeholder_task_id, 'project' );
+    $project_name  = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
+    $client_terms  = get_the_terms( $placeholder_task_id, 'client' );
+    $client_name   = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '';
+
+    wp_send_json_success( [
+        'message'      => 'Timer started!',
+        'post_id'      => $placeholder_task_id,
+        'row_index'    => $new_row_index - 1,
+        'start_time'   => $new_session['session_start_time'],
+        'task_title'   => get_the_title( $placeholder_task_id ),
+        'project_name' => $project_name,
+        'client_name'  => $client_name,
+        'session_data' => [ 'title' => $title ],
+    ] );
+}
+add_action( 'wp_ajax_ptt_today_quick_start', 'ptt_today_quick_start_callback' );
+
+/**
+ * Get or create the global placeholder Project.
+ * Returns term_id of the Project taxonomy term.
+ */
+function ptt_get_or_create_quick_start_project() {
+    $term = get_term_by( 'slug', 'quick-start', 'project' );
+    if ( $term && ! is_wp_error( $term ) ) {
+        return $term->term_id;
+    }
+    $created = wp_insert_term( 'Quick Start', 'project', [ 'slug' => 'quick-start' ] );
+    if ( is_wp_error( $created ) ) {
+        return 0;
+    }
+    return (int) ( $created['term_id'] ?? 0 );
+}
+
+/**
+ * Get or create the per-user placeholder Task under the placeholder project.
+ * Also associates the selected client taxonomy to the task.
+ */
+function ptt_get_or_create_daily_quick_start_task( $user_id, $project_term_id, $client_term_id ) {
+    $date_label = wp_date( 'M. j, Y' );
+    $client_obj = $client_term_id ? get_term( $client_term_id, 'client' ) : null;
+    $client_label = ( $client_obj && ! is_wp_error( $client_obj ) ) ? ( ' — ' . $client_obj->name ) : '';
+    $task_title = sprintf( 'Quick Start — %s — %s%s', $date_label, wp_get_current_user()->display_name, $client_label );
+
+    // Try to find an existing daily task for this user (and client)
+    $existing = get_posts( [
+        'post_type'      => 'project_task',
+        's'              => $task_title,
+        'post_status'    => [ 'publish', 'private' ],
+        'posts_per_page' => 1,
+        'meta_query'     => [
+            [ 'key' => 'ptt_assignee', 'value' => $user_id, 'compare' => '=' ],
+        ],
+        'tax_query'      => [
+            [ 'taxonomy' => 'project', 'field' => 'term_id', 'terms' => $project_term_id ],
+        ],
+        'fields'         => 'ids',
+    ] );
+
+    if ( ! empty( $existing ) ) {
+        $post_id = (int) $existing[0];
+    } else {
+        $post_id = wp_insert_post( [
+            'post_type'   => 'project_task',
+            'post_title'  => $task_title,
+            'post_status' => 'publish',
+            'post_author' => $user_id,
+        ] );
+        if ( is_wp_error( $post_id ) || ! $post_id ) {
+            return 0;
+        }
+
+        // Assign assignee and taxonomy
+        update_post_meta( $post_id, 'ptt_assignee', $user_id );
+        wp_set_post_terms( $post_id, [ $project_term_id ], 'project', false );
+
+        // Set status to In Progress if exists
+        $in_progress = get_term_by( 'name', 'In Progress', 'task_status' );
+        if ( $in_progress && ! is_wp_error( $in_progress ) ) {
+            wp_set_post_terms( $post_id, [ $in_progress->term_id ], 'task_status', false );
+        }
+    }
+
+    // Tag with the selected client (non-destructive)
+    if ( $client_term_id ) {
+        wp_set_post_terms( $post_id, [ $client_term_id ], 'client', false );
+    }
+
+    return (int) $post_id;
+}
