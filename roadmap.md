@@ -1,3 +1,7 @@
+For the Today page, could we implement a click -> live edit on the Session name?
+
+Could we also modify the WP admin toolbar at the top to indicate if a current timer is activated for the user session?
+
 # Roadmap
 
 ## Phase 2 (Security Hardening for External Client View)

@@ -1,6 +1,5 @@
 # Changelog
 
-
 ## Version 1.12.5 - Today Page Quick Start: Client Selector Re-enabled
 - Fixed: After stopping a Quick Start session on the Today page, the Client selector is now re-enabled as expected for subsequent sessions
 
