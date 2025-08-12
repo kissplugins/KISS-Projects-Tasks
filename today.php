@@ -35,7 +35,7 @@ function ptt_add_today_page() {
 add_action( 'admin_menu', 'ptt_add_today_page', 5 ); // High priority to appear early
 
 /**
- * Enqueues the Silkscreen font and time display styles for the Today page.
+ * Ensures time display styles are applied on the Today page.
  *
  * @param string $hook Current admin page hook.
  */
@@ -43,12 +43,7 @@ function ptt_today_enqueue_font( $hook ) {
     if ( 'project_task_page_ptt-today' !== $hook ) {
         return;
     }
-
-    wp_enqueue_style( 'ptt-silkscreen-font', 'https://fonts.googleapis.com/css2?family=Silkscreen&display=swap', [], null );
-    wp_add_inline_style(
-        'ptt-styles',
-        '.ptt-time-display{font-family:"Silkscreen",monospace;font-weight:400;}.entry-duration{font-family:inherit;font-weight:400;}'
-    );
+    // Using local @font-face via styles.css; no external font enqueue needed.
 }
 add_action( 'admin_enqueue_scripts', 'ptt_today_enqueue_font', 20 );
 
@@ -104,7 +99,7 @@ function ptt_render_today_page_html() {
 			</div>
 			
 			<div class="ptt-today-timer-controls">
-				<div class="ptt-today-timer-display" data-timer="main">00:00:00</div>
+				<div class="ptt-today-timer-display ptt-time-display" data-timer="main">00:00:00</div>
 				<button type="button" 
 				        id="ptt-today-start-stop-btn" 
 				        class="button button-primary"
@@ -119,10 +114,6 @@ function ptt_render_today_page_html() {
 				<div class="ptt-today-controls-wrapper">
 					<!-- Date Switcher -->
 					<div class="ptt-today-date-switcher">
-						<button class="ptt-date-nav" data-direction="prev" title="Previous day">
-							<span class="dashicons dashicons-arrow-left-alt2"></span>
-						</button>
-						
 						<select id="ptt-today-date-select" data-field="date-selector">
 							<?php
 							for ( $i = 0; $i < 10; $i++ ) {
@@ -139,15 +130,11 @@ function ptt_render_today_page_html() {
 							}
 							?>
 						</select>
-						
-						<button class="ptt-date-nav" data-direction="next" title="Next day">
-							<span class="dashicons dashicons-arrow-right-alt2"></span>
-						</button>
 					</div>
 					
 					<!-- Total Display -->
                                         <span id="ptt-today-total" data-field="total-display">
-                                                Total: <strong class="ptt-time-display">00:00:00</strong>
+                                                <span class="ptt-muted-label">Total</span> <strong class="ptt-time-display">00:00:00</strong>
                                         </span>
 					
 					<!-- View Options (Future) -->
@@ -181,9 +168,9 @@ function ptt_render_today_page_html() {
                                                </span>
                                        </div>
                                        <div class="entry-duration" data-field="duration">
-                                               Start: <span class="ptt-time-display" data-start></span> |
-                                               End: <span class="ptt-time-display" data-end></span> |
-                                               Sub-total: <span class="ptt-time-display" data-subtotal></span>
+                                               <span class="ptt-muted-label">Start</span> <span class="ptt-time-display" data-start></span> |
+                                               <span class="ptt-muted-label">End</span> <span class="ptt-time-display" data-end></span> |
+                                               <span class="ptt-muted-label">Sub-total</span> <span class="ptt-time-display" data-subtotal></span>
                                        </div>
                                </div>
                        </template>
@@ -419,11 +406,11 @@ function ptt_get_daily_entries_callback() {
                              data-field="duration"
                              data-duration-seconds="<?php echo esc_attr( $entry['duration_seconds'] ?? 0 ); ?>"
                              <?php echo $editable_attr; ?>>
-                                Start: <span class="ptt-time-display"><?php echo esc_html( $start_num ); ?></span> <?php echo esc_html( $start_ampm ); ?> |
+                                <span class="ptt-muted-label">Start</span> <span class="ptt-time-display"><?php echo esc_html( $start_num ); ?></span> <span class="ptt-ampm"><?php echo esc_html( $start_ampm ); ?></span> |
                                 <?php if ( ! $is_manual ) : ?>
-                                End: <span class="ptt-time-display"><?php echo esc_html( $end_num ); ?></span> <?php echo esc_html( $end_ampm ); ?> |
+                                <span class="ptt-muted-label">End</span> <span class="ptt-time-display"><?php echo esc_html( $end_num ); ?></span> <span class="ptt-ampm"><?php echo esc_html( $end_ampm ); ?></span> |
                                 <?php endif; ?>
-                                Sub-total: <span class="ptt-time-display"><?php echo esc_html( $subtotal ); ?></span>
+                                <span class="ptt-muted-label">Sub-total</span> <span class="ptt-time-display"><?php echo esc_html( $subtotal ); ?></span>
                         </div>
                         <?php
                         $duration_div = ob_get_clean();

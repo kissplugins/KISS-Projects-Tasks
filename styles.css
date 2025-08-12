@@ -1,3 +1,25 @@
+/* =========================================
+ * Seven-Segment Font (DSEG7 Classic Italic)
+ * ========================================= */
+@font-face {
+    font-family: 'DSEG7Classic-Italic';
+    src: url('fonts/DSEG7Classic-Italic.woff') format('woff');
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+}
+
+/* Apply to all time displays across plugin */
+.ptt-time-display,
+#ptt-today-page-container .ptt-today-timer-display,
+.ptt-session-elapsed-time,
+#ptt-today-page-container .entry-duration input {
+    font-family: 'DSEG7Classic-Italic', monospace, sans-serif !important;
+    font-weight: 400 !important;
+    font-style: italic;
+    letter-spacing: 0.02em;
+}
+
 /* --- Admin & General Styles --- */
 .ptt-start-button {
     background-color: #4CAF50 !important; /* Green */
@@ -86,7 +108,7 @@
 }
 
 .ptt-session-elapsed-time {
-    font-family: monospace;
+    font-family: 'DSEG7Classic-Italic', monospace, sans-serif;
     font-size: 1.2em;
     font-weight: bold;
     color: #f44336; /* Red for running timer */
@@ -193,7 +215,7 @@
     font-size: 1.2em;
     font-weight: bold;
     color: #4CAF50;
-    font-family: monospace;
+    font-family: 'DSEG7Classic-Italic', monospace;
 }
 
 /* --- Report Styles --- */
@@ -928,10 +950,22 @@
 }
 
 #ptt-today-page-container .ptt-today-timer-display {
-    font-family: monospace, sans-serif;
+    /* font-family inherited from .ptt-time-display styles */
     font-size: 28px;
     font-weight: bold;
     color: #1d2327;
+}
+
+/* Muted labels and AM/PM on Today page */
+#ptt-today-page-container .ptt-muted-label,
+#ptt-today-page-container .ptt-ampm {
+    color: #8a98a2; /* ~15% lighter than #6c757d */
+}
+
+/* Hide colon characters after labels by removing them from markup,
+   but ensure legacy content with colons looks clean */
+#ptt-today-page-container .entry-duration {
+    word-spacing: 1px;
 }
 
 #ptt-today-page-container #ptt-today-start-stop-btn {
