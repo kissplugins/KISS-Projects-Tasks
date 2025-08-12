@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.12.5
+ * Version:           1.12.6
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.12.5' );
+define( 'PTT_VERSION', '1.12.6' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -34,6 +34,8 @@ require_once PTT_PLUGIN_DIR . 'ext-client.php';
 
 
 // =================================================================
+require_once PTT_PLUGIN_DIR . 'admin-bar-indicator.php';
+
 // 1.0 PLUGIN ACTIVATION & DEACTIVATION
 // =================================================================
 
@@ -121,6 +123,8 @@ function ptt_register_post_type() {
         'edit_item'          => __( 'Edit Task', 'ptt' ),
         'view_item'          => __( 'View Task', 'ptt' ),
         'all_items'          => __( 'All Tasks', 'ptt' ),
+
+
         'search_items'       => __( 'Search Tasks', 'ptt' ),
         'parent_item_colon'  => __( 'Parent Tasks:', 'ptt' ),
         'not_found'          => __( 'No tasks found.', 'ptt' ),
@@ -356,6 +360,8 @@ function ptt_register_acf_fields() {
                         'label' => 'Session Title',
                         'name' => 'session_title',
                         'type' => 'text',
+
+
                     ),
                     array(
                         'key' => 'field_ptt_session_notes',
@@ -554,6 +560,8 @@ function ptt_enqueue_assets() {
 
     // Localize script to pass data like nonces and AJAX URL
     wp_localize_script( 'ptt-scripts', 'ptt_ajax_object', [
+
+
         'ajax_url'              => admin_url( 'admin-ajax.php' ),
         'nonce'                 => wp_create_nonce( 'ptt_ajax_nonce' ),
         'confirm_stop'          => __('Are you sure you want to stop the timer?', 'ptt'),
@@ -1061,6 +1069,10 @@ function ptt_start_timer_callback() {
     $status_terms = get_the_terms( $post_id, 'task_status' );
     $status_name  = ! is_wp_error( $status_terms ) && $status_terms ? $status_terms[0]->name : '';
 
+    // Mark user flag for admin bar
+    if ( function_exists( 'ptt_set_user_timer_status' ) ) {
+        ptt_set_user_timer_status( get_current_user_id(), true, $post_id );
+    }
     wp_send_json_success( [
         'message'     => 'Timer started!',
         'start_time'  => $current_time,
@@ -1120,6 +1132,11 @@ function ptt_stop_timer_callback() {
     update_field( 'stop_time', $current_time, $post_id );
 
     $duration = ptt_calculate_and_save_duration( $post_id );
+
+    // Clear user timer flag for admin bar
+    if ( function_exists( 'ptt_set_user_timer_status' ) ) {
+        ptt_set_user_timer_status( get_current_user_id(), false );
+    }
 
     wp_send_json_success( [
         'message' => 'Timer stopped! Duration: ' . $duration . ' hours.',
@@ -1265,6 +1282,14 @@ function ptt_stop_session_timer_callback() {
     }
 
     $duration = ptt_stop_session( $post_id, $row_index );
+
+    // If no other active sessions remain for this user, clear admin bar flag
+    if ( function_exists( 'ptt_get_active_session_index_for_user' ) && function_exists( 'ptt_set_user_timer_status' ) ) {
+        $active = ptt_get_active_session_index_for_user( get_current_user_id() );
+        if ( ! $active ) {
+            ptt_set_user_timer_status( get_current_user_id(), false );
+        }
+    }
 
     wp_send_json_success( [
         'message'   => 'Session stopped! Duration: ' . $duration . ' hours.',

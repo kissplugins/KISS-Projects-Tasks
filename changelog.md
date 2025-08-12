@@ -1,6 +1,10 @@
 # Changelog
 
 ## Version 1.12.5 - Today Page Quick Start: Client Selector Re-enabled
+## Version 1.12.6 - Today Page Inline Edits + Admin Bar Timer Indicator
+- New: Click-to-edit session title directly from the Today page (for non-running sessions). Saves instantly via AJAX.
+- New: Admin bar indicator shows a pulsing red dot when you have an active timer; click to jump to Today page.
+
 - Fixed: After stopping a Quick Start session on the Today page, the Client selector is now re-enabled as expected for subsequent sessions
 
 ## Version 1.12.4 - External Client View (Public)

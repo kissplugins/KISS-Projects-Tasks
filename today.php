@@ -328,6 +328,10 @@ function ptt_today_start_new_session_callback() {
         $client_terms  = get_the_terms( $post_id, 'client' );
         $client_name   = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '';
 
+        // Mark user flag for admin bar
+        if ( function_exists( 'ptt_set_user_timer_status' ) ) {
+            ptt_set_user_timer_status( get_current_user_id(), true, $post_id );
+        }
         wp_send_json_success( [
                 'message'      => 'Timer started!',
                 'post_id'      => $post_id,
@@ -548,6 +552,16 @@ function ptt_update_session_field_callback() {
 			'field_value' => $field_value,
 		] );
 	} else {
+		// Treat "no change" or same value as success to avoid false negatives
+		$sessions = get_field( 'sessions', $post_id );
+		$current = isset($sessions[$session_index][$acf_field]) ? $sessions[$session_index][$acf_field] : null;
+		if ( $current === $field_value ) {
+			wp_send_json_success( [
+				'message' => 'No changes needed.',
+				'field_name' => $field_name,
+				'field_value' => $field_value,
+			] );
+		}
 		wp_send_json_error( [ 'message' => 'Failed to update field.' ] );
 	}
 }
@@ -743,6 +757,10 @@ function ptt_today_start_timer_callback() {
 	$project_terms = get_the_terms( $post_id, 'project' );
 	$project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
 
+	// Mark user flag for admin bar
+	if ( function_exists( 'ptt_set_user_timer_status' ) ) {
+		ptt_set_user_timer_status( get_current_user_id(), true, $post_id );
+	}
 	wp_send_json_success( [
 		'message' => 'Timer started for new session!',
 		'post_id' => $post_id,
@@ -808,6 +826,10 @@ function ptt_today_quick_start_callback() {
     $client_terms  = get_the_terms( $placeholder_task_id, 'client' );
     $client_name   = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '';
 
+    // Mark user flag for admin bar
+    if ( function_exists( 'ptt_set_user_timer_status' ) ) {
+        ptt_set_user_timer_status( get_current_user_id(), true, $placeholder_task_id );
+    }
     wp_send_json_success( [
         'message'      => 'Timer started!',
         'post_id'      => $placeholder_task_id,

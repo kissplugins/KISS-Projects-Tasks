@@ -62,7 +62,7 @@ class PTT_Today_Entry_Renderer {
 		ob_start();
 		?>
 		<div class="entry-details">
-			<span class="entry-session-title" data-field="session_title">
+			<span class="entry-session-title" data-field="session_title" data-editable="true">
 				<?php echo esc_html( $entry['session_title'] ); ?>
 				<?php if ( ! empty( $entry['is_quick_start'] ) ) : ?>
 					<span class="ptt-badge-quick-start" title="Quick Start Task">Quick Start</span>

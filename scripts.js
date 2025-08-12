@@ -1254,6 +1254,61 @@ jQuery(document).ready(function ($) {
                     }
                     initializeEntryTaskSelectors();
                 }
+
+            // Inline edit: session title (non-running only)
+            $entriesList.on('click', '.ptt-today-entry .entry-details .entry-session-title[data-editable="true"]', function(){
+                const $span = $(this);
+                const $entry = $span.closest('.ptt-today-entry');
+                if ($entry.hasClass('running')) return; // do not edit running entries
+                if ($span.data('editing')) return;
+                $span.data('editing', true);
+
+                const originalText = $span.text().trim();
+                const $input = $('<input type="text" class="ptt-inline-input" />').val(originalText).css({
+                    width: Math.max($span.width()+40, 200) + 'px'
+                });
+                $span.hide().after($input);
+                $input.focus().select();
+
+                const save = () => {
+                    const newVal = $input.val().trim();
+                    if (newVal === originalText) { cancel(); return; }
+                    $input.prop('disabled', true);
+                    $.post(ptt_ajax_object.ajax_url, {
+                        action: 'ptt_update_session_field',
+                        nonce: ptt_ajax_object.nonce,
+                        post_id: $entry.data('post-id'),
+                        session_index: $entry.data('session-index'),
+                        field_name: 'session_title',
+                        field_value: newVal
+                    }).done(function(resp){
+                        if (resp.success) {
+                            $span.text(newVal);
+                        } else {
+                            alert(resp.data && resp.data.message ? resp.data.message : 'Update failed');
+                        }
+                    }).fail(function(){
+                        alert('Network error.');
+                    }).always(function(){
+                        $input.remove();
+                        $span.show();
+                        $span.data('editing', false);
+                    });
+                };
+
+                const cancel = () => {
+                    $input.remove();
+                    $span.show();
+                    $span.data('editing', false);
+                };
+
+                $input.on('keydown', function(e){
+                    if (e.key === 'Enter') { e.preventDefault(); save(); }
+                    if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+                });
+                $input.on('blur', function(){ save(); });
+            });
+
             });
         }
 
