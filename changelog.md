@@ -1,5 +1,13 @@
 # Changelog
 
+
+## Version 1.12.0 - Today Page Quick Start (Client-Required)
+- Added Client selector to the "What are you working on?" row on Today page
+- Quick Start: Users can click Start after choosing a Client; plugin creates/uses a per-user daily Quick Start task under the "Quick Start" project (scoped by user and client)
+- Auto session title format: "Started 3:42 PM - Aug. 11" (localized)
+- Task dropdown now filters by selected Client (and Project if chosen)
+- Minor UI consistency: muted labels and removed colons on time display
+
 ## Version 1.11.16
 - **Collapisble Debug Panel on Today Page**:  Less noise on screen
 

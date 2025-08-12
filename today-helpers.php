@@ -64,6 +64,9 @@ class PTT_Today_Entry_Renderer {
 		<div class="entry-details">
 			<span class="entry-session-title" data-field="session_title">
 				<?php echo esc_html( $entry['session_title'] ); ?>
+				<?php if ( ! empty( $entry['is_quick_start'] ) ) : ?>
+					<span class="ptt-badge-quick-start" title="Quick Start Task">Quick Start</span>
+				<?php endif; ?>
 			</span>
                        <span class="entry-meta">
                                <?php
@@ -76,6 +79,16 @@ class PTT_Today_Entry_Renderer {
                                        $client_id    = $entry['client_id'] ?? 0;
                                        $user_task_ids = ptt_get_tasks_for_user( get_current_user_id() );
 
+							$__is_quick_start = ! empty( $entry['is_quick_start'] );
+							$__tax_query = [ 'relation' => 'AND' ];
+							if ( $__is_quick_start && $client_id ) {
+								$__tax_query[] = [ 'taxonomy' => 'client', 'field' => 'term_id', 'terms' => $client_id ];
+							} else {
+								$__tax_query[] = [ 'taxonomy' => 'project', 'field' => 'term_id', 'terms' => $project_id ];
+								if ( $client_id ) { $__tax_query[] = [ 'taxonomy' => 'client', 'field' => 'term_id', 'terms' => $client_id ]; }
+							}
+
+
                                        $task_args = [
                                                'post_type'      => 'project_task',
                                                'posts_per_page' => 100,
@@ -83,52 +96,38 @@ class PTT_Today_Entry_Renderer {
                                                'orderby'        => 'date',
                                                'order'          => 'DESC',
                                                'post__in'       => $user_task_ids,
-                                               'tax_query'      => [
-                                                       'relation' => 'AND',
-                                                       [
-                                                               'taxonomy' => 'project',
-                                                               'field'    => 'term_id',
-                                                               'terms'    => $project_id,
-                                                       ],
-                                               ],
-                                       ];
+								'tax_query'      => $__tax_query,
+							];
 
-                                       if ( $client_id ) {
-                                               $task_args['tax_query'][] = [
-                                                       'taxonomy' => 'client',
-                                                       'field'    => 'term_id',
-                                                       'terms'    => $client_id,
-                                               ];
-                                       }
+							$tasks_query = new WP_Query( $task_args );
+							?>
+							<select class="ptt-entry-task-selector" data-original-task="<?php echo esc_attr( $entry['post_id'] ); ?>">
+								<?php
+								if ( $tasks_query->have_posts() ) {
+									while ( $tasks_query->have_posts() ) {
+										$tasks_query->the_post();
+										echo '<option value="' . esc_attr( get_the_ID() ) . '"' . selected( get_the_ID(), $entry['post_id'], false ) . '>' . esc_html( get_the_title() ) . '</option>';
+									}
+									wp_reset_postdata();
+								}
+								?>
+							</select>
+							<button type="button" class="button button-small ptt-move-session-btn" style="display:none;">Move</button>
+							<button type="button" class="button button-small ptt-cancel-move-btn" style="display:none;">Cancel</button>
+							&bull;
+							<?php } else { ?>
+								<em>Task-level entry</em> &bull;
+							<?php } ?>
+							<span class="entry-project-name" data-field="project_name">
+								<?php echo esc_html( $entry['project_name'] ); ?>
+							</span>
+							<?php if ( ! empty( $entry['client_name'] ) ) : ?>
+								&bull;
+								<span class="entry-client-name" data-field="client_name">
+									<?php echo esc_html( $entry['client_name'] ); ?>
+								</span>
+							<?php endif; ?>
 
-                                       $tasks_query = new WP_Query( $task_args );
-                                       ?>
-                                       <select class="ptt-entry-task-selector" data-original-task="<?php echo esc_attr( $entry['post_id'] ); ?>">
-                                               <?php
-                                               if ( $tasks_query->have_posts() ) {
-                                                       while ( $tasks_query->have_posts() ) {
-                                                               $tasks_query->the_post();
-                                                               echo '<option value="' . esc_attr( get_the_ID() ) . '"' . selected( get_the_ID(), $entry['post_id'], false ) . '>' . esc_html( get_the_title() ) . '</option>';
-                                                       }
-                                                       wp_reset_postdata();
-                                               }
-                                               ?>
-                                       </select>
-                                       <button type="button" class="button button-small ptt-move-session-btn" style="display:none;">Move</button>
-                                       <button type="button" class="button button-small ptt-cancel-move-btn" style="display:none;">Cancel</button>
-                                       &bull;
-                               <?php } else { ?>
-                                       <em>Task-level entry</em> &bull;
-                               <?php } ?>
-                               <span class="entry-project-name" data-field="project_name">
-                                       <?php echo esc_html( $entry['project_name'] ); ?>
-                               </span>
-                               <?php if ( ! empty( $entry['client_name'] ) ) : ?>
-                                       &bull;
-                                       <span class="entry-client-name" data-field="client_name">
-                                               <?php echo esc_html( $entry['client_name'] ); ?>
-                                       </span>
-                               <?php endif; ?>
                        </span>
 			<?php if ( ! empty( $entry['session_notes'] ) ) : ?>
 				<span class="entry-notes" data-field="session_notes">
@@ -419,6 +418,7 @@ class PTT_Today_Data_Provider {
 				'client_name'      => $client_name,
 				'project_id'       => $project_id,
 				'client_id'        => $client_id,
+				'is_quick_start'   => ( $project_name === 'Quick Start' ),
 				'start_time'       => $start_ts,
 				'stop_time'        => $stop_ts,
 				'duration_seconds' => $duration_seconds,
@@ -499,6 +499,7 @@ class PTT_Today_Data_Provider {
 					'client_name'      => $client_name,
 					'project_id'       => $project_id,
 					'client_id'        => $client_id,
+					'is_quick_start'   => ( $project_name === 'Quick Start' ),
 					'start_time'       => $start_ts,
 					'stop_time'        => $stop_ts,
 					'duration_seconds' => $duration_seconds,
@@ -637,6 +638,18 @@ class PTT_Today_Page_Manager {
 					</li>
 					<li><strong>Workflow:</strong> Use action buttons (Start Timer, Add Another Session, Edit Task) for seamless time tracking</li>
 					<li><strong>Data Access:</strong> Tasks created by the user but assigned to others are NOT shown (use Reports or All Tasks for broader data)</li>
+					<li><strong>Quick Start & Reassignment Rules:</strong>
+						<ul>
+							<li><strong>Quick Start Project:</strong> Daily Quick Start tasks are created under the <em>"Quick Start"</em> project and tagged with the selected Client.</li>
+							<li><strong>Task Selector (Move Session):</strong>
+								<ul>
+									<li><strong>Quick Start entries:</strong> Lists tasks assigned to the current user for the <em>same Client only</em> (Project is ignored for reassignment).</li>
+									<li><strong>Non-Quick-Start entries:</strong> Lists tasks assigned to the current user that match the entry’s <em>Project</em>; if the entry has a Client, tasks must also match that <em>Client</em>.</li>
+								</ul>
+							</li>
+							<li><strong>Implication:</strong> For Quick Start sessions, you can now reassign directly to any of your tasks for that Client, regardless of Project.</li>
+						</ul>
+					</li>
 				</ul>
 			</li>
 			<hr />

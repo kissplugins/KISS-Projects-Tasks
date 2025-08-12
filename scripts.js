@@ -1088,6 +1088,7 @@ jQuery(document).ready(function ($) {
      */
     if ($('#ptt-today-page-container').length) {
         const $projectFilter = $('#ptt-today-project-filter');
+        const $clientFilter = $('#ptt-today-client-filter');
         const $taskSelect = $('#ptt-today-task-select');
         const $sessionTitle = $('#ptt-today-session-title');
         const $startStopBtn = $('#ptt-today-start-stop-btn');
@@ -1098,15 +1099,17 @@ jQuery(document).ready(function ($) {
 
         let activeTimerInterval = null;
 
-        // Fetch tasks when project filter changes
-        $projectFilter.on('change', function() {
-            const projectId = $(this).val();
+        // Fetch tasks based on filters
+        function loadTasks() {
+            const projectId = $projectFilter.val();
+            const clientId = $clientFilter.val();
             $taskSelect.prop('disabled', true).html('<option value="">Loading...</option>');
 
             $.post(ptt_ajax_object.ajax_url, {
                 action: 'ptt_get_tasks_for_today_page',
                 nonce: ptt_ajax_object.nonce,
-                project_id: projectId
+                project_id: projectId,
+                client_id: clientId
             }).done(function(response) {
                 if (response.success && response.data.length) {
                     let options = '<option value="">-- Select a Task --</option>';
@@ -1117,8 +1120,13 @@ jQuery(document).ready(function ($) {
                 } else {
                     $taskSelect.html('<option value="">No available tasks</option>');
                 }
+            }).fail(function() {
+                $taskSelect.html('<option value="">-- Select a Task --</option>');
             });
-        });
+        }
+
+        $projectFilter.on('change', loadTasks);
+        $clientFilter.on('change', loadTasks);
 
         // Main Start/Stop button logic
         $startStopBtn.on('click', function() {
@@ -1153,9 +1161,42 @@ jQuery(document).ready(function ($) {
                 // --- START TIMER ---
                 const taskId = $taskSelect.val();
                 const title = $sessionTitle.val();
+                const clientId = $clientFilter.val();
+
+                // Quick Start path: Client selected, but missing task or title
+                if (clientId && (!taskId || !title.trim())) {
+                    $btn.prop('disabled', true).text('Starting...');
+                    $.post(ptt_ajax_object.ajax_url, {
+                        action: 'ptt_today_quick_start',
+                        nonce: ptt_ajax_object.nonce,
+                        client_id: clientId
+                    }).done(function(response){
+                        if (response.success) {
+                            $btn.text('Stop').addClass('running');
+                            $taskSelect.prop('disabled', true);
+                            $projectFilter.prop('disabled', true);
+                            $clientFilter.prop('disabled', true);
+                            startTodayPageTimer(response.data.start_time);
+                            // Fill session title with server provided title
+                            if (response.data.session_data && response.data.session_data.title) {
+                                $sessionTitle.val(response.data.session_data.title);
+                            }
+                            loadDailyEntries();
+                        } else {
+                            alert(response.data.message || 'Could not start timer.');
+                            $btn.text('Start');
+                        }
+                    }).fail(function(){
+                        alert('An error occurred.');
+                        $btn.text('Start');
+                    }).always(function(){
+                        $btn.prop('disabled', false);
+                    });
+                    return;
+                }
 
                 if (!taskId || !title.trim()) {
-                    alert('Please enter a session title and select a task.');
+                    alert('Please enter a session title and select a task (or choose a Client for Quick Start).');
                     return;
                 }
 
@@ -1477,7 +1518,10 @@ jQuery(document).ready(function ($) {
         }).done(function (response) {
             if (response.success && response.data && Array.isArray(response.data.results)) {
                 const results = response.data.results;
-                let tableHtml = '<table class="wp-list-table widefat striped"><thead><tr><th>Test Name</th><th>Status</th><th>Message</th></tr></thead><tbody>';
+                const total = results.length;
+                const failed = results.filter(r => r.status && r.status.toLowerCase() === 'failed').length;
+                const summaryHtml = `<div class="notice ${failed ? 'notice-error' : 'notice-success'}"><strong>Number of Tests:</strong> ${failed} out of ${total} Failed</div>`;
+                let tableHtml = summaryHtml + '<table class="wp-list-table widefat striped"><thead><tr><th>Test Name</th><th>Status</th><th>Message</th></tr></thead><tbody>';
                 results.forEach(function (result) {
                     tableHtml += `<tr>
                         <td>${result.name}</td>
@@ -1486,7 +1530,7 @@ jQuery(document).ready(function ($) {
                     </tr>`;
                 });
                 tableHtml += '</tbody></table>';
-                $resultsContainer.html(tableHtml); // Use .html() to clear previous results
+                $resultsContainer.html(tableHtml);
                 if (response.data.time) {
                     $('#ptt-last-test-time').text('Tests Last Ran at ' + response.data.time);
                 }
