@@ -156,7 +156,7 @@ class PTT_Today_Entry_Renderer {
 		     data-field="duration"
 		     data-duration-seconds="<?php echo esc_attr( $entry['duration_seconds'] ?? 0 ); ?>"
 		     <?php echo $editable_attr; ?>>
-			<?php echo esc_html( $entry['duration'] ); ?>
+			<span class="ptt-time-display"><?php echo esc_html( $entry['duration'] ); ?></span>
 		</div>
 		<?php
 		return ob_get_clean();
