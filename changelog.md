@@ -14,7 +14,8 @@
 ### Documentation
 - Added other-docs/sessions-quickstart.md (Session Recordings Quick Start overview, history, and roadmap)
 - Linked sessions-quickstart.md from readme.md
-
+  
+### Quick Start Features
 - Added Client selector to the "What are you working on?" row on Today page
 - Quick Start: Users can click Start after choosing a Client; plugin creates/uses a per-user daily Quick Start task under the "Quick Start" project (scoped by user and client)
 - Auto session title format: "Started 3:42 PM - Aug. 11" (localized)
