@@ -1,10 +1,6 @@
 # Changelog
 
 
-## Version 1.12.6 - Task Editor: Clients as Radio Buttons
-- Change: Clients taxonomy in the Task post editor now uses radio buttons (single selection) instead of multi-select checkboxes
-- Scope: Only affects the Task CPT editor; other screens remain unchanged
-
 ## Version 1.12.5 - Today Page Quick Start: Client Selector Re-enabled
 - Fixed: After stopping a Quick Start session on the Today page, the Client selector is now re-enabled as expected for subsequent sessions
 
