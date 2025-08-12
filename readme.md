@@ -21,6 +21,11 @@ A robust WordPress plugin for tracking time spent on client projects and individ
 
 ***
 
+### Quick Start Documentation
+- See “Session Recordings Quick Start” for a feature overview and change history:
+  - other-docs/sessions-quickstart.md
+
+
 ## ✨ Features
 
 ### Project & Task Management

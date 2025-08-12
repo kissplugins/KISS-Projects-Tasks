@@ -10,6 +10,11 @@
 - Self Tests: Added "Jump to first failed" link that anchors to the first failing test row
 
 ## Version 1.12.0 - Today Page Quick Start (Client-Required)
+
+### Documentation
+- Added other-docs/sessions-quickstart.md (Session Recordings Quick Start overview, history, and roadmap)
+- Linked sessions-quickstart.md from readme.md
+
 - Added Client selector to the "What are you working on?" row on Today page
 - Quick Start: Users can click Start after choosing a Client; plugin creates/uses a per-user daily Quick Start task under the "Quick Start" project (scoped by user and client)
 - Auto session title format: "Started 3:42 PM - Aug. 11" (localized)
