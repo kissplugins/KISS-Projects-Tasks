@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.12.2
+ * Version:           1.12.3
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.12.2' );
+define( 'PTT_VERSION', '1.12.3' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -850,6 +850,28 @@ function ptt_save_assignee_meta( $post_id ) {
     update_post_meta( $post_id, 'ptt_assignee', $assignee );
 }
 add_action( 'save_post_project_task', 'ptt_save_assignee_meta' );
+
+/**
+ * Default Assignee: when creating a new Task, set assignee to the post author if empty.
+ */
+function ptt_default_assignee_on_create( $post_id, $post, $update ) {
+    if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) ) {
+        return;
+    }
+    if ( $post->post_type !== 'project_task' ) {
+        return;
+    }
+    // Only on first creation; $update is false when inserting a new post
+    $assignee = (int) get_post_meta( $post_id, 'ptt_assignee', true );
+    if ( empty( $assignee ) ) {
+        $author_id = (int) $post->post_author;
+        if ( $author_id > 0 ) {
+            update_post_meta( $post_id, 'ptt_assignee', $author_id );
+        }
+    }
+}
+add_action( 'save_post', 'ptt_default_assignee_on_create', 10, 3 );
+
 
 
 /**

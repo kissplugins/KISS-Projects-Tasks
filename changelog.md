@@ -1,6 +1,10 @@
 # Changelog
 
 
+## Version 1.12.3 - Default Assignee on New Tasks
+- New: When creating a new Task, the Assignee defaults to the post Author (current logged-in user)
+- This runs on initial save and only fills the Assignee if it’s empty; manual selections remain respected
+
 ## Version 1.12.2 - Today Page Stacking and Start/Stop Button Styling
 - Today page: Stack input group and timer controls on medium screens for improved responsiveness (switch to column layout at <=1400px)
 - Today page: Ensure Start/Stop button has consistent height and responsive full-width on small screens

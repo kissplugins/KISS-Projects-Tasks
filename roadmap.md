@@ -1,3 +1,17 @@
+# Roadmap
+
+## Phase 2 (Security Hardening for External Client View)
+- Add bot protection to the external client portal
+  - Recommendation: Prefer Cloudflare Turnstile (privacy‑friendly, no user tracking, simple UI) over Google reCAPTCHA
+  - Fallback: Support Google reCAPTCHA v2/v3 if Turnstile is unavailable in the hosting environment
+  - Implementation plan:
+    - Pluggable validation service with a common interface so the view code stays DRY
+    - Admin settings to choose provider and supply site/secret keys
+    - Server-side verification via wp_remote_post with timeouts and robust error handling
+    - Rate limiting (per IP + per client ID) to slow brute-force URL guessing
+    - Logging of failed/blocked attempts (optional toggle)
+
+
 Hide Parent Level Time Entry and Timer - Done
 
 Yes, I see a few excellent opportunities to improve the self-tests by using the main plugin’s functions for more integrated and meaningful results.
