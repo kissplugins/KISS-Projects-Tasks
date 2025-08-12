@@ -112,6 +112,12 @@ class PTT_Today_Entry_Renderer {
 								}
 								?>
 							</select>
+							<?php if ( $__is_quick_start ) : ?>
+								<div class="ptt-qs-hint" style="margin-top:6px;color:#555;font-size:12px;">
+									Quick Start: showing tasks for client (project not restricted)
+								</div>
+							<?php endif; ?>
+
 							<button type="button" class="button button-small ptt-move-session-btn" style="display:none;">Move</button>
 							<button type="button" class="button button-small ptt-cancel-move-btn" style="display:none;">Cancel</button>
 							&bull;

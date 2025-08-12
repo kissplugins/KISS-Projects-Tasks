@@ -1520,10 +1520,15 @@ jQuery(document).ready(function ($) {
                 const results = response.data.results;
                 const total = results.length;
                 const failed = results.filter(r => r.status && r.status.toLowerCase() === 'failed').length;
-                const summaryHtml = `<div class="notice ${failed ? 'notice-error' : 'notice-success'}"><strong>Number of Tests:</strong> ${failed} out of ${total} Failed</div>`;
+                const firstFailedIndex = results.findIndex(r => r.status && r.status.toLowerCase() === 'failed');
+                const jumpLink = failed ? `<a href="#ptt-first-failed" style="margin-left:8px;">Jump to first failed</a>` : '';
+                const passedNote = failed === 0 ? ` <span style="color:#2e7d32;font-weight:bold;">All tests have passed.</span>` : '';
+                const summaryHtml = `<div class="notice ${failed ? 'notice-error' : 'notice-success'}"><strong>Number of Tests:</strong> ${failed} out of ${total} Failed.${passedNote} ${jumpLink}</div>`;
                 let tableHtml = summaryHtml + '<table class="wp-list-table widefat striped"><thead><tr><th>Test Name</th><th>Status</th><th>Message</th></tr></thead><tbody>';
-                results.forEach(function (result) {
-                    tableHtml += `<tr>
+                results.forEach(function (result, idx) {
+                    const isFailed = result.status && result.status.toLowerCase() === 'failed';
+                    const anchor = (isFailed && idx === firstFailedIndex) ? ' id="ptt-first-failed"' : '';
+                    tableHtml += `<tr${anchor}>
                         <td>${result.name}</td>
                         <td class="status-${result.status.toLowerCase()}">${result.status}</td>
                         <td>${result.message}</td>
