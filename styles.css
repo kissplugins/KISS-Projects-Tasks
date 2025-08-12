@@ -982,6 +982,42 @@
     font-size: 16px;
 }
 
+/* Today page: responsive stacking for timer and inputs */
+@media (max-width: 1400px) {
+    #ptt-today-page-container .ptt-today-entry-box {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    #ptt-today-page-container .ptt-today-input-group {
+        width: 100%;
+        flex-wrap: wrap;
+    }
+    #ptt-today-page-container .ptt-today-input-group input[type="text"],
+    #ptt-today-page-container .ptt-today-input-group select,
+    #ptt-today-page-container #ptt-today-client-filter-container {
+        flex: 1 1 300px; /* allow wrapping while keeping reasonable width */
+        max-width: 100%;
+    }
+    #ptt-today-page-container .ptt-today-timer-controls {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 782px) { /* WordPress admin breakpoint */
+    #ptt-today-page-container .ptt-today-timer-controls {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    #ptt-today-page-container .ptt-today-timer-display {
+        font-size: 24px; /* slightly smaller on narrow screens */
+    }
+    #ptt-today-page-container #ptt-today-start-stop-btn {
+        width: 100%;
+    }
+}
+
 #ptt-today-page-container #ptt-today-start-stop-btn.running {
     background-color: #d63638; /* Red */
     border-color: #b62b2d;

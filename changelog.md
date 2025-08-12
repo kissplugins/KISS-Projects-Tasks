@@ -1,6 +1,11 @@
 # Changelog
 
 
+## Version 1.12.2 - Today Page Stacking and Start/Stop Button Styling
+- Today page: Stack input group and timer controls on medium screens for improved responsiveness (switch to column layout at <=1400px)
+- Today page: Ensure Start/Stop button has consistent height and responsive full-width on small screens
+- CSS cleanup: Consolidated media query rules and fixed stray properties around the start/stop button block
+
 
 ## Version 1.12.1 - Quick Start Reassignment + Self Test Summary Improvements
 - Today page: Relaxed session reassignment rules for Quick Start entries to "same Client only" (Project not required)
@@ -14,7 +19,7 @@
 ### Documentation
 - Added other-docs/sessions-quickstart.md (Session Recordings Quick Start overview, history, and roadmap)
 - Linked sessions-quickstart.md from readme.md
-  
+
 ### Quick Start Features
 - Added Client selector to the "What are you working on?" row on Today page
 - Quick Start: Users can click Start after choosing a Client; plugin creates/uses a per-user daily Quick Start task under the "Quick Start" project (scoped by user and client)

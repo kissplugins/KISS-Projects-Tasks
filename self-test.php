@@ -46,7 +46,7 @@ function ptt_changelog_page_html() {
     $file_path = PTT_PLUGIN_DIR . 'changelog.md';
 
     echo '<div class="wrap">';
-    echo '<h1>Plugin Changelog</h1>';
+    echo '<h1>Plugin Changelog – v' . esc_html( PTT_VERSION ) . '</h1>';
 
     if ( function_exists( 'kiss_mdv_render_file' ) ) {
         $html = kiss_mdv_render_file( $file_path );
