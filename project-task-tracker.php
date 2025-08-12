@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.12.3
+ * Version:           1.12.6
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.12.3' );
+define( 'PTT_VERSION', '1.12.6' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -30,6 +30,8 @@ require_once PTT_PLUGIN_DIR . 'self-test.php';
 require_once PTT_PLUGIN_DIR . 'reports.php';
 require_once PTT_PLUGIN_DIR . 'kanban.php';
 require_once PTT_PLUGIN_DIR . 'today.php';
+require_once PTT_PLUGIN_DIR . 'ext-client.php';
+
 
 // =================================================================
 // 1.0 PLUGIN ACTIVATION & DEACTIVATION
@@ -63,6 +65,10 @@ function ptt_activate() {
         wp_insert_post( $post_data );
     }
 
+    // Ensure external client route is registered before flushing.
+    if ( function_exists( 'ptt_ext_client_rewrite_rule' ) ) {
+        ptt_ext_client_rewrite_rule();
+    }
     // Flush rewrite rules.
     flush_rewrite_rules();
 }
@@ -780,6 +786,56 @@ function ptt_recalculate_on_save( $post_id ) {
             }
         }
         ptt_calculate_and_save_duration( $post_id );
+
+/**
+ * Walker to render radio buttons for taxonomy checklist (Clients)
+ */
+if ( class_exists( 'Walker_Category_Checklist' ) && ! class_exists( 'PTT_Walker_Tax_Radio' ) ) {
+    class PTT_Walker_Tax_Radio extends Walker_Category_Checklist {
+        public function start_el( &$output, $term, $depth = 0, $args = [], $id = 0 ) {
+            if ( empty( $args['taxonomy'] ) ) {
+                $taxonomy = 'category';
+            } else {
+                $taxonomy = $args['taxonomy'];
+            }
+
+            $name = 'tax_input[' . esc_attr( $taxonomy ) . '][]';
+            $id   = esc_attr( $taxonomy . '-' . $term->term_id );
+
+            $checked    = in_array( $term->term_id, (array) $args['selected_cats'], true ) ? ' checked="checked"' : '';
+            $disabled   = ! empty( $args['disabled'] ) ? ' disabled="disabled"' : '';
+            $aria_checked = $checked ? ' aria-checked="true"' : ' aria-checked="false"';
+
+            $output .= '\n<li id="' . $id . '" class="' . esc_attr( $taxonomy ) . '-checklist-item">'
+                . '<label class="selectit">'
+                . '<input type="radio" name="' . $name . '" value="' . esc_attr( $term->term_id ) . '"' . $checked . $disabled . ' /> '
+                . esc_html( apply_filters( 'the_category', $term->name ) )
+                . '</label>';
+        }
+    }
+}
+
+/**
+ * Use radio buttons for Clients taxonomy on project_task editor
+ */
+function ptt_clients_taxonomy_as_radio( $args, $post_id, $taxonomy ) {
+    if ( 'client' !== $taxonomy ) {
+        return $args;
+    }
+    // Scope to Task CPT editor only
+    if ( function_exists( 'get_current_screen' ) ) {
+        $screen = get_current_screen();
+        if ( $screen && isset( $screen->post_type ) && $screen->post_type !== 'project_task' ) {
+            return $args;
+        }
+    }
+    $args['walker'] = new PTT_Walker_Tax_Radio();
+    // Keep natural order rather than checked on top for clearer UI
+    $args['checked_ontop'] = false;
+    return $args;
+}
+add_filter( 'wp_terms_checklist_args', 'ptt_clients_taxonomy_as_radio', 10, 3 );
+
     }
 }
 add_action( 'acf/save_post', 'ptt_recalculate_on_save', 20 );

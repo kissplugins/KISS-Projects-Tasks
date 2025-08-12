@@ -1150,6 +1150,7 @@ jQuery(document).ready(function ($) {
                     $sessionTitle.val('').prop('disabled', false);
                     $taskSelect.prop('disabled', false);
                     $projectFilter.prop('disabled', false);
+                    $clientFilter.prop('disabled', false);
                     loadDailyEntries(); // Refresh list
                 }).fail(function(){
                     alert('Failed to stop timer.');

@@ -1,6 +1,19 @@
 # Changelog
 
 
+## Version 1.12.6 - Task Editor: Clients as Radio Buttons
+- Change: Clients taxonomy in the Task post editor now uses radio buttons (single selection) instead of multi-select checkboxes
+- Scope: Only affects the Task CPT editor; other screens remain unchanged
+
+## Version 1.12.5 - Today Page Quick Start: Client Selector Re-enabled
+- Fixed: After stopping a Quick Start session on the Today page, the Client selector is now re-enabled as expected for subsequent sessions
+
+## Version 1.12.4 - External Client View (Public)
+- New: Public, read-only external route `/ext/client/{client_id}/tasks` shows the last two calendar months for a given client
+- Sections per month: "Tasks + Current Status", "Session Entries + Entered Time", and a monthly total
+- DRY approach: reuses plugin data structures and calculation patterns; minimal frontend styling via existing styles.css
+- Activation: rewrite rule registered and flushed on activation for new route
+
 ## Version 1.12.3 - Default Assignee on New Tasks
 - New: When creating a new Task, the Assignee defaults to the post Author (current logged-in user)
 - This runs on initial save and only fills the Assignee if it’s empty; manual selections remain respected
