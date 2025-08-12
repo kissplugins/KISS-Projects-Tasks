@@ -541,13 +541,13 @@ function ptt_display_report_results() {
 			echo '<td>' . esc_html( $task['project_name'] ) . '</td>';
 			echo '<td>' . esc_html( $task['creation_date'] ) . '</td>';
 			echo '<td>' . esc_html( $task['last_entry_date'] ) . '</td>';
-			echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
+			echo '<td><span class="ptt-time-display">' . number_format( $task['duration'], 2 ) . '</span></td>';
 			echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
 			echo '<td>' . $status_dropdown . '</td>';
 			echo '</tr>';
 		}
 		echo '</tbody></table>';
-		echo '<div class="grand-total"><strong>Grand Total: ' . number_format( $grand_total, 2 ) . '&nbsp;hours</strong></div>';
+		echo '<div class="grand-total"><strong>Grand Total: <span class="ptt-time-display">' . number_format( $grand_total, 2 ) . '</span>&nbsp;hours</strong></div>';
 		echo '</div>'; // .ptt-report-results
 
 	} elseif ( 'single_day' === $view_mode ) {
@@ -723,7 +723,7 @@ function ptt_display_report_results() {
 				echo '<td>' . esc_html( $task['assignee_name'] ) . '</td>';
 				echo '<td>' . esc_html( $task['client_name'] ) . '</td>';
 				echo '<td>' . esc_html( $task['project_name'] ) . '</td>';
-				echo '<td ' . $duration_cell_style . '>' . ( $task['daily_duration'] > 0 ? number_format( $task['daily_duration'], 2 ) : '–' ) . '</td>';
+				echo '<td ' . $duration_cell_style . '>' . ( $task['daily_duration'] > 0 ? '<span class="ptt-time-display">' . number_format( $task['daily_duration'], 2 ) . '</span>' : '–' ) . '</td>';
 				echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
 				echo '</tr>';
 			}
@@ -746,7 +746,7 @@ function ptt_display_report_results() {
 			$net_total_today = $grand_total_today - $deductible_time;
 
 			// Display the grand total.
-			$total_display_text = '<strong>Total for Day: ' . number_format( $net_total_today, 2 ) . '&nbsp;hours</strong>';
+			$total_display_text = '<strong>Total for Day: <span class="ptt-time-display">' . number_format( $net_total_today, 2 ) . '</span>&nbsp;hours</strong>';
 			if ( $deductible_time > 0 ) {
 				$total_display_text .= ' <span class="subtotal" style="font-weight:normal;">(Exc. any "Breaks" or "Personal Time")</span>';
 			}
@@ -912,13 +912,13 @@ function ptt_display_report_results() {
 		// Render the hierarchical table
 		echo '<div class="ptt-report-results">';
 		foreach ( $report as $author ) {
-			echo '<h3>User: ' . esc_html( $author['name'] ) . ' <span class="subtotal">(User&nbsp;Total: ' . number_format( $author['total'], 2 ) . '&nbsp;hrs)</span></h3>';
+			echo '<h3>User: ' . esc_html( $author['name'] ) . ' <span class="subtotal">(User&nbsp;Total: <span class="ptt-time-display">' . number_format( $author['total'], 2 ) . '</span>&nbsp;hrs)</span></h3>';
 			foreach ( $author['clients'] as $client ) {
 				echo '<div class="client-group">';
-				echo '<h4>Client: ' . esc_html( $client['name'] ) . ' <span class="subtotal">(Client&nbsp;Total: ' . number_format( $client['total'], 2 ) . '&nbsp;hrs)</span></h4>';
+				echo '<h4>Client: ' . esc_html( $client['name'] ) . ' <span class="subtotal">(Client&nbsp;Total: <span class="ptt-time-display">' . number_format( $client['total'], 2 ) . '</span>&nbsp;hrs)</span></h4>';
 				foreach ( $client['projects'] as $project ) {
 					echo '<div class="project-group">';
-					echo '<h5>Project: ' . esc_html( $project['name'] ) . ' <span class="subtotal">(Project&nbsp;Total: ' . number_format( $project['total'], 2 ) . '&nbsp;hrs)</span></h5>';
+					echo '<h5>Project: ' . esc_html( $project['name'] ) . ' <span class="subtotal">(Project&nbsp;Total: <span class="ptt-time-display">' . number_format( $project['total'], 2 ) . '</span>&nbsp;hrs)</span></h5>';
 					echo '<table class="wp-list-table widefat fixed striped">';
 					echo '<thead><tr>
 							<th style="width:22%">Task Name</th>
@@ -961,7 +961,7 @@ function ptt_display_report_results() {
 						echo '<td>' . esc_html( $task['assignee_name'] ) . '</td>';
 						echo '<td>' . esc_html( $task['creation_date'] ) . '</td>';
 						echo '<td>' . esc_html( $task['last_entry_date'] ) . '</td>';
-						echo '<td>' . number_format( $task['duration'], 2 ) . '</td>';
+						echo '<td><span class="ptt-time-display">' . number_format( $task['duration'], 2 ) . '</span></td>';
 						echo '<td ' . $budget_td_style . '>' . $budget_display . '</td>';
 						echo '<td>' . ptt_format_task_notes( $task['content'] ) . '</td>';
 						echo '<td>' . $status_dropdown . '</td>';
@@ -972,7 +972,7 @@ function ptt_display_report_results() {
 				echo '</div>';
 			}
 		}
-		echo '<div class="grand-total"><strong>Grand Total: ' . number_format( $grand_total, 2 ) . '&nbsp;hours</strong></div>';
+		echo '<div class="grand-total"><strong>Grand Total: <span class="ptt-time-display">' . number_format( $grand_total, 2 ) . '</span>&nbsp;hours</strong></div>';
 		echo '</div>'; // .ptt-report-results
 	}
 }
