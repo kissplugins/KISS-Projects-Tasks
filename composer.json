@@ -1,0 +1,9 @@
+{
+    "name": "kiss/plugins-project-task-tracker",
+    "type": "wordpress-plugin",
+    "autoload": {
+        "psr-4": {
+            "KISS\\PTT\\": "src/"
+        }
+    }
+}
