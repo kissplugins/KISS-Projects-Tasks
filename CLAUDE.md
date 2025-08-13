@@ -32,6 +32,15 @@ In-depth analysis of the current ACF implementation with:
 - Implementation priorities and cost-benefit analysis
 - Scalability concerns and solutions
 
+#### [Today Page Optimization Guide](.claude/TODAY-PAGE-OPTIMIZATION.md)
+Specific optimization strategies for the Today page including:
+- Current performance profile and critical issues
+- Immediate optimizations (50-60% improvement in 1-2 days)
+- Medium-term optimizations (70-80% improvement in 3-5 days)
+- Long-term solutions (85-95% improvement in 7-10 days)
+- Implementation priorities with expected results
+- Code examples and migration strategies
+
 ### 📋 Project Management
 
 #### [Changelog](.claude/changelog.md)

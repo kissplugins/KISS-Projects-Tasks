@@ -1,5 +1,27 @@
 # Changelog
 
+
+
+## Version 1.12.1 - Quick Start Reassignment + Self Test Summary Improvements
+- Today page: Relaxed session reassignment rules for Quick Start entries to "same Client only" (Project not required)
+- Today page: Added inline hint below Task Selector for Quick Start entries: "Quick Start: showing tasks for client (project not restricted)"
+- Debug panel: Documented the new Quick Start reassignment behavior and clarified non-Quick Start rules
+- Self Tests: Added summary at the top "Number of Tests: X out of Y Failed" with green "All tests have passed." when zero failures
+- Self Tests: Added "Jump to first failed" link that anchors to the first failing test row
+
+## Version 1.12.0 - Today Page Quick Start (Client-Required)
+
+### Documentation
+- Added other-docs/sessions-quickstart.md (Session Recordings Quick Start overview, history, and roadmap)
+- Linked sessions-quickstart.md from readme.md
+  
+### Quick Start Features
+- Added Client selector to the "What are you working on?" row on Today page
+- Quick Start: Users can click Start after choosing a Client; plugin creates/uses a per-user daily Quick Start task under the "Quick Start" project (scoped by user and client)
+- Auto session title format: "Started 3:42 PM - Aug. 11" (localized)
+- Task dropdown now filters by selected Client (and Project if chosen)
+- Minor UI consistency: muted labels and removed colons on time display
+
 ## Version 1.11.16
 - **Collapisble Debug Panel on Today Page**:  Less noise on screen
 
