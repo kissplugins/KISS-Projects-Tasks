@@ -1,6 +1,7 @@
 # Changelog
 
-## Version 1.13.0 - PSR-4 bootstrap
+## Version 2.0.0 - PSR-4 bootstrap
+- Major version bump to 2.0.0 to reflect PSR-4 architecture.
 - Introduced Composer-based PSR-4 autoloader and plugin bootstrap class.
 - Migrated time calculation helpers and task helpers to namespaced classes.
 - Added ROADMAP for phased PSR-4 migration.
