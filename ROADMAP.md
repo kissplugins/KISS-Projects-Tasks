@@ -5,6 +5,8 @@
 - [x] Refactor main plugin bootstrap into `KISS\PTT\Plugin`
 - [x] Move time calculation logic into `KISS\PTT\Time\Calculator`
 - [x] Wrap existing helper functions to call namespaced classes
+- [ ] Human QA Testing - Not done yet
+
 
 ## Phase 2 – Convert Remaining Modules (In Progress)
 - [ ] Establish service seams under PSR-4
