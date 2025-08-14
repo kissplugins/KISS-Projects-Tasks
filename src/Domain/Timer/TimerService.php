@@ -33,14 +33,29 @@ class TimerService
     /** Start a new session on a task with an initial title. Enforces invariants. */
     public function start(int $postId, string $title): bool
     {
-        // Invariant: Task must not have a parent-level running timer
+        // Invariant 0: Global – disallow multiple active sessions per user (strict)
+        if ( function_exists('ptt_get_active_session_index_for_user') ) {
+            $currentUser = get_current_user_id();
+            if ( $currentUser ) {
+                $active = ptt_get_active_session_index_for_user( $currentUser );
+                if ( $active && (!isset($active['post_id']) || (int)$active['post_id'] !== (int)$postId) ) {
+                    return false; // Active elsewhere – deny start
+                }
+                // If active on same task, also deny (no multiple actives)
+                if ( $active && (int)$active['post_id'] === (int)$postId ) {
+                    return false;
+                }
+            }
+        }
+
+        // Invariant 1: Task must not have a parent-level running timer
         $start = $this->acf->getField('start_time', $postId);
         $stop  = $this->acf->getField('stop_time', $postId);
         if ($start && !$stop) {
             return false;
         }
 
-        // Invariant: Task should not already have a running session
+        // Invariant 2: Task should not already have a running session
         $sessions = $this->sessions->getAll($postId);
         foreach ($sessions as $s) {
             if (!empty($s['session_start_time']) && empty($s['session_stop_time'])) {

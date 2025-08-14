@@ -29,8 +29,10 @@ class Plugin {
         // Load remaining procedural modules
         require_once PTT_PLUGIN_DIR . 'helpers.php';
         require_once PTT_PLUGIN_DIR . 'time-functions.php';
-        // Register local ACF groups if ACF is active
+        // Register local ACF groups and diagnostics if ACF is active
         require_once PTT_PLUGIN_DIR . 'src/Integration/ACF/FieldGroups.php';
+        require_once PTT_PLUGIN_DIR . 'src/Integration/ACF/Diagnostics.php';
+        \KISS\PTT\Integration\ACF\Diagnostics::register();
         require_once PTT_PLUGIN_DIR . 'shortcodes.php';
         require_once PTT_PLUGIN_DIR . 'self-test.php';
         require_once PTT_PLUGIN_DIR . 'reports.php';

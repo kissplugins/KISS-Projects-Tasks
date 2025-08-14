@@ -19,6 +19,15 @@ class Assets {
             self::enqueueCore($hook);
             return;
         }
+
+        // Project Task post editor (post.php / post-new.php)
+        if ( $hook === 'post.php' || $hook === 'post-new.php' ) {
+            $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+            if ( $screen && $screen->post_type === 'project_task' ) {
+                self::enqueueCore($hook);
+                return;
+            }
+        }
     }
 
     private static function enqueueCore($hook) {
