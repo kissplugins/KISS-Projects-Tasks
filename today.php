@@ -710,30 +710,19 @@ function ptt_today_start_timer_callback() {
 		] );
 	}
 
-	// Generate session title with current time
+	// Generate session title with current time (for display only)
 	$current_time = current_time( 'mysql', 1 ); // UTC
 	$display_time = wp_date( 'g:i A', strtotime( $current_time ) ); // Local time for display
-	$task_title = get_the_title( $post_id );
 	$session_title = 'Session ' . $display_time;
 
-	// Create new session
-	$session_data = [
-		'session_title' => $session_title,
-		'session_notes' => '',
-		'session_start_time' => $current_time,
-		'session_stop_time' => '',
-		'session_manual_override' => false,
-		'session_manual_duration' => 0,
-		'session_calculated_duration' => '0.00',
-	];
+	// Use TimerService to start a session (low-risk intro to services)
+	if ( ! \KISS\PTT\Plugin::$timer->start( $post_id, $session_title ) ) {
+		wp_send_json_error( [ 'message' => 'Failed to start session (timer conflict).' ] );
+	}
 
-	// Add the session to the task
+	// Find the new session index (last one added)
 	$sessions = get_field( 'sessions', $post_id ) ?: [];
-	$sessions[] = $session_data;
-	update_field( 'sessions', $sessions, $post_id );
-
-	// Get the new session index (last one added)
-	$session_index = count( $sessions ) - 1;
+	$session_index = max( 0, count( $sessions ) - 1 );
 
 	// Recalculate duration
 	ptt_calculate_and_save_duration( $post_id );

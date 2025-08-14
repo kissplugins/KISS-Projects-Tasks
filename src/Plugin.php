@@ -2,9 +2,24 @@
 namespace KISS\PTT;
 
 use KISS\PTT\Time\Calculator;
+use KISS\PTT\Integration\ACF\ACFAdapter;
+use KISS\PTT\Domain\Session\SessionRepository;
+use KISS\PTT\Domain\Timer\TimerService;
 
 class Plugin {
+    // Simple, low-risk: register services directly on Plugin
+    public static ACFAdapter $acf;
+    public static SessionRepository $sessions;
+    public static TimerService $timer;
+
+
     public static function init() {
+        // Instantiate services (low risk)
+        self::$acf      = new ACFAdapter();
+        self::$sessions = new SessionRepository( self::$acf );
+        self::$timer    = new TimerService( self::$acf, self::$sessions );
+
+
         self::register_hooks();
         // Load remaining procedural modules
         require_once PTT_PLUGIN_DIR . 'helpers.php';
