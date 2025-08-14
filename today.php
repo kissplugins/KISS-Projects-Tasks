@@ -206,8 +206,8 @@ function ptt_get_tasks_for_today_page_callback() {
 		wp_send_json_error();
 	}
 
-	$project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
-	$client_id  = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
+	$project_id = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
+	$client_id  = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
 	$user_id    = get_current_user_id();
 
 	// Get all tasks assigned to the current user
@@ -220,21 +220,25 @@ function ptt_get_tasks_for_today_page_callback() {
 	$status_terms_to_include = [];
 	$not_started = get_term_by( 'name', 'Not Started', 'task_status' );
 	$in_progress = get_term_by( 'name', 'In Progress', 'task_status' );
-	if ( $not_started ) $status_terms_to_include[] = $not_started->term_id;
-	if ( $in_progress ) $status_terms_to_include[] = $in_progress->term_id;
+	if ( $not_started ) { $status_terms_to_include[] = (int) $not_started->term_id; }
+	if ( $in_progress ) { $status_terms_to_include[] = (int) $in_progress->term_id; }
 
 	if ( empty( $status_terms_to_include ) ) {
 		wp_send_json_error( [ 'message' => 'Required task statuses not found.' ] );
 	}
 
 	$args = [
-		'post_type'      => 'project_task',
-		'posts_per_page' => 100,
-		'post_status'    => 'publish',
-		'orderby'        => 'modified', // LIFO
-		'order'          => 'DESC',
-		'post__in'       => $user_task_ids, // Only query user's tasks
-		'tax_query'      => [
+		'post_type'               => 'project_task',
+		'posts_per_page'          => 100,
+		'post_status'             => 'publish',
+		'orderby'                 => 'modified', // LIFO
+		'order'                   => 'DESC',
+		'post__in'                => $user_task_ids, // Only query user's tasks
+		'no_found_rows'           => true,
+		'suppress_filters'        => true,
+		'update_post_term_cache'  => false,
+		'update_post_meta_cache'  => false,
+		'tax_query'               => [
 			'relation' => 'AND',
 			[
 				'taxonomy' => 'task_status',
@@ -356,8 +360,11 @@ function ptt_get_daily_entries_callback() {
 
 	$user_id = get_current_user_id();
 	$target_date = isset( $_POST['date'] ) ? sanitize_text_field( $_POST['date'] ) : date( 'Y-m-d' );
-	$client_id = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
-	$project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
+	if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $target_date ) ) {
+		wp_send_json_error( [ 'message' => 'Invalid date.' ] );
+	}
+	$client_id = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
+	$project_id = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
 
 	// Build filters array
 	$filters = [];
@@ -445,28 +452,39 @@ function ptt_update_session_duration_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-	$session_index = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
+	$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+	$session_index = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
 	$new_duration = isset( $_POST['duration'] ) ? sanitize_text_field( $_POST['duration'] ) : '';
 
 	if ( ! $post_id || $session_index < 0 || empty( $new_duration ) ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
 	}
+	if ( get_post_type( $post_id ) !== 'project_task' || ! current_user_can( 'edit_post', $post_id ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	}
 
 	// Parse duration (expects format like "1.5" for hours or "01:30:00" for time format)
-	$duration_hours = 0;
+	$duration_hours = 0.0;
 	if ( strpos( $new_duration, ':' ) !== false ) {
 		// Time format (HH:MM:SS or HH:MM)
 		$parts = explode( ':', $new_duration );
-		$hours = intval( $parts[0] );
-		$minutes = isset( $parts[1] ) ? intval( $parts[1] ) : 0;
-		$seconds = isset( $parts[2] ) ? intval( $parts[2] ) : 0;
+		$hours = absint( $parts[0] );
+		$minutes = isset( $parts[1] ) ? absint( $parts[1] ) : 0;
+		$seconds = isset( $parts[2] ) ? absint( $parts[2] ) : 0;
 		$duration_hours = $hours + ( $minutes / 60 ) + ( $seconds / 3600 );
 	} else {
 		// Decimal hours format
-		$duration_hours = floatval( $new_duration );
+		$duration_hours = (float) $new_duration;
 	}
+	// Clamp to sane bounds [0, 48] hours
+	$duration_hours = max( 0.0, min( 48.0, $duration_hours ) );
 
+	// Validate repeater bounds before update
+	$rows = get_field( 'sessions', $post_id );
+	$rows_count = is_array( $rows ) ? count( $rows ) : 0;
+	if ( $session_index >= $rows_count ) {
+		wp_send_json_error( [ 'message' => 'Invalid session index.' ] );
+	}
 	// Update the session's manual duration
 	$updated = update_sub_field(
 		array( 'sessions', $session_index + 1, 'session_manual_override' ),
@@ -513,13 +531,16 @@ function ptt_update_session_field_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-	$session_index = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
+	$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+	$session_index = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
 	$field_name = isset( $_POST['field_name'] ) ? sanitize_text_field( $_POST['field_name'] ) : '';
 	$field_value = isset( $_POST['field_value'] ) ? sanitize_text_field( $_POST['field_value'] ) : '';
 
 	if ( ! $post_id || $session_index < 0 || empty( $field_name ) ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+	}
+	if ( get_post_type( $post_id ) !== 'project_task' || ! current_user_can( 'edit_post', $post_id ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
 	// Map field names to ACF field keys
@@ -534,6 +555,12 @@ function ptt_update_session_field_callback() {
 
 	$acf_field = $field_map[ $field_name ];
 
+	// Validate repeater bounds before update
+	$rows = get_field( 'sessions', $post_id );
+	$rows_count = is_array( $rows ) ? count( $rows ) : 0;
+	if ( $session_index >= $rows_count ) {
+		wp_send_json_error( [ 'message' => 'Invalid session index.' ] );
+	}
 	// Update the field
 	$updated = update_sub_field(
 		array( 'sessions', $session_index + 1, $acf_field ),
@@ -563,13 +590,22 @@ function ptt_delete_session_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-	$session_index = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
+	$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+	$session_index = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
 
 	if ( ! $post_id || $session_index < 0 ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
 	}
+	if ( get_post_type( $post_id ) !== 'project_task' || ! current_user_can( 'edit_post', $post_id ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	}
 
+	// Validate repeater bounds before deletion
+	$rows = get_field( 'sessions', $post_id );
+	$rows_count = is_array( $rows ) ? count( $rows ) : 0;
+	if ( $session_index >= $rows_count ) {
+		wp_send_json_error( [ 'message' => 'Invalid session index.' ] );
+	}
 	// Delete the row
 	$deleted = delete_row( 'sessions', $session_index + 1, $post_id );
 
@@ -631,12 +667,16 @@ function ptt_move_session_callback() {
                 wp_send_json_error( [ 'message' => 'Permission denied.' ] );
         }
 
-        $post_id        = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-        $session_index  = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
-        $target_post_id = isset( $_POST['target_post_id'] ) ? intval( $_POST['target_post_id'] ) : 0;
+        $post_id        = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+        $session_index  = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
+        $target_post_id = isset( $_POST['target_post_id'] ) ? absint( $_POST['target_post_id'] ) : 0;
 
         if ( ! $post_id || $session_index < 0 || ! $target_post_id ) {
                 wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+        }
+        if ( get_post_type( $post_id ) !== 'project_task' || ! current_user_can( 'edit_post', $post_id ) ||
+             get_post_type( $target_post_id ) !== 'project_task' || ! current_user_can( 'edit_post', $target_post_id ) ) {
+                wp_send_json_error( [ 'message' => 'Permission denied.' ] );
         }
 
         $new_index = ptt_move_session_to_task( $post_id, $session_index, $target_post_id );
