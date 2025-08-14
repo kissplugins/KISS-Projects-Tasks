@@ -10,9 +10,12 @@ class Diagnostics {
         add_action('admin_notices', [__CLASS__, 'adminNotice']);
     }
 
-    public static function adminNotice() {
-        if ( ! current_user_can('manage_options') ) return;
-        if ( ! function_exists('acf_get_field_groups') ) return;
+    /**
+     * Collect ACF schema issues for display in notices or admin pages.
+     * @return array<string> human-readable issue strings
+     */
+    public static function collectIssues(): array {
+        if ( ! function_exists('acf_get_field_groups') ) return [ 'ACF Pro not active: acf_get_field_groups() missing.' ];
 
         $issues = [];
         $groups = acf_get_field_groups();
@@ -41,15 +44,12 @@ class Diagnostics {
             foreach ($expectedParents as $key => $expect) {
                 $f = acf_get_field($key);
                 if (!$f) { $issues[] = "ACF field missing: {$key}"; continue; }
-                // Check name
                 if (($f['name'] ?? null) !== $expect['name']) {
                     $issues[] = sprintf('ACF field name mismatch for %s: expected %s got %s', $key, $expect['name'], $f['name'] ?? '');
                 }
-                // Check type
                 if (($f['type'] ?? null) !== $expect['type']) {
                     $issues[] = sprintf('ACF field type mismatch for %s: expected %s got %s', $key, $expect['type'], $f['type'] ?? '');
                 }
-                // Optional format checks for date_time_picker
                 if ($expect['type'] === 'date_time_picker') {
                     $expDisp = $expect['display_format'] ?? null;
                     $expRet  = $expect['return_format'] ?? null;
@@ -64,9 +64,7 @@ class Diagnostics {
 
             // Sessions repeater sub-fields
             $sessions = acf_get_field('field_ptt_sessions');
-            if (!$sessions) {
-                // already reported above as missing
-            } else {
+            if ($sessions) {
                 if (($sessions['type'] ?? null) !== 'repeater') {
                     $issues[] = sprintf('ACF field type mismatch for field_ptt_sessions: expected repeater got %s', $sessions['type'] ?? '');
                 }
@@ -105,12 +103,15 @@ class Diagnostics {
             }
         }
 
-        if (!empty($issues)) {
-            echo '<div class="notice notice-warning"><p><strong>Project & Task Time Tracker:</strong> ACF schema warnings:</p><ul style="margin-left:1em;">';
-            foreach ($issues as $msg) {
-                echo '<li>' . esc_html($msg) . '</li>';
-            }
-            echo '</ul></div>';
-        }
+        return $issues;
+    }
+
+    public static function adminNotice() {
+        if ( ! current_user_can('manage_options') ) return;
+        $issues = self::collectIssues();
+        if (empty($issues)) return;
+        echo '<div class="notice notice-warning"><p><strong>Project & Task Time Tracker:</strong> ACF schema warnings:</p><ul style="margin-left:1em;">';
+        foreach ($issues as $msg) { echo '<li>' . esc_html($msg) . '</li>'; }
+        echo '</ul></div>';
     }
 }
