@@ -31,6 +31,9 @@
   - [ ] Hooks for auditing: ptt_session_started/updated/stopped
   - [x] Wire ACFAdapter/SessionRepository/TimerService directly on Plugin (low‑risk)
   - [x] Route start‑timer flow through TimerService
+  - [x] Add stopActive() and resume() to TimerService; enforce no overlapping sessions per task
+  - [x] Replace existing stop calls in start flows with TimerService->stopActive()
+
 
 
 ## Phase 3 – Service Seams under PSR‑4 (In Progress)

@@ -40,6 +40,27 @@ function ptt_add_changelog_submenu_page() {
 add_action( 'admin_menu', 'ptt_add_changelog_submenu_page', 60 );
 
 /**
+ * Ensure core admin assets (scripts.js, styles.css) are loaded and localized on Self‑Test/Changelog pages.
+ */
+function ptt_enqueue_selftest_assets( $hook ) {
+    $targets = [ 'project_task_page_ptt-self-test', 'project_task_page_ptt-changelog' ];
+    if ( ! in_array( $hook, $targets, true ) ) {
+        return;
+    }
+    // Styles
+    wp_enqueue_style( 'ptt-styles', PTT_PLUGIN_URL . 'styles.css', [], PTT_VERSION );
+    // Main plugin JS (contains Self‑Test handlers)
+    wp_enqueue_script( 'ptt-scripts', PTT_PLUGIN_URL . 'scripts.js', [ 'jquery' ], PTT_VERSION, true );
+    // Localize for AJAX
+    wp_localize_script( 'ptt-scripts', 'ptt_ajax_object', [
+        'ajax_url' => admin_url( 'admin-ajax.php' ),
+        'nonce'    => wp_create_nonce( 'ptt_ajax_nonce' ),
+    ] );
+}
+add_action( 'admin_enqueue_scripts', 'ptt_enqueue_selftest_assets' );
+
+
+/**
  * Renders the Changelog page HTML.
  */
 function ptt_changelog_page_html() {
