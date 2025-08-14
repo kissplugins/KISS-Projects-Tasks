@@ -10,9 +10,11 @@
  * ------------------------------------------------------------------
  */
 
+use KISS\PTT\Helpers\TaskHelper;
+
 // Block direct access.
 if ( ! defined( 'WPINC' ) ) {
-	die;
+    die;
 }
 
 /**
@@ -26,22 +28,5 @@ if ( ! defined( 'WPINC' ) ) {
  * @return array An array of task post IDs. Returns an empty array if no tasks are found.
  */
 function ptt_get_tasks_for_user( $user_id ) {
-	global $wpdb;
-
-	if ( ! $user_id ) {
-		return [];
-	}
-
-	// Get posts where the user is the assignee
-	$assigned_posts_query = $wpdb->prepare(
-		"SELECT post_id FROM {$wpdb->postmeta}
-		 WHERE meta_key = 'ptt_assignee' AND meta_value = %d",
-		$user_id
-	);
-	$assigned_posts = $wpdb->get_col( $assigned_posts_query );
-
-	// Merge, remove duplicates, and ensure all values are integers
-	$task_ids = array_map( 'intval', array_unique( $assigned_posts ) );
-
-	return $task_ids;
+    return TaskHelper::get_tasks_for_user( $user_id );
 }
