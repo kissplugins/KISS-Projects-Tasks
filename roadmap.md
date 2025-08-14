@@ -20,9 +20,8 @@ The current “Reporting Logic” test (Test #5) runs a generic `WP_Query` which
 	- **Proposed Test**: Instead of a broad query, we could make this test specifically check the status sorting logic. It would replicate the steps from the `ptt_display_report_results` function to build the status order map and then verify that the statuses are sorted in the correct, expected order. This would provide a much more meaningful test of the actual reporting feature.
 
 
-## Security – Today Page Inputs
+## Security
 
-### Short‑term / Quick wins
 - [x] Add per‑post capability checks for all task actions
   - [x] Verify current_user_can('edit_post', $post_id) (and for $target_post_id on moves)
   - [x] Validate post_type === 'project_task' before acting
@@ -33,39 +32,32 @@ The current “Reporting Logic” test (Test #5) runs a generic `WP_Query` which
   - [x] Keep whitelist mapping for editable fields; prefer ACF field keys
 - [x] Harden responses and nonce scope
   - [x] Consistent error messages; maintain check_ajax_referer('ptt_ajax_nonce', 'nonce')
+- [x] Data Authorization
+  - [x] Introduce ptt_validate_task_access( $post_id, $user_id ) helper (assignee‑only rule)
+  - [x] Enforce in Today AJAX handlers (start/move/update/delete)
+  - [x] Add self‑tests to confirm non‑assignees are denied
+- [ ] Information Disclosure
+  - [ ] Restrict PTT_Today_Page_Manager::get_debug_info() to manage_options
+  - [ ] Hide Debug panel for non‑admins
 
-### Mid‑/Long‑term
-- Centralize validation in a TodayService layer called by all endpoints
-- Replace admin‑ajax endpoints with REST routes using argument schema and permission_callback
-- Add rate‑limit/debounce on write operations (e.g., transient‑based per user)
-- Add audit logging for session create/update/delete/move events
-- Add automated tests covering authZ, parameter validation, and negative cases
+## Performance
 
-## Performance – Today Page
-
-### Short‑term / Quick wins
 - [x] Bound and optimize queries
   - [x] Add 'no_found_rows' => true and 'suppress_filters' => true to non‑paginated queries
   - [x] Avoid 'posts_per_page' => -1; use a reasonable cap or batch
-  - [ ] For dropdown queries: 'fields' => 'ids', disable meta/term cache updates (N/A in final UI after consolidation)
+  - [x] For dropdown queries: 'fields' => 'ids', disable meta/term cache updates
 - [x] Remove N+1 selector queries
   - [x] Preload the user’s task <option> list once per response, or lazy‑load via a single AJAX call
 - [x] Reduce ACF overhead immediately
   - [x] Early‑exit processing when a task has no sessions on the target date
   - [x] Add a 60‑second cache for Today entries; invalidate on acf/save_post affecting sessions
-
-### Mid‑/Long‑term
-- Introduce PSR‑4 services and repositories to centralize data access
-  - ACFAdapter: field‑key access and UTC normalization
-  - SessionRepository: minimal‑read access to sessions (avoid full repeater hydration)
-  - TodayService: builds entries, owns caching and invalidation
-- Add stable session_uuid for each row and update by UUID instead of numeric index
-- Coarsely pre‑filter task candidates by post_modified or date_query
-- Promote session storage
-  - Option B1: Session CPT (ptt_session) with indexed meta and native REST
-  - Option B2: Custom table (wp_ptt_sessions) with indexed columns for fast lookups
-- Consider prefetching term data once per response (or include in query) to avoid repeated get_the_terms calls
-- Add pagination/virtual scrolling for very large daily entry lists
+- [ ] Mid/Long‑term improvements
+  - Introduce PSR‑4 services/repositories; TodayService, SessionRepository, ACFAdapter
+  - Add stable session_uuid and update by UUID instead of numeric index
+  - Coarsely pre‑filter task candidates by post_modified or date_query
+  - Promote session storage (Session CPT or custom table)
+  - Consider prefetching term data once per response
+  - Add pagination/virtual scrolling for very large daily entry lists
 
 
 ## Security – Audit Follow‑ups (from prior review)

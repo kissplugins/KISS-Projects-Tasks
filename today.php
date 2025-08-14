@@ -229,6 +229,7 @@ function ptt_get_tasks_for_today_page_callback() {
 
 	$args = [
 		'post_type'               => 'project_task',
+		'fields'                  => 'ids',
 		'posts_per_page'          => 100,
 		'post_status'             => 'publish',
 		'orderby'                 => 'modified', // LIFO
@@ -266,23 +267,19 @@ function ptt_get_tasks_for_today_page_callback() {
 
 	$query = new WP_Query( $args );
 	$tasks = [];
-	if ( $query->have_posts() ) {
-		while ( $query->have_posts() ) {
-			$query->the_post();
-			$post_id = get_the_ID();
-
+	$ids = $query->posts;
+	if ( ! empty( $ids ) ) {
+		foreach ( $ids as $post_id ) {
 			// Get additional metadata for richer dropdown display
 			$project_terms = get_the_terms( $post_id, 'project' );
 			$project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '';
-
 			$tasks[] = [
 				'id'           => $post_id,
-				'title'        => get_the_title(),
+				'title'        => get_the_title( $post_id ),
 				'project_name' => $project_name,
 				'edit_link'    => get_edit_post_link( $post_id ),
 			];
 		}
-		wp_reset_postdata();
 	}
 
 	wp_send_json_success( $tasks );
