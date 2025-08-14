@@ -78,8 +78,8 @@ Priority order based on the audit (do not implement yet; track and schedule):
 - [x] Add unit/integration tests to confirm access is denied for non‑assignees
 
 2) Input Validation (MEDIUM PRIORITY)
-- [ ] Create centralized ptt_validate_* helpers (ptt_validate_date, ptt_validate_id, ptt_validate_session_index, ptt_validate_duration)
-- [ ] Refactor all Today AJAX handlers to use these helpers consistently (replace ad‑hoc inline checks)
+- [x] Create centralized ptt_validate_* helpers (ptt_validate_date, ptt_validate_id, ptt_validate_session_index, ptt_validate_duration)
+- [x] Refactor all Today AJAX handlers to use these helpers consistently (replace ad‑hoc inline checks)
 
 3) Information Disclosure (LOW PRIORITY)
 - [ ] Restrict PTT_Today_Page_Manager::get_debug_info() output to current_user_can('manage_options') only (or behind a filter/feature flag)

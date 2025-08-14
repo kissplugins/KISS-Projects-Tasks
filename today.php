@@ -359,12 +359,12 @@ function ptt_get_daily_entries_callback() {
 	}
 
 	$user_id = get_current_user_id();
-	$target_date = isset( $_POST['date'] ) ? sanitize_text_field( $_POST['date'] ) : date( 'Y-m-d' );
-	if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $target_date ) ) {
-		wp_send_json_error( [ 'message' => 'Invalid date.' ] );
+	$target_date = ptt_validate_date( $_POST['date'] ?? '' );
+	if ( $target_date === '' ) {
+		$target_date = date( 'Y-m-d' );
 	}
-	$client_id = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
-	$project_id = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
+	$client_id  = ptt_validate_id( $_POST['client_id']  ?? 0 );
+	$project_id = ptt_validate_id( $_POST['project_id'] ?? 0 );
 
 	// Build filters array
 	$filters = [];
@@ -452,11 +452,11 @@ function ptt_update_session_duration_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+	$post_id       = ptt_validate_id( $_POST['post_id'] ?? 0 );
 	$session_index = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
-	$new_duration = isset( $_POST['duration'] ) ? sanitize_text_field( $_POST['duration'] ) : '';
+	$new_duration  = isset( $_POST['duration'] ) ? sanitize_text_field( $_POST['duration'] ) : '';
 
-	if ( ! $post_id || $session_index < 0 || empty( $new_duration ) ) {
+	if ( ! $post_id || $session_index < 0 || $new_duration === '' ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
 	}
 	// Enforce task access: user must be assignee (admins allowed)
@@ -464,8 +464,8 @@ function ptt_update_session_duration_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
 	}
 
-	// Parse duration (expects format like "1.5" for hours or "01:30:00" for time format)
-	$duration_hours = 0.0;
+	// Parse duration via helper
+	$duration_hours = ptt_validate_duration( $new_duration );
 	if ( strpos( $new_duration, ':' ) !== false ) {
 		// Time format (HH:MM:SS or HH:MM)
 		$parts = explode( ':', $new_duration );
@@ -532,12 +532,12 @@ function ptt_update_session_field_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+	$post_id       = ptt_validate_id( $_POST['post_id'] ?? 0 );
 	$session_index = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
-	$field_name = isset( $_POST['field_name'] ) ? sanitize_text_field( $_POST['field_name'] ) : '';
-	$field_value = isset( $_POST['field_value'] ) ? sanitize_text_field( $_POST['field_value'] ) : '';
+	$field_name    = isset( $_POST['field_name'] ) ? sanitize_text_field( $_POST['field_name'] ) : '';
+	$field_value   = isset( $_POST['field_value'] ) ? sanitize_text_field( $_POST['field_value'] ) : '';
 
-	if ( ! $post_id || $session_index < 0 || empty( $field_name ) ) {
+	if ( ! $post_id || $session_index < 0 || $field_name === '' ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
 	}
 	// Enforce task access: user must be assignee (admins allowed)
@@ -592,7 +592,7 @@ function ptt_delete_session_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+	$post_id       = ptt_validate_id( $_POST['post_id'] ?? 0 );
 	$session_index = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
 
 	if ( ! $post_id || $session_index < 0 ) {
@@ -670,9 +670,9 @@ function ptt_move_session_callback() {
                 wp_send_json_error( [ 'message' => 'Permission denied.' ] );
         }
 
-        $post_id        = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+        $post_id        = ptt_validate_id( $_POST['post_id'] ?? 0 );
         $session_index  = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
-        $target_post_id = isset( $_POST['target_post_id'] ) ? absint( $_POST['target_post_id'] ) : 0;
+        $target_post_id = ptt_validate_id( $_POST['target_post_id'] ?? 0 );
 
         if ( ! $post_id || $session_index < 0 || ! $target_post_id ) {
                 wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
@@ -739,7 +739,7 @@ function ptt_today_start_timer_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+	$post_id = ptt_validate_id( $_POST['post_id'] ?? 0 );
 	if ( ! $post_id ) {
 		wp_send_json_error( [ 'message' => 'Invalid task ID.' ] );
 	}
