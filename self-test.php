@@ -21,8 +21,8 @@ function ptt_add_settings_submenu_page() {
         'ptt_self_test_page_html'          // Callback
     );
 }
-// Run after WordPress has finished building default CPT & taxonomy menus.
-add_action( 'admin_menu', 'ptt_add_settings_submenu_page', 60 );
+// Hook is now registered via KISS\PTT\Admin\SelfTestController::register().
+// add_action( 'admin_menu', 'ptt_add_settings_submenu_page', 60 );
 
 /**
  * Adds the “Changelog” link under the Tasks CPT menu.
@@ -37,38 +37,37 @@ function ptt_add_changelog_submenu_page() {
         'ptt_changelog_page_html'          // Callback
     );
 }
-add_action( 'admin_menu', 'ptt_add_changelog_submenu_page', 60 );
+// Hook is now registered via KISS\PTT\Admin\SelfTestController::register().
+// add_action( 'admin_menu', 'ptt_add_changelog_submenu_page', 60 );
+
+/**
+ * Ensure core admin assets (scripts.js, styles.css) are loaded and localized on Self‑Test/Changelog pages.
+ */
+function ptt_enqueue_selftest_assets( $hook ) {
+    $targets = [ 'project_task_page_ptt-self-test', 'project_task_page_ptt-changelog' ];
+    if ( ! in_array( $hook, $targets, true ) ) {
+        return;
+    }
+    // Styles
+    wp_enqueue_style( 'ptt-styles', PTT_PLUGIN_URL . 'styles.css', [], PTT_VERSION );
+    // Main plugin JS (contains Self‑Test handlers)
+    wp_enqueue_script( 'ptt-scripts', PTT_PLUGIN_URL . 'scripts.js', [ 'jquery' ], PTT_VERSION, true );
+    // Localize for AJAX
+    wp_localize_script( 'ptt-scripts', 'ptt_ajax_object', [
+        'ajax_url' => admin_url( 'admin-ajax.php' ),
+        'nonce'    => wp_create_nonce( 'ptt_ajax_nonce' ),
+    ] );
+}
+// Enqueued centrally via KISS\PTT\Admin\Assets::enqueue_admin().
+// add_action( 'admin_enqueue_scripts', 'ptt_enqueue_selftest_assets' );
+
 
 /**
  * Renders the Changelog page HTML.
  */
 function ptt_changelog_page_html() {
-    $file_path = PTT_PLUGIN_DIR . 'changelog.md';
-
-    echo '<div class="wrap">';
-    echo '<h1>Plugin Changelog</h1>';
-
-    if ( function_exists( 'kiss_mdv_render_file' ) ) {
-        $html = kiss_mdv_render_file( $file_path );
-        if ( $html ) {
-            echo $html;
-        } else {
-            echo '<p>Unable to render changelog.</p>';
-        }
-    } else {
-        $content = '';
-        if ( file_exists( $file_path ) ) {
-            $lines   = file( $file_path );
-            $preview = array_slice( $lines, 0, 500 );
-            $content = implode( '', $preview );
-        } else {
-            $content = 'changelog.md not found.';
-        }
-        echo '<pre>' . esc_html( $content ) . '</pre>';
-        echo '<p><em>To view the entire changelog, please open the changelog.md file in a text viewer.</em></p>';
-    }
-
-    echo '</div>';
+    // BC wrapper; now handled by KISS\\PTT\\Admin\\SelfTestController
+    return \KISS\PTT\Admin\SelfTestController::renderChangelogPage();
 }
 
 /* -----------------------------------------------------------------
@@ -81,470 +80,28 @@ function ptt_changelog_page_html() {
 /**
  * Renders the Self‑Test page HTML.
  */
-function ptt_self_test_page_html() { ?>
-    <div class="wrap">
-        <h1>Plugin Settings &amp; Self Test</h1>
-        <p>This module verifies core plugin functionality. It creates test data and immediately deletes it.</p>
-
-        <button id="ptt-run-self-tests" class="button button-primary">Re‑Run Tests</button>
-        <p id="ptt-last-test-time">
-            <?php
-            $last_run = get_option( 'ptt_tests_last_run' );
-            if ( $last_run ) {
-                echo 'Tests last ran at ' . esc_html( date_i18n( get_option( 'time_format' ), $last_run ) );
-            } else {
-                echo 'Tests last ran at --:--:--';
-            }
-            ?>
-        </p>
-
-        <div id="ptt-test-results-container" style="margin-top:20px;">
-            <div class="ptt-ajax-spinner" style="display:none;"></div>
-        </div>
-
-        <hr />
-        <button id="ptt-sync-authors" class="button">Synchronize Authors &rarr; Assignee</button>
-        <p id="ptt-sync-authors-result"></p>
-    </div>
-<?php }
+function ptt_self_test_page_html() {
+    // BC wrapper; now handled by KISS\\PTT\\Admin\\SelfTestController
+    return \KISS\PTT\Admin\SelfTestController::renderSelfTestPage();
+}
 
 /**
- * AJAX handler to run all self‑tests.
+ * AJAX handler to run all self‑tests (delegates to controller).
  */
 function ptt_run_self_tests_callback() {
-    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
-    if ( ! current_user_can( 'manage_options' ) ) {
-        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
-    }
-
-    $results = [];
-
-    /* -------------------------------------------------------------
-     * TEST 1 – Task Post Save & Assignee Update
-     * -----------------------------------------------------------*/
-    $test_post_id = wp_insert_post( [
-        'post_type'   => 'project_task',
-        'post_title'  => 'SELF TEST POST',
-        'post_status' => 'publish',
-    ] );
-
-    if ( $test_post_id && ! is_wp_error( $test_post_id ) ) {
-        $admin_id = get_current_user_id();
-        update_post_meta( $test_post_id, 'ptt_assignee', $admin_id );
-        $saved_assignee = (int) get_post_meta( $test_post_id, 'ptt_assignee', true );
-
-        $results[] = [
-            'name'    => 'Task Post Save & Assignee Update',
-            'status'  => ( $saved_assignee === $admin_id ) ? 'Pass' : 'Fail',
-            'message' => ( $saved_assignee === $admin_id )
-                ? 'Successfully created post and updated its assignee meta field.'
-                : 'Created post but failed to update or verify assignee meta field.',
-        ];
-
-        wp_delete_post( $test_post_id, true ); // force delete
-    } else {
-        $results[] = [
-            'name'    => 'Task Post Save & Assignee Update',
-            'status'  => 'Fail',
-            'message' => 'Failed to create test post.',
-        ];
-    }
-
-    /* -------------------------------------------------------------
-     * TEST 2 – Create Client & Project taxonomies
-     * -----------------------------------------------------------*/
-    $client_term  = wp_insert_term( 'SELF TEST CLIENT',  'client'  );
-    $project_term = wp_insert_term( 'SELF TEST PROJECT', 'project' );
-
-    if ( ! is_wp_error( $client_term ) && ! is_wp_error( $project_term ) ) {
-        $results[] = [
-            'name'    => 'Create Client & Project',
-            'status'  => 'Pass',
-            'message' => 'Successfully created test taxonomies.',
-        ];
-        wp_delete_term( $client_term['term_id'],  'client'  );
-        wp_delete_term( $project_term['term_id'], 'project' );
-    } else {
-        $results[] = [
-            'name'    => 'Create Client & Project',
-            'status'  => 'Fail',
-            'message' => 'Failed to create test taxonomies.',
-        ];
-    }
-
-    /* -------------------------------------------------------------
-     * TEST 3 – Calculate Total Time (basic & rounding)
-     * -----------------------------------------------------------*/
-    $calc_post = wp_insert_post( [
-        'post_type'   => 'project_task',
-        'post_title'  => 'CALC TEST POST',
-        'post_status' => 'publish',
-    ] );
-
-    if ( $calc_post && ! is_wp_error( $calc_post ) ) {
-        // 1.5 hours exactly
-        update_field( 'start_time', '2025-07-19 10:00:00', $calc_post );
-        update_field( 'stop_time',  '2025-07-19 11:30:00', $calc_post );
-        $duration = ptt_calculate_and_save_duration( $calc_post );
-
-        $results[] = [
-            'name'    => 'Calculate Total Time (1h 30m)',
-            'status'  => ( $duration === '1.50' ) ? 'Pass' : 'Fail',
-            'message' => ( $duration === '1.50' )
-                ? 'Correctly calculated 1.50 hours.'
-                : "Calculation incorrect. Expected 1.50, got {$duration}.",
-        ];
-
-        // 1 minute → should round up to 0.02
-        update_field( 'start_time', '2025-07-19 12:00:00', $calc_post );
-        update_field( 'stop_time',  '2025-07-19 12:01:00', $calc_post );
-        $duration_round = ptt_calculate_and_save_duration( $calc_post );
-
-        $results[] = [
-            'name'    => 'Calculate Total Time (Rounding)',
-            'status'  => ( $duration_round === '0.02' ) ? 'Pass' : 'Fail',
-            'message' => ( $duration_round === '0.02' )
-                ? 'Correctly rounded to 0.02 hours.'
-                : "Expected 0.02 hours, got {$duration_round}.",
-        ];
-
-        wp_delete_post( $calc_post, true );
-    } else {
-        $results[] = [
-            'name'    => 'Calculate Total Time',
-            'status'  => 'Fail',
-            'message' => 'Could not create post for calculation test.',
-        ];
-    }
-
-    /* -------------------------------------------------------------
-     * TEST 4 – Status Update Logic
-     * -----------------------------------------------------------*/
-    $status_term = wp_insert_term( 'SELF TEST STATUS ' . wp_rand(), 'task_status' );
-    $status_post = wp_insert_post( [
-        'post_type'   => 'project_task',
-        'post_title'  => 'STATUS TEST',
-        'post_status' => 'publish',
-    ] );
-
-    if (
-        $status_post && ! is_wp_error( $status_post ) &&
-        $status_term && ! is_wp_error( $status_term )
-    ) {
-        wp_set_object_terms( $status_post, $status_term['term_id'], 'task_status', false );
-        $assigned = has_term( $status_term['term_id'], 'task_status', $status_post );
-
-        $results[] = [
-            'name'    => 'Status Update Logic',
-            'status'  => $assigned ? 'Pass' : 'Fail',
-            'message' => $assigned
-                ? 'Core status assignment successful.'
-                : 'wp_set_object_terms failed to assign status.',
-        ];
-    } else {
-        $results[] = [
-            'name'    => 'Status Update Logic',
-            'status'  => 'Fail',
-            'message' => 'Could not create test post or term for status update test.',
-        ];
-    }
-
-    // Always clean up
-    wp_delete_post( $status_post, true );
-    if ( $status_term && ! is_wp_error( $status_term ) ) {
-        wp_delete_term( $status_term['term_id'], 'task_status' );
-    }
-
-    /* -------------------------------------------------------------
-     * TEST 5–7 – Reporting Logic & Date‑Range filter
-     * (code unchanged from original, omitted here for brevity)
-     * -----------------------------------------------------------*/
-
-    /* -------------------------------------------------------------
-     * TEST 8 – User Query for Assignees
-     * -----------------------------------------------------------*/
-    $assignee_users = get_users( [
-        'capability' => 'publish_posts',
-        'fields'     => 'ID',
-    ] );
-
-    $results[] = [
-        'name'    => 'User Query for Assignees',
-        'status'  => ( ! empty( $assignee_users ) ) ? 'Pass' : 'Fail',
-        'message' => ( ! empty( $assignee_users ) )
-            ? 'Found ' . count( $assignee_users ) . ' potential assignees.'
-            : 'No users with “publish_posts” capability found; Assignee dropdown may be empty.',
-    ];
-
-    /* -------------------------------------------------------------
-     * TEST 9 – Taxonomy Registration & Visibility
-     * -----------------------------------------------------------*/
-    $taxonomies_to_check = [ 'client', 'project', 'task_status' ];
-    $errors = [];
-
-    foreach ( $taxonomies_to_check as $tax_slug ) {
-        $tax_obj = get_taxonomy( $tax_slug );
-
-        if ( ! $tax_obj ) {
-            $errors[] = "Taxonomy '{$tax_slug}' is not registered.";
-            continue;
-        }
-
-        // Check if taxonomy has UI visibility
-        if ( empty( $tax_obj->show_ui ) ) {
-            $errors[] = "Taxonomy '{$tax_slug}' has show_ui disabled.";
-        }
-
-        // Check if taxonomy is visible in menu (can be true or a string)
-        if ( empty( $tax_obj->show_in_menu ) ) {
-            $errors[] = "Taxonomy '{$tax_slug}' has show_in_menu disabled.";
-        }
-
-        // Check if associated with project_task post type
-        if ( ! in_array( 'project_task', (array) $tax_obj->object_type, true ) ) {
-            $errors[] = "Taxonomy '{$tax_slug}' is not associated with the 'project_task' post type.";
-        }
-    }
-
-    $results[] = [
-        'name'    => 'Taxonomy Registration & Visibility',
-        'status'  => empty( $errors ) ? 'Pass' : 'Fail',
-        'message' => empty( $errors )
-            ? 'All taxonomies are correctly registered and configured for menu visibility.'
-            : implode( ' ', $errors ),
-    ];
-
-    /* -------------------------------------------------------------
-     * TEST 10 – Today Page User Data Isolation
-     * -----------------------------------------------------------*/
-    $user_a_id = wp_insert_user( [ 'user_login' => 'test_user_a', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
-    $user_b_id = wp_insert_user( [ 'user_login' => 'test_user_b', 'user_pass' => wp_generate_password(), 'role' => 'editor' ] );
-
-    if ( is_wp_error( $user_a_id ) || is_wp_error( $user_b_id ) ) {
-        $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => 'Could not create test users.' ];
-    } else {
-        // Task 1: Authored by A, Assigned to A
-        $task1 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task A1', 'post_author' => $user_a_id, 'post_status' => 'publish' ]);
-        update_post_meta($task1, 'ptt_assignee', $user_a_id);
-
-        // Task 2: Authored by B, Assigned to B
-        $task2 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task B1', 'post_author' => $user_b_id, 'post_status' => 'publish' ]);
-        update_post_meta($task2, 'ptt_assignee', $user_b_id);
-
-        // Task 3: Authored by A, Assigned to B
-        $task3 = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'Test Task A2/B2', 'post_author' => $user_a_id, 'post_status' => 'publish' ]);
-        update_post_meta($task3, 'ptt_assignee', $user_b_id);
-
-        $tasks_for_a = ptt_get_tasks_for_user( $user_a_id );
-        $tasks_for_b = ptt_get_tasks_for_user( $user_b_id );
-
-        $pass_a = count( $tasks_for_a ) === 1 && in_array( $task1, $tasks_for_a );
-        $pass_b = count( $tasks_for_b ) === 2 && in_array( $task2, $tasks_for_b ) && in_array( $task3, $tasks_for_b );
-
-        if ($pass_a && $pass_b) {
-            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Pass', 'message' => 'ptt_get_tasks_for_user() correctly isolated tasks for assignees.' ];
-        } else {
-            $fail_message = 'ptt_get_tasks_for_user() failed. ';
-            if (!$pass_a) $fail_message .= 'User A expected 1 task, got ' . count($tasks_for_a) . '. ';
-            if (!$pass_b) $fail_message .= 'User B expected 2 tasks, got ' . count($tasks_for_b) . '. ';
-            $results[] = [ 'name' => 'User Data Isolation', 'status' => 'Fail', 'message' => trim($fail_message) ];
-        }
-
-        // Cleanup
-        wp_delete_post( $task1, true );
-        wp_delete_post( $task2, true );
-        wp_delete_post( $task3, true );
-        require_once(ABSPATH.'wp-admin/includes/user.php');
-        wp_delete_user( $user_a_id );
-        wp_delete_user( $user_b_id );
-    }
-
-    /* -------------------------------------------------------------
-     * TEST 11 – Move Session Between Tasks
-     * -----------------------------------------------------------*/
-    $source_task = wp_insert_post( [
-        'post_type'   => 'project_task',
-        'post_title'  => 'Session Move Source',
-        'post_status' => 'publish',
-    ] );
-    $target_task = wp_insert_post( [
-        'post_type'   => 'project_task',
-        'post_title'  => 'Session Move Target',
-        'post_status' => 'publish',
-    ] );
-
-    if (
-        $source_task && ! is_wp_error( $source_task ) &&
-        $target_task && ! is_wp_error( $target_task )
-    ) {
-        $session_data = [
-            'session_title'            => 'Move Test',
-            'session_notes'            => '',
-            'session_start_time'       => '',
-            'session_stop_time'        => '',
-            'session_manual_override'  => 1,
-            'session_manual_duration'  => 1.5,
-            'session_calculated_duration' => '1.50',
-        ];
-        $row = add_row( 'sessions', $session_data, $source_task );
-        ptt_calculate_and_save_duration( $source_task );
-
-        $move_result = ptt_move_session_to_task( $source_task, $row - 1, $target_task );
-
-        $source_sessions = get_field( 'sessions', $source_task );
-        $target_sessions = get_field( 'sessions', $target_task );
-        $source_total    = get_field( 'calculated_duration', $source_task );
-        $target_total    = get_field( 'calculated_duration', $target_task );
-
-        $pass = (
-            $move_result !== false &&
-            empty( $source_sessions ) &&
-            is_array( $target_sessions ) &&
-            count( $target_sessions ) === 1 &&
-            $source_total === '0.00' &&
-            $target_total === '1.50'
-        );
-
-        $results[] = [
-            'name'    => 'Move Session Between Tasks',
-            'status'  => $pass ? 'Pass' : 'Fail',
-            'message' => $pass ? 'Session reassigned successfully.' : 'Failed to reassign session correctly.',
-        ];
-
-        wp_delete_post( $source_task, true );
-        wp_delete_post( $target_task, true );
-    } else {
-        $results[] = [
-            'name'    => 'Move Session Between Tasks',
-            'status'  => 'Fail',
-            'message' => 'Could not create test tasks for session move.',
-        ];
-    }
-
-	/* -------------------------------------------------------------
-	 * TEST 12 – Manual Session Auto-Timestamping
-	 * -----------------------------------------------------------*/
-	$timestamp_post = wp_insert_post(
-		[
-			'post_type'   => 'project_task',
-			'post_title'  => 'SELF TEST - AUTO TIMESTAMP',
-			'post_status' => 'publish',
-		]
-	);
-
-	if ( $timestamp_post && ! is_wp_error( $timestamp_post ) ) {
-		$session_row = [
-			'session_title'           => 'Manual session to be timestamped',
-			'session_start_time'      => '', // Intentionally blank
-			'session_manual_override' => 1,
-			'session_manual_duration' => 0.5,
-		];
-
-		// This call saves the initial data, then triggers the filter we are testing (ACF may use keys; ensure matching).
-		update_field( 'sessions', [ $session_row ], $timestamp_post );
-
-			// Normalize storage to names, in case update_sub_field with keys was used
-			$saved_sessions_pre = get_field( 'sessions', $timestamp_post );
-			if ( empty( $saved_sessions_pre[0]['session_start_time'] ) && ! empty( $saved_sessions_pre[0]['field_ptt_session_start_time'] ) ) {
-				// Copy from key->name for verification consistency
-				$saved_sessions_pre[0]['session_start_time'] = $saved_sessions_pre[0]['field_ptt_session_start_time'];
-				$saved_sessions_pre[0]['session_stop_time']  = $saved_sessions_pre[0]['field_ptt_session_stop_time'];
-			}
-
-
-			// Run safety net to ensure timestamps are set in current system
-			if ( function_exists( 'ptt_ensure_manual_session_timestamps' ) ) {
-				ptt_ensure_manual_session_timestamps( $timestamp_post );
-			}
-
-
-		// Retrieve the saved data to verify the filter worked.
-		$saved_sessions = get_field( 'sessions', $timestamp_post );
-
-		$pass         = false;
-		$fail_message = 'An unknown error occurred during verification.';
-		$debug_data   = '';
-
-		if ( empty( $saved_sessions ) || ! is_array( $saved_sessions ) ) {
-			$fail_message = 'Failed at step 1: The session data was not saved or was empty after retrieval.';
-		} else {
-
-				// Debug: include raw fields for more insight
-				$debug_data .= ' | Raw get_post_meta: ' . print_r( get_post_meta( $timestamp_post ), true );
-
-			$first_session = $saved_sessions[0];
-			$debug_data    = ' Retrieved session data: ' . print_r( $first_session, true );
-
-			if ( empty( $first_session['session_start_time'] ) ) {
-				$fail_message = 'Failed at step 2: The session start time was not automatically populated.';
-			} elseif ( $first_session['session_start_time'] !== $first_session['session_stop_time'] ) {
-				$fail_message = 'Failed at step 3: The session start and stop times were populated but do not match.';
-			} else {
-				$pass = true;
-			}
-		}
-
-		$results[] = [
-			'name'    => 'Manual Session Auto-Timestamping',
-			'status'  => $pass ? 'Pass' : 'Fail',
-			'message' => $pass
-				? 'A manual session without a date was correctly timestamped on save.'
-				: $fail_message . $debug_data,
-		];
-
-		wp_delete_post( $timestamp_post, true );
-	} else {
-		$results[] = [
-			'name'    => 'Manual Session Auto-Timestamping',
-			'status'  => 'Fail',
-			'message' => 'Could not create the test post required for the test.',
-		];
-	}
-
-    /* -------------------------------------------------------------
-     * TEST 8 – Data Structure Integrity
-     * -----------------------------------------------------------*/
-    $structure_results = ptt_test_data_structure_integrity();
-    $results = array_merge( $results, $structure_results );
-
-    /* -------------------------------------------------------------*/
-
-    $timestamp = current_time( 'timestamp' );
-    update_option( 'ptt_tests_last_run', $timestamp );
-
-    wp_send_json_success( [
-        'results' => $results,
-        'time'    => date_i18n( get_option( 'time_format' ), $timestamp ),
-    ] );
+    return \KISS\PTT\Admin\SelfTestController::ajaxRunSelfTests();
 }
-add_action( 'wp_ajax_ptt_run_self_tests', 'ptt_run_self_tests_callback' );
+// Hook is now registered via KISS\PTT\Admin\SelfTestController::register().
+// add_action( 'wp_ajax_ptt_run_self_tests', 'ptt_run_self_tests_callback' );
 
 /**
- * AJAX handler to copy post authors into the Assignee field.
+ * AJAX handler to copy post authors into the Assignee field (delegates to controller).
  */
 function ptt_sync_authors_assignee_callback() {
-    check_ajax_referer( 'ptt_ajax_nonce', 'nonce' );
-    if ( ! current_user_can( 'manage_options' ) ) {
-        wp_send_json_error( [ 'message' => 'Permission denied.' ] );
-    }
-
-    $posts = get_posts( [
-        'post_type'      => 'project_task',
-        'post_status'    => 'any',
-        'posts_per_page' => -1,
-        'fields'         => 'ids',
-    ] );
-
-    $count = 0;
-    foreach ( $posts as $post_id ) {
-        $author_id = (int) get_post_field( 'post_author', $post_id );
-        update_post_meta( $post_id, 'ptt_assignee', $author_id );
-        $count++;
-    }
-
-    wp_send_json_success( [ 'count' => $count ] );
+    return \KISS\PTT\Admin\SelfTestController::ajaxSyncAuthors();
 }
-add_action( 'wp_ajax_ptt_sync_authors_assignee', 'ptt_sync_authors_assignee_callback' );
+// Hook is now registered via KISS\PTT\Admin\SelfTestController::register().
+// add_action( 'wp_ajax_ptt_sync_authors_assignee', 'ptt_sync_authors_assignee_callback' );
 
 /**
  * Data Structure Integrity Test

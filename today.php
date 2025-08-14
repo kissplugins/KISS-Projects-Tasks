@@ -303,10 +303,10 @@ function ptt_today_start_new_session_callback() {
 		wp_send_json_error( [ 'message' => 'Invalid Task ID.' ] );
 	}
 
-	// Stop any other running session for the current user first.
+	// Stop any other running session for the current user first (global invariant)
 	$active_session = ptt_get_active_session_index_for_user( get_current_user_id() );
 	if ( $active_session ) {
-		ptt_stop_session( $active_session['post_id'], $active_session['index'] );
+		\KISS\PTT\Plugin::$timer->stopActive( $active_session['post_id'] );
 	}
 
 	$new_session = [
@@ -760,10 +760,10 @@ function ptt_today_quick_start_callback() {
 
     $user_id = get_current_user_id();
 
-    // Stop any other running session for the current user first.
+    // Stop any other running session for the current user first (global invariant)
     $active_session = ptt_get_active_session_index_for_user( $user_id );
     if ( $active_session ) {
-        ptt_stop_session( $active_session['post_id'], $active_session['index'] );
+        \KISS\PTT\Plugin::$timer->stopActive( $active_session['post_id'] );
     }
 
     // Ensure Quick Start project exists
