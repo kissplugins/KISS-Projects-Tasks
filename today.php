@@ -7,7 +7,7 @@
  * This file registers the "Today" page and renders its markup and
  * logic for a daily time-tracking dashboard view.
  *
- * Version: 1.12.0
+ * Version: 1.12.2
  * ------------------------------------------------------------------
  */
 
@@ -764,9 +764,9 @@ function ptt_today_quick_start_callback() {
         wp_send_json_error( [ 'message' => 'Permission denied.' ] );
     }
 
-    $client_id = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
-    if ( ! $client_id ) {
-        wp_send_json_error( [ 'message' => 'Client is required.' ] );
+    $client_id = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
+    if ( ! $client_id || ! term_exists( $client_id, 'client' ) ) {
+        wp_send_json_error( [ 'message' => 'Valid client is required.' ] );
     }
 
     $user_id = get_current_user_id();
@@ -842,29 +842,25 @@ function ptt_get_or_create_quick_start_project() {
  * Also associates the selected client taxonomy to the task.
  */
 function ptt_get_or_create_daily_quick_start_task( $user_id, $project_term_id, $client_term_id ) {
-    $date_label = wp_date( 'M. j, Y' );
-    $client_obj = $client_term_id ? get_term( $client_term_id, 'client' ) : null;
+    $date_label   = wp_date( 'M. j, Y' );
+    $client_obj   = $client_term_id ? get_term( $client_term_id, 'client' ) : null;
     $client_label = ( $client_obj && ! is_wp_error( $client_obj ) ) ? ( ' — ' . $client_obj->name ) : '';
-    $task_title = sprintf( 'Quick Start — %s — %s%s', $date_label, wp_get_current_user()->display_name, $client_label );
+    $task_title   = sanitize_text_field( sprintf( 'Quick Start — %s — %s%s', $date_label, wp_get_current_user()->display_name, $client_label ) );
 
     // Try to find an existing daily task for this user (and client)
-    $existing = get_posts( [
-        'post_type'      => 'project_task',
-        's'              => $task_title,
-        'post_status'    => [ 'publish', 'private' ],
-        'posts_per_page' => 1,
-        'meta_query'     => [
-            [ 'key' => 'ptt_assignee', 'value' => $user_id, 'compare' => '=' ],
-        ],
-        'tax_query'      => [
-            [ 'taxonomy' => 'project', 'field' => 'term_id', 'terms' => $project_term_id ],
-        ],
-        'fields'         => 'ids',
-    ] );
-
-    if ( ! empty( $existing ) ) {
-        $post_id = (int) $existing[0];
+    $existing = get_page_by_title( $task_title, OBJECT, 'project_task' );
+    if ( $existing && ! is_wp_error( $existing ) ) {
+        $post_id   = (int) $existing->ID;
+        $assignee  = (int) get_post_meta( $post_id, 'ptt_assignee', true );
+        $has_proj  = has_term( $project_term_id, 'project', $post_id );
+        if ( $assignee !== $user_id || ! $has_proj ) {
+            $post_id = 0; // Not the expected task
+        }
     } else {
+        $post_id = 0;
+    }
+
+    if ( ! $post_id ) {
         $post_id = wp_insert_post( [
             'post_type'   => 'project_task',
             'post_title'  => $task_title,
