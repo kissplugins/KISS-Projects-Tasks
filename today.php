@@ -7,7 +7,7 @@
  * This file registers the "Today" page and renders its markup and
  * logic for a daily time-tracking dashboard view.
  *
- * Version: 1.12.0
+ * Version: 1.12.2
  * ------------------------------------------------------------------
  */
 
@@ -769,6 +769,11 @@ function ptt_today_quick_start_callback() {
         wp_send_json_error( [ 'message' => 'Client is required.' ] );
     }
 
+    $client_term = get_term( $client_id, 'client' );
+    if ( ! $client_term || is_wp_error( $client_term ) ) {
+        wp_send_json_error( [ 'message' => 'Invalid client.' ] );
+    }
+
     $user_id = get_current_user_id();
 
     // Stop any other running session for the current user first.
@@ -826,15 +831,24 @@ add_action( 'wp_ajax_ptt_today_quick_start', 'ptt_today_quick_start_callback' );
  * Returns term_id of the Project taxonomy term.
  */
 function ptt_get_or_create_quick_start_project() {
+    $cached = get_option( 'ptt_quick_start_project_id' );
+    if ( $cached && term_exists( (int) $cached, 'project' ) ) {
+        return (int) $cached;
+    }
+
     $term = get_term_by( 'slug', 'quick-start', 'project' );
     if ( $term && ! is_wp_error( $term ) ) {
-        return $term->term_id;
+        update_option( 'ptt_quick_start_project_id', (int) $term->term_id );
+        return (int) $term->term_id;
     }
+
     $created = wp_insert_term( 'Quick Start', 'project', [ 'slug' => 'quick-start' ] );
     if ( is_wp_error( $created ) ) {
         return 0;
     }
-    return (int) ( $created['term_id'] ?? 0 );
+
+    update_option( 'ptt_quick_start_project_id', (int) $created['term_id'] );
+    return (int) $created['term_id'];
 }
 
 /**
@@ -842,54 +856,86 @@ function ptt_get_or_create_quick_start_project() {
  * Also associates the selected client taxonomy to the task.
  */
 function ptt_get_or_create_daily_quick_start_task( $user_id, $project_term_id, $client_term_id ) {
-    $date_label = wp_date( 'M. j, Y' );
-    $client_obj = $client_term_id ? get_term( $client_term_id, 'client' ) : null;
-    $client_label = ( $client_obj && ! is_wp_error( $client_obj ) ) ? ( ' — ' . $client_obj->name ) : '';
-    $task_title = sprintf( 'Quick Start — %s — %s%s', $date_label, wp_get_current_user()->display_name, $client_label );
+    $date_label   = sanitize_text_field( wp_date( 'M. j, Y' ) );
+    $client_obj   = $client_term_id ? get_term( $client_term_id, 'client' ) : null;
+    $client_name  = ( $client_obj && ! is_wp_error( $client_obj ) ) ? sanitize_text_field( $client_obj->name ) : '';
+    $user_name    = sanitize_text_field( wp_get_current_user()->display_name );
+    $client_label = $client_name ? ' — ' . $client_name : '';
+    $task_title   = sprintf( 'Quick Start — %s — %s%s', $date_label, $user_name, $client_label );
 
-    // Try to find an existing daily task for this user (and client)
-    $existing = get_posts( [
-        'post_type'      => 'project_task',
-        's'              => $task_title,
-        'post_status'    => [ 'publish', 'private' ],
-        'posts_per_page' => 1,
-        'meta_query'     => [
-            [ 'key' => 'ptt_assignee', 'value' => $user_id, 'compare' => '=' ],
-        ],
-        'tax_query'      => [
-            [ 'taxonomy' => 'project', 'field' => 'term_id', 'terms' => $project_term_id ],
-        ],
-        'fields'         => 'ids',
-    ] );
+    $slug_parts = [ 'quick-start', wp_date( 'Y-m-d' ), $user_id, ( $client_term_id ? $client_term_id : 0 ) ];
+    $slug       = sanitize_title( implode( '-', $slug_parts ) );
 
-    if ( ! empty( $existing ) ) {
-        $post_id = (int) $existing[0];
+    $existing = get_page_by_path( $slug, OBJECT, 'project_task' );
+
+    if ( $existing ) {
+        $post_id = (int) $existing->ID;
     } else {
         $post_id = wp_insert_post( [
             'post_type'   => 'project_task',
             'post_title'  => $task_title,
             'post_status' => 'publish',
             'post_author' => $user_id,
+            'post_name'   => $slug,
         ] );
         if ( is_wp_error( $post_id ) || ! $post_id ) {
             return 0;
         }
 
-        // Assign assignee and taxonomy
+        $actual_slug = get_post_field( 'post_name', $post_id );
+        if ( $actual_slug !== $slug ) {
+            $existing = get_page_by_path( $slug, OBJECT, 'project_task' );
+            if ( $existing ) {
+                wp_delete_post( $post_id, true );
+                $post_id = (int) $existing->ID;
+            }
+        }
+
         update_post_meta( $post_id, 'ptt_assignee', $user_id );
         wp_set_post_terms( $post_id, [ $project_term_id ], 'project', false );
 
-        // Set status to In Progress if exists
         $in_progress = get_term_by( 'name', 'In Progress', 'task_status' );
         if ( $in_progress && ! is_wp_error( $in_progress ) ) {
             wp_set_post_terms( $post_id, [ $in_progress->term_id ], 'task_status', false );
         }
     }
 
-    // Tag with the selected client (non-destructive)
     if ( $client_term_id ) {
         wp_set_post_terms( $post_id, [ $client_term_id ], 'client', false );
     }
 
     return (int) $post_id;
 }
+
+/**
+ * Cleanup old Quick Start placeholder tasks (30+ days).
+ */
+function ptt_cleanup_old_quick_start_tasks() {
+    $old_tasks = get_posts( [
+        'post_type'      => 'project_task',
+        'fields'         => 'ids',
+        'posts_per_page' => 50,
+        'tax_query'      => [
+            [
+                'taxonomy' => 'project',
+                'field'    => 'slug',
+                'terms'    => 'quick-start',
+            ],
+        ],
+        'date_query'     => [
+            [
+                'column' => 'post_modified_gmt',
+                'before' => '30 days ago',
+            ],
+        ],
+    ] );
+
+    foreach ( $old_tasks as $old_id ) {
+        wp_delete_post( $old_id, true );
+    }
+}
+
+if ( ! wp_next_scheduled( 'ptt_cleanup_quick_start_tasks' ) ) {
+    wp_schedule_event( time(), 'daily', 'ptt_cleanup_quick_start_tasks' );
+}
+add_action( 'ptt_cleanup_quick_start_tasks', 'ptt_cleanup_old_quick_start_tasks' );

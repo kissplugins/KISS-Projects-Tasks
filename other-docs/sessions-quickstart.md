@@ -29,6 +29,8 @@ Key goals:
 - The Today page Debug panel explains the filtering rules and what appears for the selected date
 
 ## History of changes
+- v1.12.2
+  - Hardened Quick Start creation with client validation, sanitized lookups, and stale task cleanup
 - v1.12.1
   - Relaxed reassignment for Quick Start sessions to "same Client only" (Project not required)
   - Added inline hint under Task Selector for Quick Start entries
