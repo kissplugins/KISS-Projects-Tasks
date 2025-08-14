@@ -1125,6 +1125,43 @@ jQuery(document).ready(function ($) {
             });
         }
 
+		// Provide task options to per-row selectors once to avoid N+1 queries
+		function populatePerRowTaskSelectors() {
+		    const optionsHtml = $taskSelect.html();
+		    $('.ptt-entry-task-selector').each(function(){
+		        const $sel = $(this);
+		        if (!$sel.data('populated')) {
+		            $sel.html(optionsHtml);
+		            $sel.data('populated', true);
+		        }
+		    });
+		}
+
+		// After tasks load, also populate the per-row selectors
+		const _origLoadTasks = loadTasks;
+		loadTasks = function(){
+		    return $.post(ptt_ajax_object.ajax_url, {
+		        action: 'ptt_get_tasks_for_today_page',
+		        nonce: ptt_ajax_object.nonce,
+		        project_id: $projectFilter.val(),
+		        client_id: $clientFilter.val()
+		    }).done(function(response){
+		        if (response.success && response.data.length) {
+		            let options = '<option value="">-- Select a Task --</option>';
+		            response.data.forEach(task => { options += `<option value="${task.id}">${task.title}</option>`; });
+		            $taskSelect.html(options).prop('disabled', false);
+		            populatePerRowTaskSelectors();
+		        } else {
+		            $taskSelect.html('<option value="">No available tasks</option>');
+		            populatePerRowTaskSelectors();
+		        }
+		    }).fail(function(){
+		        $taskSelect.html('<option value="">-- Select a Task --</option>');
+		        populatePerRowTaskSelectors();
+		    });
+		};
+
+
         $projectFilter.on('change', loadTasks);
         $clientFilter.on('change', loadTasks);
 

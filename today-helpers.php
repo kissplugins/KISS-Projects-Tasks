@@ -99,18 +99,11 @@ class PTT_Today_Entry_Renderer {
 								'tax_query'      => $__tax_query,
 							];
 
-							$tasks_query = new WP_Query( $task_args );
+							// Pre-rendered task options are provided by JS globally; avoid per-row queries
 							?>
 							<select class="ptt-entry-task-selector" data-original-task="<?php echo esc_attr( $entry['post_id'] ); ?>">
-								<?php
-								if ( $tasks_query->have_posts() ) {
-									while ( $tasks_query->have_posts() ) {
-										$tasks_query->the_post();
-										echo '<option value="' . esc_attr( get_the_ID() ) . '"' . selected( get_the_ID(), $entry['post_id'], false ) . '>' . esc_html( get_the_title() ) . '</option>';
-									}
-									wp_reset_postdata();
-								}
-								?>
+								<!-- Options injected by JS once; this avoids N+1 queries -->
+							</select>
 							</select>
 							<?php if ( $__is_quick_start ) : ?>
 								<div class="ptt-qs-hint" style="margin-top:6px;color:#555;font-size:12px;">
@@ -236,6 +229,13 @@ class PTT_Today_Data_Provider {
 	 * @return array Processed entries array.
 	 */
 	public static function get_daily_entries( $user_id, $target_date, $filters = [] ) {
+			// Simple short-lived cache to reduce repeated work on rapid navigation
+			$cache_key = 'ptt_today_entries_' . $user_id . '_' . md5( $target_date . '|' . wp_json_encode( $filters ) );
+			$cached = get_transient( $cache_key );
+			if ( is_array( $cached ) ) {
+				return $cached;
+			}
+
 		$all_entries = [];
 
 		// Get all tasks for the current user
@@ -267,7 +267,10 @@ class PTT_Today_Data_Provider {
 			return $b['start_time'] <=> $a['start_time'];
 		} );
 
-		return $all_entries;
+
+			// Store in a short cache to speed up subsequent requests (60s)
+			set_transient( $cache_key, $all_entries, 60 );
+			return $all_entries;
 	}
 
 	/**
@@ -290,11 +293,17 @@ class PTT_Today_Data_Provider {
 		}
 
 		$args = [
-			'post_type'      => 'project_task',
-			'posts_per_page' => -1,
-			'post_status'    => ['publish', 'private'],
-			'post__in'       => $user_task_ids,
-			'tax_query'      => [
+			'post_type'               => 'project_task',
+			'posts_per_page'          => 200, // bound to avoid unbounded scans; adjust as needed
+			'post_status'             => ['publish', 'private'],
+			'post__in'                => $user_task_ids,
+			'orderby'                 => 'modified',
+			'order'                   => 'DESC',
+			'no_found_rows'           => true,
+			'suppress_filters'        => true,
+			'update_post_term_cache'  => false,
+			'update_post_meta_cache'  => false,
+			'tax_query'               => [
 				'relation' => 'AND',
 			],
 		];
@@ -545,6 +554,22 @@ class PTT_Today_Data_Provider {
 			'formatted' => $formatted,
 		];
 	}
+
+	/**
+	 * Invalidate Today page transient caches when a task is saved.
+	 * NOTE: This is a coarse invalidation (clears all ptt_today_entries_* for this site).
+	 * For finer-grained invalidation we can namespace by user/date in future.
+	 */
+	function ptt_today_invalidate_cache_on_save( $post_id ) {
+		if ( get_post_type( $post_id ) !== 'project_task' ) {
+			return;
+		}
+		global $wpdb;
+		$like = $wpdb->esc_like( '_transient_ptt_today_entries_' ) . '%';
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $like ) );
+	}
+	add_action( 'acf/save_post', 'ptt_today_invalidate_cache_on_save', 99 );
+
 }
 
 /**
