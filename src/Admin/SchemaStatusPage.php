@@ -32,14 +32,25 @@ class SchemaStatusPage {
         }
 
         $issues = ACFDiagnostics::collectIssues();
-        if ( empty($issues) ) {
+        $hasIssues = !empty($issues);
+        if ( !$hasIssues ) {
             echo '<div class="notice notice-success"><p>No issues detected. Your ACF schema matches the expected mapping.</p></div>';
         } else {
             echo '<div class="notice notice-warning"><p><strong>Warnings:</strong></p><ul style="margin-left:1em;">';
             foreach ($issues as $msg) {
                 echo '<li>' . esc_html($msg) . '</li>';
             }
-            echo '</ul></div>';
+            echo '</ul>';
+            echo '<p><button id="ptt-copy-diagnostics" class="button">Copy diagnostics (text)</button> ';
+            echo '<button id="ptt-copy-diagnostics-json" class="button">Copy diagnostics (JSON)</button></p>';
+            echo '</div>';
+            // Inline script for copy buttons (no extra asset required)
+            echo '<script>(function(){\n'
+                . 'function copy(txt){navigator.clipboard.writeText(txt).then(function(){alert("Diagnostics copied to clipboard.");}).catch(function(){prompt("Copy diagnostics:", txt);});}\n'
+                . 'document.addEventListener("DOMContentLoaded",function(){\n'
+                . 'var btn1=document.getElementById("ptt-copy-diagnostics"); if(btn1){btn1.addEventListener("click",function(){copy(' . json_encode(implode("\n", $issues)) . ');});}\n'
+                . 'var btn2=document.getElementById("ptt-copy-diagnostics-json"); if(btn2){btn2.addEventListener("click",function(){copy(' . json_encode(json_encode($issues)) . ');});}\n'
+                . '});})();</script>';
         }
 
         echo '<h2>Authoritative Mapping</h2>';

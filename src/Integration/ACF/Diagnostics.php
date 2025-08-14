@@ -83,7 +83,9 @@ class Diagnostics {
                 foreach ($subExpected as $k => $expect) {
                     $sf = $subByKey[$k] ?? null;
                     if (!$sf) { $issues[] = "Sessions sub-field missing: {$k}"; continue; }
-                    if (($sf['name'] ?? null) !== $expect['name']) {
+                    // Message fields may legitimately have an empty name; allow blank name for 'message' type
+                    $shouldCheckName = !($expect['type'] === 'message' && empty($sf['name']));
+                    if ($shouldCheckName && (($sf['name'] ?? null) !== $expect['name'])) {
                         $issues[] = sprintf('Sessions sub-field name mismatch for %s: expected %s got %s', $k, $expect['name'], $sf['name'] ?? '');
                     }
                     if (($sf['type'] ?? null) !== $expect['type']) {
