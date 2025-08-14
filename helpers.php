@@ -56,3 +56,52 @@ function ptt_validate_task_access( int $post_id, int $user_id ): bool {
     $assignee = (int) get_post_meta( $post_id, 'ptt_assignee', true );
     return $assignee === (int) $user_id;
 }
+
+
+/** Input validation helpers (centralized) */
+
+/**
+ * Validate and normalize a WordPress ID (post, term, user).
+ */
+function ptt_validate_id( $val ): int {
+    $id = absint( $val );
+    return $id > 0 ? $id : 0;
+}
+
+/**
+ * Validate a date string in YYYY-MM-DD format; returns empty string if invalid.
+ */
+function ptt_validate_date( $val ): string {
+    $s = is_string( $val ) ? trim( $val ) : '';
+    if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $s ) ) {
+        return '';
+    }
+    // Extra check for real calendar date
+    [$y, $m, $d] = array_map( 'intval', explode( '-', $s ) );
+    return checkdate( $m, $d, $y ) ? $s : '';
+}
+
+/**
+ * Validate session index against a count; returns -1 if invalid.
+ */
+function ptt_validate_session_index( $val, int $count ): int {
+    $idx = absint( $val );
+    return ( $idx >= 0 && $idx < $count ) ? $idx : -1;
+}
+
+/**
+ * Validate duration in hours. Accepts decimal or HH:MM[:SS]. Clamps to [0, 48].
+ */
+function ptt_validate_duration( $val ): float {
+    if ( is_string( $val ) && strpos( $val, ':' ) !== false ) {
+        $parts = explode( ':', $val );
+        $h = isset( $parts[0] ) ? absint( $parts[0] ) : 0;
+        $m = isset( $parts[1] ) ? absint( $parts[1] ) : 0;
+        $s = isset( $parts[2] ) ? absint( $parts[2] ) : 0;
+        $hours = $h + ($m / 60) + ($s / 3600);
+    } else {
+        $hours = (float) $val;
+    }
+    if ( ! is_finite( $hours ) ) { $hours = 0.0; }
+    return max( 0.0, min( 48.0, $hours ) );
+}
