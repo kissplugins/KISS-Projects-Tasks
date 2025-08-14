@@ -2,6 +2,10 @@
 
 
 
+## Version 1.12.2 - Quick Start Security Fix
+- Today page: validated Client IDs before Quick Start operations
+- Quick Start task lookup uses exact title matching to avoid SQL injection risk
+
 ## Version 1.12.1 - Quick Start Reassignment + Self Test Summary Improvements
 - Today page: Relaxed session reassignment rules for Quick Start entries to "same Client only" (Project not required)
 - Today page: Added inline hint below Task Selector for Quick Start entries: "Quick Start: showing tasks for client (project not restricted)"
