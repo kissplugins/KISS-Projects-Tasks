@@ -5,6 +5,8 @@ use KISS\PTT\Time\Calculator;
 use KISS\PTT\Integration\ACF\ACFAdapter;
 use KISS\PTT\Domain\Session\SessionRepository;
 use KISS\PTT\Domain\Timer\TimerService;
+use KISS\PTT\Admin\Assets as AdminAssets;
+use KISS\PTT\Admin\SelfTestController;
 
 class Plugin {
     // Simple, low-risk: register services directly on Plugin
@@ -19,6 +21,9 @@ class Plugin {
         self::$sessions = new SessionRepository( self::$acf );
         self::$timer    = new TimerService( self::$acf, self::$sessions );
 
+        // Register admin assets and controllers
+        AdminAssets::register();
+        SelfTestController::register();
 
         self::register_hooks();
         // Load remaining procedural modules

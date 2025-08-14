@@ -21,8 +21,8 @@ function ptt_add_settings_submenu_page() {
         'ptt_self_test_page_html'          // Callback
     );
 }
-// Run after WordPress has finished building default CPT & taxonomy menus.
-add_action( 'admin_menu', 'ptt_add_settings_submenu_page', 60 );
+// Hook is now registered via KISS\PTT\Admin\SelfTestController::register().
+// add_action( 'admin_menu', 'ptt_add_settings_submenu_page', 60 );
 
 /**
  * Adds the “Changelog” link under the Tasks CPT menu.
@@ -37,7 +37,8 @@ function ptt_add_changelog_submenu_page() {
         'ptt_changelog_page_html'          // Callback
     );
 }
-add_action( 'admin_menu', 'ptt_add_changelog_submenu_page', 60 );
+// Hook is now registered via KISS\PTT\Admin\SelfTestController::register().
+// add_action( 'admin_menu', 'ptt_add_changelog_submenu_page', 60 );
 
 /**
  * Ensure core admin assets (scripts.js, styles.css) are loaded and localized on Self‑Test/Changelog pages.
@@ -57,7 +58,8 @@ function ptt_enqueue_selftest_assets( $hook ) {
         'nonce'    => wp_create_nonce( 'ptt_ajax_nonce' ),
     ] );
 }
-add_action( 'admin_enqueue_scripts', 'ptt_enqueue_selftest_assets' );
+// Enqueued centrally via KISS\PTT\Admin\Assets::enqueue_admin().
+// add_action( 'admin_enqueue_scripts', 'ptt_enqueue_selftest_assets' );
 
 
 /**
@@ -538,7 +540,8 @@ function ptt_run_self_tests_callback() {
         'time'    => date_i18n( get_option( 'time_format' ), $timestamp ),
     ] );
 }
-add_action( 'wp_ajax_ptt_run_self_tests', 'ptt_run_self_tests_callback' );
+// Hook is now registered via KISS\PTT\Admin\SelfTestController::register().
+// add_action( 'wp_ajax_ptt_run_self_tests', 'ptt_run_self_tests_callback' );
 
 /**
  * AJAX handler to copy post authors into the Assignee field.
@@ -565,7 +568,8 @@ function ptt_sync_authors_assignee_callback() {
 
     wp_send_json_success( [ 'count' => $count ] );
 }
-add_action( 'wp_ajax_ptt_sync_authors_assignee', 'ptt_sync_authors_assignee_callback' );
+// Hook is now registered via KISS\PTT\Admin\SelfTestController::register().
+// add_action( 'wp_ajax_ptt_sync_authors_assignee', 'ptt_sync_authors_assignee_callback' );
 
 /**
  * Data Structure Integrity Test
