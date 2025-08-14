@@ -1,7 +1,4 @@
-Hide Parent Level Time Entry and Timer - Done
-
-Yes, I see a few excellent opportunities to improve the self-tests by using the main plugin’s functions for more integrated and meaningful results.
-The current test suite does a good job of testing core WordPress functions within the plugin’s context (e.g., can a post be created, can meta be saved). However, we can make it more powerful by directly testing the plugin’s own data processing and helper functions.
+1.x Series (Pre PSR-4 Legacy)
 —
 
 ## 1. Test Key Helper Functions
@@ -76,9 +73,9 @@ The current “Reporting Logic” test (Test #5) runs a generic `WP_Query` which
 Priority order based on the audit (do not implement yet; track and schedule):
 
 1) Data Authorization (HIGH PRIORITY)
-- [ ] Introduce ptt_validate_task_access( $post_id, $user_id ) helper; rule: user must be the ptt_assignee to start/move/update sessions
-- [ ] Enforce in today.php handlers that change state: ptt_today_start_timer_callback, ptt_move_session_callback, ptt_update_session_duration_callback, ptt_update_session_field_callback, ptt_delete_session_callback
-- [ ] Add unit/integration tests to confirm access is denied for non‑assignees
+- [x] Introduce ptt_validate_task_access( $post_id, $user_id ) helper; rule: user must be the ptt_assignee to start/move/update sessions
+- [x] Enforce in today.php handlers that change state: ptt_today_start_timer_callback, ptt_move_session_callback, ptt_update_session_duration_callback, ptt_update_session_field_callback, ptt_delete_session_callback
+- [x] Add unit/integration tests to confirm access is denied for non‑assignees
 
 2) Input Validation (MEDIUM PRIORITY)
 - [ ] Create centralized ptt_validate_* helpers (ptt_validate_date, ptt_validate_id, ptt_validate_session_index, ptt_validate_duration)
