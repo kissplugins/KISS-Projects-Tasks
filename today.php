@@ -459,8 +459,9 @@ function ptt_update_session_duration_callback() {
 	if ( ! $post_id || $session_index < 0 || empty( $new_duration ) ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
 	}
-	if ( get_post_type( $post_id ) !== 'project_task' || ! current_user_can( 'edit_post', $post_id ) ) {
-		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	// Enforce task access: user must be assignee (admins allowed)
+	if ( ! ptt_validate_task_access( $post_id, get_current_user_id() ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
 	}
 
 	// Parse duration (expects format like "1.5" for hours or "01:30:00" for time format)
@@ -539,8 +540,9 @@ function ptt_update_session_field_callback() {
 	if ( ! $post_id || $session_index < 0 || empty( $field_name ) ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
 	}
-	if ( get_post_type( $post_id ) !== 'project_task' || ! current_user_can( 'edit_post', $post_id ) ) {
-		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	// Enforce task access: user must be assignee (admins allowed)
+	if ( ! ptt_validate_task_access( $post_id, get_current_user_id() ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
 	}
 
 	// Map field names to ACF field keys
@@ -596,8 +598,9 @@ function ptt_delete_session_callback() {
 	if ( ! $post_id || $session_index < 0 ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
 	}
-	if ( get_post_type( $post_id ) !== 'project_task' || ! current_user_can( 'edit_post', $post_id ) ) {
-		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+	// Enforce task access: user must be assignee (admins allowed)
+	if ( ! ptt_validate_task_access( $post_id, get_current_user_id() ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
 	}
 
 	// Validate repeater bounds before deletion
@@ -674,9 +677,9 @@ function ptt_move_session_callback() {
         if ( ! $post_id || $session_index < 0 || ! $target_post_id ) {
                 wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
         }
-        if ( get_post_type( $post_id ) !== 'project_task' || ! current_user_can( 'edit_post', $post_id ) ||
-             get_post_type( $target_post_id ) !== 'project_task' || ! current_user_can( 'edit_post', $target_post_id ) ) {
-                wp_send_json_error( [ 'message' => 'Permission denied.' ] );
+        // Enforce task access: user must be assignee (admins allowed)
+        if ( ! ptt_validate_task_access( $post_id, get_current_user_id() ) || ! ptt_validate_task_access( $target_post_id, get_current_user_id() ) ) {
+                wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
         }
 
         $new_index = ptt_move_session_to_task( $post_id, $session_index, $target_post_id );
@@ -736,9 +739,13 @@ function ptt_today_start_timer_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+	$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
 	if ( ! $post_id ) {
 		wp_send_json_error( [ 'message' => 'Invalid task ID.' ] );
+	}
+	// Enforce task access: user must be assignee (admins allowed)
+	if ( ! ptt_validate_task_access( $post_id, get_current_user_id() ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
 	}
 
 	// Check if user has any active sessions

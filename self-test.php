@@ -509,6 +509,84 @@ function ptt_run_self_tests_callback() {
 
     /* -------------------------------------------------------------*/
 
+	    /* -------------------------------------------------------------
+	     * TEST 9 – Authorization: Start Timer (Assignee only)
+	     * -----------------------------------------------------------*/
+	    $user_a_login = 'auth_user_a_' . wp_generate_password(4, false);
+	    $user_b_login = 'auth_user_b_' . wp_generate_password(4, false);
+	    $user_a_id = wp_insert_user( [ 'user_login' => $user_a_login, 'user_pass' => wp_generate_password(), 'role' => 'editor', 'user_email' => $user_a_login.'@example.com' ] );
+	    $user_b_id = wp_insert_user( [ 'user_login' => $user_b_login, 'user_pass' => wp_generate_password(), 'role' => 'editor', 'user_email' => $user_b_login.'@example.com' ] );
+	    if ( ! is_wp_error( $user_a_id ) && ! is_wp_error( $user_b_id ) ) {
+	        $task = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Auth Start Timer Task', 'post_status' => 'publish' ] );
+	        update_post_meta( $task, 'ptt_assignee', $user_a_id );
+	        $pass = ( ptt_validate_task_access( $task, $user_a_id ) === true )
+	            && ( ptt_validate_task_access( $task, $user_b_id ) === false );
+	        $results[] = [
+	            'name'    => 'Authorization: Start Timer (Assignee only)',
+	            'status'  => $pass ? 'Pass' : 'Fail',
+	            'message' => $pass ? 'Assignee allowed; non‑assignee denied.' : 'Authorization rules failed for start timer.',
+	        ];
+	        wp_delete_post( $task, true );
+	    } else {
+	        $results[] = [ 'name' => 'Authorization: Start Timer (Assignee only)', 'status' => 'Fail', 'message' => 'Could not create test users.' ];
+	    }
+	    if ( ! is_wp_error( $user_a_id ) ) { wp_delete_user( $user_a_id ); }
+	    if ( ! is_wp_error( $user_b_id ) ) { wp_delete_user( $user_b_id ); }
+
+	    /* -------------------------------------------------------------
+	     * TEST 10 – Authorization: Move Session (Source & Target ownership)
+	     * -----------------------------------------------------------*/
+	    $user_a_login = 'auth_user2_a_' . wp_generate_password(4, false);
+	    $user_b_login = 'auth_user2_b_' . wp_generate_password(4, false);
+	    $user_a_id = wp_insert_user( [ 'user_login' => $user_a_login, 'user_pass' => wp_generate_password(), 'role' => 'editor', 'user_email' => $user_a_login.'@example.com' ] );
+	    $user_b_id = wp_insert_user( [ 'user_login' => $user_b_login, 'user_pass' => wp_generate_password(), 'role' => 'editor', 'user_email' => $user_b_login.'@example.com' ] );
+	    if ( ! is_wp_error( $user_a_id ) && ! is_wp_error( $user_b_id ) ) {
+	        $source = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Auth Move Source', 'post_status' => 'publish' ] );
+	        $target = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Auth Move Target', 'post_status' => 'publish' ] );
+	        update_post_meta( $source, 'ptt_assignee', $user_a_id );
+	        update_post_meta( $target, 'ptt_assignee', $user_b_id );
+	        $a_can_source = ptt_validate_task_access( $source, $user_a_id );
+	        $a_can_target = ptt_validate_task_access( $target, $user_a_id );
+	        $b_can_target = ptt_validate_task_access( $target, $user_b_id );
+	        $pass = ( $a_can_source === true ) && ( $a_can_target === false ) && ( $b_can_target === true );
+	        $results[] = [
+	            'name'    => 'Authorization: Move Session (ownership enforced)',
+	            'status'  => $pass ? 'Pass' : 'Fail',
+	            'message' => $pass ? 'Source allowed to assignee, target restricted to its assignee.' : 'Ownership checks failed for move operation.',
+	        ];
+	        wp_delete_post( $source, true );
+	        wp_delete_post( $target, true );
+	    } else {
+	        $results[] = [ 'name' => 'Authorization: Move Session (ownership enforced)', 'status' => 'Fail', 'message' => 'Could not create test users.' ];
+	    }
+	    if ( ! is_wp_error( $user_a_id ) ) { wp_delete_user( $user_a_id ); }
+	    if ( ! is_wp_error( $user_b_id ) ) { wp_delete_user( $user_b_id ); }
+
+	    /* -------------------------------------------------------------
+	     * TEST 11 – Authorization: Edit/Delete Session (Assignee only)
+	     * -----------------------------------------------------------*/
+	    $user_a_login = 'auth_user3_a_' . wp_generate_password(4, false);
+	    $user_b_login = 'auth_user3_b_' . wp_generate_password(4, false);
+	    $user_a_id = wp_insert_user( [ 'user_login' => $user_a_login, 'user_pass' => wp_generate_password(), 'role' => 'editor', 'user_email' => $user_a_login.'@example.com' ] );
+	    $user_b_id = wp_insert_user( [ 'user_login' => $user_b_login, 'user_pass' => wp_generate_password(), 'role' => 'editor', 'user_email' => $user_b_login.'@example.com' ] );
+	    if ( ! is_wp_error( $user_a_id ) && ! is_wp_error( $user_b_id ) ) {
+	        $task = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Auth Edit/Delete Task', 'post_status' => 'publish' ] );
+	        update_post_meta( $task, 'ptt_assignee', $user_a_id );
+	        $pass = ( ptt_validate_task_access( $task, $user_a_id ) === true )
+	            && ( ptt_validate_task_access( $task, $user_b_id ) === false );
+	        $results[] = [
+	            'name'    => 'Authorization: Edit/Delete Session (Assignee only)',
+	            'status'  => $pass ? 'Pass' : 'Fail',
+	            'message' => $pass ? 'Assignee allowed; non‑assignee denied.' : 'Authorization rules failed for edit/delete.',
+	        ];
+	        wp_delete_post( $task, true );
+	    } else {
+	        $results[] = [ 'name' => 'Authorization: Edit/Delete Session (Assignee only)', 'status' => 'Fail', 'message' => 'Could not create test users.' ];
+	    }
+	    if ( ! is_wp_error( $user_a_id ) ) { wp_delete_user( $user_a_id ); }
+	    if ( ! is_wp_error( $user_b_id ) ) { wp_delete_user( $user_b_id ); }
+
+
     $timestamp = current_time( 'timestamp' );
     update_option( 'ptt_tests_last_run', $timestamp );
 

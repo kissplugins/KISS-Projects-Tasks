@@ -45,3 +45,14 @@ function ptt_get_tasks_for_user( $user_id ) {
 
 	return $task_ids;
 }
+
+/**
+ * Validates whether a specific user (by ID) is the assignee of a task.
+ * Pure check: no reliance on the current logged-in user or capabilities.
+ */
+function ptt_validate_task_access( int $post_id, int $user_id ): bool {
+    if ( ! $post_id || ! $user_id ) return false;
+    if ( get_post_type( $post_id ) !== 'project_task' ) return false;
+    $assignee = (int) get_post_meta( $post_id, 'ptt_assignee', true );
+    return $assignee === (int) $user_id;
+}
