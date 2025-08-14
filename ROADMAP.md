@@ -20,15 +20,17 @@
   - [x] Create SessionRepository (src/Domain/Session/SessionRepository.php)
   - [x] Create TimerService skeleton (src/Domain/Timer/TimerService.php)
 
+  - [x] Register local ACF field groups for clean installs (src/Integration/ACF/FieldGroups.php)
+
 - [ ] Session Domain & Repository (Core)
-  - [ ] src/Domain/Session/SessionRepository (minimal-read access; avoid full repeater hydration)
+  - [x] src/Domain/Session/SessionRepository (minimal-read access; avoid full repeater hydration)
   - [ ] Invariants: one active session per user; prevent overlaps; deterministic ordering
   - [ ] Time normalization (UTC) and rounding rules in one place
 - Decision (low‑risk for finish line): Register services directly on Plugin; defer Service Locator to Post‑Project
 
 - [ ] Timer Orchestration (Core)
-  - [ ] src/Domain/Timer/TimerService for start/stop/resume transitions and validation
-  - [ ] Hooks for auditing: ptt_session_started/updated/stopped
+  - [x] src/Domain/Timer/TimerService for start/stop/resume transitions and validation
+  - [x] Hooks for auditing: ptt_session_started/resumed/stopped
   - [x] Wire ACFAdapter/SessionRepository/TimerService directly on Plugin (low‑risk)
   - [x] Route start‑timer flow through TimerService
   - [x] Add stopActive() and resume() to TimerService; enforce no overlapping sessions per task

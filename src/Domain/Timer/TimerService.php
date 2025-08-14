@@ -56,7 +56,11 @@ class TimerService
             'session_manual_override' => 0,
             'session_manual_duration' => 0,
         ];
-        return $this->sessions->add($row, $postId);
+        $ok = $this->sessions->add($row, $postId);
+        if ($ok) {
+            do_action('ptt_session_started', $postId, $now, $title);
+        }
+        return $ok;
     }
 
     /** Stop the active (running) session for a task, if any. */
@@ -70,7 +74,11 @@ class TimerService
         for ($i = $count - 1; $i >= 0; $i--) {
             $s = $sessions[$i] ?? [];
             if (!empty($s['session_start_time']) && empty($s['session_stop_time'])) {
-                return $this->sessions->updateSub($i, 'session_stop_time', $now, $postId);
+                $ok = $this->sessions->updateSub($i, 'session_stop_time', $now, $postId);
+                if ($ok) {
+                    do_action('ptt_session_stopped', $postId, $now, $i);
+                }
+                return $ok;
             }
         }
         return false;
@@ -87,7 +95,11 @@ class TimerService
             return false;
         }
         $newTitle = $title ?? ($target['session_title'] ?? 'Session');
-        return $this->start($postId, $newTitle);
+        $ok = $this->start($postId, $newTitle);
+        if ($ok) {
+            do_action('ptt_session_resumed', $postId, $index0, $newTitle);
+        }
+        return $ok;
     }
 }
 
