@@ -7,7 +7,7 @@
  * This file registers the "Today" page and renders its markup and
  * logic for a daily time-tracking dashboard view.
  *
- * Version: 1.12.0
+ * Version: 1.12.2
  * ------------------------------------------------------------------
  */
 
@@ -206,8 +206,8 @@ function ptt_get_tasks_for_today_page_callback() {
 		wp_send_json_error();
 	}
 
-	$project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
-	$client_id  = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
+	$project_id = isset( $_POST['project_id'] ) ? absint( $_POST['project_id'] ) : 0;
+	$client_id  = isset( $_POST['client_id'] ) ? absint( $_POST['client_id'] ) : 0;
 	$user_id    = get_current_user_id();
 
 	// Get all tasks assigned to the current user
@@ -220,21 +220,25 @@ function ptt_get_tasks_for_today_page_callback() {
 	$status_terms_to_include = [];
 	$not_started = get_term_by( 'name', 'Not Started', 'task_status' );
 	$in_progress = get_term_by( 'name', 'In Progress', 'task_status' );
-	if ( $not_started ) $status_terms_to_include[] = $not_started->term_id;
-	if ( $in_progress ) $status_terms_to_include[] = $in_progress->term_id;
+	if ( $not_started ) { $status_terms_to_include[] = (int) $not_started->term_id; }
+	if ( $in_progress ) { $status_terms_to_include[] = (int) $in_progress->term_id; }
 
 	if ( empty( $status_terms_to_include ) ) {
 		wp_send_json_error( [ 'message' => 'Required task statuses not found.' ] );
 	}
 
 	$args = [
-		'post_type'      => 'project_task',
-		'posts_per_page' => 100,
-		'post_status'    => 'publish',
-		'orderby'        => 'modified', // LIFO
-		'order'          => 'DESC',
-		'post__in'       => $user_task_ids, // Only query user's tasks
-		'tax_query'      => [
+		'post_type'               => 'project_task',
+		'posts_per_page'          => 100,
+		'post_status'             => 'publish',
+		'orderby'                 => 'modified', // LIFO
+		'order'                   => 'DESC',
+		'post__in'                => $user_task_ids, // Only query user's tasks
+		'no_found_rows'           => true,
+		'suppress_filters'        => true,
+		'update_post_term_cache'  => false,
+		'update_post_meta_cache'  => false,
+		'tax_query'               => [
 			'relation' => 'AND',
 			[
 				'taxonomy' => 'task_status',
@@ -355,9 +359,12 @@ function ptt_get_daily_entries_callback() {
 	}
 
 	$user_id = get_current_user_id();
-	$target_date = isset( $_POST['date'] ) ? sanitize_text_field( $_POST['date'] ) : date( 'Y-m-d' );
-	$client_id = isset( $_POST['client_id'] ) ? intval( $_POST['client_id'] ) : 0;
-	$project_id = isset( $_POST['project_id'] ) ? intval( $_POST['project_id'] ) : 0;
+	$target_date = ptt_validate_date( $_POST['date'] ?? '' );
+	if ( $target_date === '' ) {
+		$target_date = date( 'Y-m-d' );
+	}
+	$client_id  = ptt_validate_id( $_POST['client_id']  ?? 0 );
+	$project_id = ptt_validate_id( $_POST['project_id'] ?? 0 );
 
 	// Build filters array
 	$filters = [];
@@ -445,28 +452,40 @@ function ptt_update_session_duration_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-	$session_index = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
-	$new_duration = isset( $_POST['duration'] ) ? sanitize_text_field( $_POST['duration'] ) : '';
+	$post_id       = ptt_validate_id( $_POST['post_id'] ?? 0 );
+	$session_index = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
+	$new_duration  = isset( $_POST['duration'] ) ? sanitize_text_field( $_POST['duration'] ) : '';
 
-	if ( ! $post_id || $session_index < 0 || empty( $new_duration ) ) {
+	if ( ! $post_id || $session_index < 0 || $new_duration === '' ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
 	}
+	// Enforce task access: user must be assignee (admins allowed)
+	if ( ! ptt_validate_task_access( $post_id, get_current_user_id() ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
+	}
 
-	// Parse duration (expects format like "1.5" for hours or "01:30:00" for time format)
-	$duration_hours = 0;
+	// Parse duration via helper
+	$duration_hours = ptt_validate_duration( $new_duration );
 	if ( strpos( $new_duration, ':' ) !== false ) {
 		// Time format (HH:MM:SS or HH:MM)
 		$parts = explode( ':', $new_duration );
-		$hours = intval( $parts[0] );
-		$minutes = isset( $parts[1] ) ? intval( $parts[1] ) : 0;
-		$seconds = isset( $parts[2] ) ? intval( $parts[2] ) : 0;
+		$hours = absint( $parts[0] );
+		$minutes = isset( $parts[1] ) ? absint( $parts[1] ) : 0;
+		$seconds = isset( $parts[2] ) ? absint( $parts[2] ) : 0;
 		$duration_hours = $hours + ( $minutes / 60 ) + ( $seconds / 3600 );
 	} else {
 		// Decimal hours format
-		$duration_hours = floatval( $new_duration );
+		$duration_hours = (float) $new_duration;
 	}
+	// Clamp to sane bounds [0, 48] hours
+	$duration_hours = max( 0.0, min( 48.0, $duration_hours ) );
 
+	// Validate repeater bounds before update
+	$rows = get_field( 'sessions', $post_id );
+	$rows_count = is_array( $rows ) ? count( $rows ) : 0;
+	if ( $session_index >= $rows_count ) {
+		wp_send_json_error( [ 'message' => 'Invalid session index.' ] );
+	}
 	// Update the session's manual duration
 	$updated = update_sub_field(
 		array( 'sessions', $session_index + 1, 'session_manual_override' ),
@@ -513,13 +532,17 @@ function ptt_update_session_field_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-	$session_index = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
-	$field_name = isset( $_POST['field_name'] ) ? sanitize_text_field( $_POST['field_name'] ) : '';
-	$field_value = isset( $_POST['field_value'] ) ? sanitize_text_field( $_POST['field_value'] ) : '';
+	$post_id       = ptt_validate_id( $_POST['post_id'] ?? 0 );
+	$session_index = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
+	$field_name    = isset( $_POST['field_name'] ) ? sanitize_text_field( $_POST['field_name'] ) : '';
+	$field_value   = isset( $_POST['field_value'] ) ? sanitize_text_field( $_POST['field_value'] ) : '';
 
-	if ( ! $post_id || $session_index < 0 || empty( $field_name ) ) {
+	if ( ! $post_id || $session_index < 0 || $field_name === '' ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+	}
+	// Enforce task access: user must be assignee (admins allowed)
+	if ( ! ptt_validate_task_access( $post_id, get_current_user_id() ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
 	}
 
 	// Map field names to ACF field keys
@@ -534,6 +557,12 @@ function ptt_update_session_field_callback() {
 
 	$acf_field = $field_map[ $field_name ];
 
+	// Validate repeater bounds before update
+	$rows = get_field( 'sessions', $post_id );
+	$rows_count = is_array( $rows ) ? count( $rows ) : 0;
+	if ( $session_index >= $rows_count ) {
+		wp_send_json_error( [ 'message' => 'Invalid session index.' ] );
+	}
 	// Update the field
 	$updated = update_sub_field(
 		array( 'sessions', $session_index + 1, $acf_field ),
@@ -563,13 +592,23 @@ function ptt_delete_session_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-	$session_index = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
+	$post_id       = ptt_validate_id( $_POST['post_id'] ?? 0 );
+	$session_index = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
 
 	if ( ! $post_id || $session_index < 0 ) {
 		wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
 	}
+	// Enforce task access: user must be assignee (admins allowed)
+	if ( ! ptt_validate_task_access( $post_id, get_current_user_id() ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
+	}
 
+	// Validate repeater bounds before deletion
+	$rows = get_field( 'sessions', $post_id );
+	$rows_count = is_array( $rows ) ? count( $rows ) : 0;
+	if ( $session_index >= $rows_count ) {
+		wp_send_json_error( [ 'message' => 'Invalid session index.' ] );
+	}
 	// Delete the row
 	$deleted = delete_row( 'sessions', $session_index + 1, $post_id );
 
@@ -631,12 +670,16 @@ function ptt_move_session_callback() {
                 wp_send_json_error( [ 'message' => 'Permission denied.' ] );
         }
 
-        $post_id        = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
-        $session_index  = isset( $_POST['session_index'] ) ? intval( $_POST['session_index'] ) : -1;
-        $target_post_id = isset( $_POST['target_post_id'] ) ? intval( $_POST['target_post_id'] ) : 0;
+        $post_id        = ptt_validate_id( $_POST['post_id'] ?? 0 );
+        $session_index  = isset( $_POST['session_index'] ) ? absint( $_POST['session_index'] ) : -1;
+        $target_post_id = ptt_validate_id( $_POST['target_post_id'] ?? 0 );
 
         if ( ! $post_id || $session_index < 0 || ! $target_post_id ) {
                 wp_send_json_error( [ 'message' => 'Invalid data provided.' ] );
+        }
+        // Enforce task access: user must be assignee (admins allowed)
+        if ( ! ptt_validate_task_access( $post_id, get_current_user_id() ) || ! ptt_validate_task_access( $target_post_id, get_current_user_id() ) ) {
+                wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
         }
 
         $new_index = ptt_move_session_to_task( $post_id, $session_index, $target_post_id );
@@ -696,9 +739,13 @@ function ptt_today_start_timer_callback() {
 		wp_send_json_error( [ 'message' => 'Permission denied.' ] );
 	}
 
-	$post_id = isset( $_POST['post_id'] ) ? intval( $_POST['post_id'] ) : 0;
+	$post_id = ptt_validate_id( $_POST['post_id'] ?? 0 );
 	if ( ! $post_id ) {
 		wp_send_json_error( [ 'message' => 'Invalid task ID.' ] );
+	}
+	// Enforce task access: user must be assignee (admins allowed)
+	if ( ! ptt_validate_task_access( $post_id, get_current_user_id() ) ) {
+		wp_send_json_error( [ 'message' => 'Permission denied (not assignee).' ] );
 	}
 
 	// Check if user has any active sessions
@@ -769,6 +816,11 @@ function ptt_today_quick_start_callback() {
         wp_send_json_error( [ 'message' => 'Client is required.' ] );
     }
 
+    $client_term = get_term( $client_id, 'client' );
+    if ( ! $client_term || is_wp_error( $client_term ) ) {
+        wp_send_json_error( [ 'message' => 'Invalid client.' ] );
+    }
+
     $user_id = get_current_user_id();
 
     // Stop any other running session for the current user first.
@@ -826,15 +878,24 @@ add_action( 'wp_ajax_ptt_today_quick_start', 'ptt_today_quick_start_callback' );
  * Returns term_id of the Project taxonomy term.
  */
 function ptt_get_or_create_quick_start_project() {
+    $cached = get_option( 'ptt_quick_start_project_id' );
+    if ( $cached && term_exists( (int) $cached, 'project' ) ) {
+        return (int) $cached;
+    }
+
     $term = get_term_by( 'slug', 'quick-start', 'project' );
     if ( $term && ! is_wp_error( $term ) ) {
-        return $term->term_id;
+        update_option( 'ptt_quick_start_project_id', (int) $term->term_id );
+        return (int) $term->term_id;
     }
+
     $created = wp_insert_term( 'Quick Start', 'project', [ 'slug' => 'quick-start' ] );
     if ( is_wp_error( $created ) ) {
         return 0;
     }
-    return (int) ( $created['term_id'] ?? 0 );
+
+    update_option( 'ptt_quick_start_project_id', (int) $created['term_id'] );
+    return (int) $created['term_id'];
 }
 
 /**
@@ -842,54 +903,86 @@ function ptt_get_or_create_quick_start_project() {
  * Also associates the selected client taxonomy to the task.
  */
 function ptt_get_or_create_daily_quick_start_task( $user_id, $project_term_id, $client_term_id ) {
-    $date_label = wp_date( 'M. j, Y' );
-    $client_obj = $client_term_id ? get_term( $client_term_id, 'client' ) : null;
-    $client_label = ( $client_obj && ! is_wp_error( $client_obj ) ) ? ( ' — ' . $client_obj->name ) : '';
-    $task_title = sprintf( 'Quick Start — %s — %s%s', $date_label, wp_get_current_user()->display_name, $client_label );
+    $date_label   = sanitize_text_field( wp_date( 'M. j, Y' ) );
+    $client_obj   = $client_term_id ? get_term( $client_term_id, 'client' ) : null;
+    $client_name  = ( $client_obj && ! is_wp_error( $client_obj ) ) ? sanitize_text_field( $client_obj->name ) : '';
+    $user_name    = sanitize_text_field( wp_get_current_user()->display_name );
+    $client_label = $client_name ? ' — ' . $client_name : '';
+    $task_title   = sprintf( 'Quick Start — %s — %s%s', $date_label, $user_name, $client_label );
 
-    // Try to find an existing daily task for this user (and client)
-    $existing = get_posts( [
-        'post_type'      => 'project_task',
-        's'              => $task_title,
-        'post_status'    => [ 'publish', 'private' ],
-        'posts_per_page' => 1,
-        'meta_query'     => [
-            [ 'key' => 'ptt_assignee', 'value' => $user_id, 'compare' => '=' ],
-        ],
-        'tax_query'      => [
-            [ 'taxonomy' => 'project', 'field' => 'term_id', 'terms' => $project_term_id ],
-        ],
-        'fields'         => 'ids',
-    ] );
+    $slug_parts = [ 'quick-start', wp_date( 'Y-m-d' ), $user_id, ( $client_term_id ? $client_term_id : 0 ) ];
+    $slug       = sanitize_title( implode( '-', $slug_parts ) );
 
-    if ( ! empty( $existing ) ) {
-        $post_id = (int) $existing[0];
+    $existing = get_page_by_path( $slug, OBJECT, 'project_task' );
+
+    if ( $existing ) {
+        $post_id = (int) $existing->ID;
     } else {
         $post_id = wp_insert_post( [
             'post_type'   => 'project_task',
             'post_title'  => $task_title,
             'post_status' => 'publish',
             'post_author' => $user_id,
+            'post_name'   => $slug,
         ] );
         if ( is_wp_error( $post_id ) || ! $post_id ) {
             return 0;
         }
 
-        // Assign assignee and taxonomy
+        $actual_slug = get_post_field( 'post_name', $post_id );
+        if ( $actual_slug !== $slug ) {
+            $existing = get_page_by_path( $slug, OBJECT, 'project_task' );
+            if ( $existing ) {
+                wp_delete_post( $post_id, true );
+                $post_id = (int) $existing->ID;
+            }
+        }
+
         update_post_meta( $post_id, 'ptt_assignee', $user_id );
         wp_set_post_terms( $post_id, [ $project_term_id ], 'project', false );
 
-        // Set status to In Progress if exists
         $in_progress = get_term_by( 'name', 'In Progress', 'task_status' );
         if ( $in_progress && ! is_wp_error( $in_progress ) ) {
             wp_set_post_terms( $post_id, [ $in_progress->term_id ], 'task_status', false );
         }
     }
 
-    // Tag with the selected client (non-destructive)
     if ( $client_term_id ) {
         wp_set_post_terms( $post_id, [ $client_term_id ], 'client', false );
     }
 
     return (int) $post_id;
 }
+
+/**
+ * Cleanup old Quick Start placeholder tasks (30+ days).
+ */
+function ptt_cleanup_old_quick_start_tasks() {
+    $old_tasks = get_posts( [
+        'post_type'      => 'project_task',
+        'fields'         => 'ids',
+        'posts_per_page' => 50,
+        'tax_query'      => [
+            [
+                'taxonomy' => 'project',
+                'field'    => 'slug',
+                'terms'    => 'quick-start',
+            ],
+        ],
+        'date_query'     => [
+            [
+                'column' => 'post_modified_gmt',
+                'before' => '30 days ago',
+            ],
+        ],
+    ] );
+
+    foreach ( $old_tasks as $old_id ) {
+        wp_delete_post( $old_id, true );
+    }
+}
+
+if ( ! wp_next_scheduled( 'ptt_cleanup_quick_start_tasks' ) ) {
+    wp_schedule_event( time(), 'daily', 'ptt_cleanup_quick_start_tasks' );
+}
+add_action( 'ptt_cleanup_quick_start_tasks', 'ptt_cleanup_old_quick_start_tasks' );
