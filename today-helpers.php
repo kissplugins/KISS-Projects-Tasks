@@ -555,6 +555,9 @@ class PTT_Today_Data_Provider {
 		];
 	}
 
+	}
+
+
 	/**
 	 * Invalidate Today page transient caches when a task is saved.
 	 * NOTE: This is a coarse invalidation (clears all ptt_today_entries_* for this site).
@@ -569,8 +572,6 @@ class PTT_Today_Data_Provider {
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s", $like ) );
 	}
 	add_action( 'acf/save_post', 'ptt_today_invalidate_cache_on_save', 99 );
-
-}
 
 /**
  * Class PTT_Today_Page_Manager

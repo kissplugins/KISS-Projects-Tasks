@@ -69,3 +69,21 @@ The current “Reporting Logic” test (Test #5) runs a generic `WP_Query` which
   - Option B2: Custom table (wp_ptt_sessions) with indexed columns for fast lookups
 - Consider prefetching term data once per response (or include in query) to avoid repeated get_the_terms calls
 - Add pagination/virtual scrolling for very large daily entry lists
+
+
+## Security – Audit Follow‑ups (from prior review)
+
+Priority order based on the audit (do not implement yet; track and schedule):
+
+1) Data Authorization (HIGH PRIORITY)
+- [ ] Introduce ptt_validate_task_access( $post_id, $user_id ) helper; rule: user must be the ptt_assignee to start/move/update sessions
+- [ ] Enforce in today.php handlers that change state: ptt_today_start_timer_callback, ptt_move_session_callback, ptt_update_session_duration_callback, ptt_update_session_field_callback, ptt_delete_session_callback
+- [ ] Add unit/integration tests to confirm access is denied for non‑assignees
+
+2) Input Validation (MEDIUM PRIORITY)
+- [ ] Create centralized ptt_validate_* helpers (ptt_validate_date, ptt_validate_id, ptt_validate_session_index, ptt_validate_duration)
+- [ ] Refactor all Today AJAX handlers to use these helpers consistently (replace ad‑hoc inline checks)
+
+3) Information Disclosure (LOW PRIORITY)
+- [ ] Restrict PTT_Today_Page_Manager::get_debug_info() output to current_user_can('manage_options') only (or behind a filter/feature flag)
+- [ ] Ensure the Debug Info panel is hidden for non‑admin roles
