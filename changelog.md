@@ -1,6 +1,23 @@
 # Changelog
 
 
+
+## Version 1.12.3 - Today Security + Performance hardening
+
+- Security
+  - Added assignee-based authorization helper ptt_validate_task_access() and enforced it across Today AJAX handlers (start timer, move session, update duration/field, delete session)
+  - Centralized input validation helpers and refactored handlers to use them: ptt_validate_id(), ptt_validate_date(), ptt_validate_session_index(), ptt_validate_duration()
+  - Added repeater bounds checks for session_index in update/delete/duration handlers to prevent out-of-range edits
+- Performance
+  - Today entries query: capped results (200), ordered by modified; added no_found_rows, suppress_filters; disabled term/meta cache updates
+  - Added 60s transient cache for daily entries with coarse invalidation on acf/save_post
+  - Tasks dropdown endpoint: use 'fields' => 'ids', disabled cache updates, avoided global post usage; retained no_found_rows and suppress_filters
+  - Eliminated N+1 task selector queries by populating per-row selectors from a single request in JS
+- Stability
+  - Fixed a fatal parse error by moving an add_action hook out of a class scope in today-helpers.php
+- QA
+  - Added self-tests: authorization checks for assignee-only rules and a SQL hardening regression test to detect unprepared $wpdb calls
+
 ## Version 1.12.2 - Secure Quick Start task creation
 - Today page: Validate client input and sanitize Quick Start task search to prevent SQL injection
 - Today page: Ensure unique placeholder tasks and clean up old Quick Start tasks daily

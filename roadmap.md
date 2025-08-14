@@ -42,15 +42,7 @@ The current “Reporting Logic” test (Test #5) runs a generic `WP_Query` which
 
 ## Performance
 
-- [x] Bound and optimize queries
-  - [x] Add 'no_found_rows' => true and 'suppress_filters' => true to non‑paginated queries
-  - [x] Avoid 'posts_per_page' => -1; use a reasonable cap or batch
-  - [x] For dropdown queries: 'fields' => 'ids', disable meta/term cache updates
-- [x] Remove N+1 selector queries
-  - [x] Preload the user’s task <option> list once per response, or lazy‑load via a single AJAX call
-- [x] Reduce ACF overhead immediately
-  - [x] Early‑exit processing when a task has no sessions on the target date
-  - [x] Add a 60‑second cache for Today entries; invalidate on acf/save_post affecting sessions
+c
 - [ ] Mid/Long‑term improvements
   - Introduce PSR‑4 services/repositories; TodayService, SessionRepository, ACFAdapter
   - Add stable session_uuid and update by UUID instead of numeric index

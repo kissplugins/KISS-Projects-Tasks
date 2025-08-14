@@ -587,6 +587,47 @@ function ptt_run_self_tests_callback() {
 	    if ( ! is_wp_error( $user_b_id ) ) { wp_delete_user( $user_b_id ); }
 
 
+	    /* -------------------------------------------------------------
+	     * TEST 12 – SQL Hardening: detect unprepared $wpdb calls
+	     * -----------------------------------------------------------*/
+	    $sql_findings = [];
+	    try {
+	        $plugin_dir = dirname( __FILE__ );
+	        $rii = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $plugin_dir ) );
+	        foreach ( $rii as $file ) {
+	            if ( ! $file->isFile() ) { continue; }
+	            $path = $file->getPathname();
+	            if ( substr( $path, -4 ) !== '.php' ) { continue; }
+	            if ( basename( $path ) === 'self-test.php' ) { continue; } // avoid self‑flagging
+	            $lines = @file( $path );
+	            if ( $lines === false ) { continue; }
+	            foreach ( $lines as $ln => $line ) {
+	                if ( strpos( $line, '$wpdb->' ) === false ) { continue; }
+	                if ( preg_match( '/\$wpdb->(query|get_results|get_row|get_col|get_var)\s*\((.*)\)\s*;?/i', $line, $m ) ) {
+	                    $args_str = $m[2];
+	                    $has_prepare_inline = ( strpos( $line, 'prepare(' ) !== false );
+	                    if ( ! $has_prepare_inline ) {
+	                        // Heuristic: flag if argument contains a quote or concatenation
+	                        if ( strpos( $args_str, "'" ) !== false || strpos( $args_str, '"' ) !== false || strpos( $args_str, '.' ) !== false ) {
+	                            $sql_findings[] = $path . ':' . ( $ln + 1 );
+	                        }
+	                    }
+	                }
+	            }
+	        }
+	    } catch ( Exception $e ) {
+	        // If filesystem iteration fails, mark as warning
+	        $sql_findings[] = 'File scan error: ' . $e->getMessage();
+	    }
+	    $results[] = [
+	        'name'    => 'SQL Hardening: Unprepared $wpdb calls',
+	        'status'  => empty( $sql_findings ) ? 'Pass' : 'Fail',
+	        'message' => empty( $sql_findings )
+	            ? 'No unprepared $wpdb calls detected.'
+	            : ( 'Potential unprepared queries at: ' . implode( ', ', $sql_findings ) ),
+	    ];
+
+
     $timestamp = current_time( 'timestamp' );
     update_option( 'ptt_tests_last_run', $timestamp );
 
