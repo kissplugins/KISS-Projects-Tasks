@@ -1028,6 +1028,7 @@ function ptt_display_report_results() {
 				echo '</div>';
 			}
 		}
+		// Display period total for billing accuracy (not lifetime total)
 		echo '<div class="grand-total"><strong>Grand Total: <span class="ptt-time-display">' . number_format( $grand_total, 2 ) . '</span>&nbsp;hours</strong></div>';
 		echo '</div>'; // .ptt-report-results
 	}
