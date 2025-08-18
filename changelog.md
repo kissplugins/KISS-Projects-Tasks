@@ -2,6 +2,11 @@
 
 
 
+## Version 1.12.4 - Accurate date-range totals in reports
+
+- Reports
+  - Classic and Task Focused views now sum only sessions within the selected date range and show per-period totals
+
 ## Version 1.12.3 - Today Security + Performance hardening
 
 - Security

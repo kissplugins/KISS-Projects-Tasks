@@ -7,7 +7,7 @@
  * This file registers the "Today" page and renders its markup and
  * logic for a daily time-tracking dashboard view.
  *
- * Version: 1.12.2
+ * Version: 1.12.4
  * ------------------------------------------------------------------
  */
 
