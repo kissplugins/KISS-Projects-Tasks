@@ -2,6 +2,14 @@
 
 
 
+## Version 1.12.5 - Updated Reports debug messages
+
+- Reports
+  - Updated debug mode messages in all three views (Classic, Task Focused, Single Day) to accurately reflect the new date-range filtering functionality
+  - Debug messages now clearly explain that session totals are calculated only for sessions within the selected date range using ptt_sum_sessions_in_range()
+  - Added view-specific titles to debug sections for better clarity
+  - Updated debug checkbox description to mention date range filtering logic
+
 ## Version 1.12.4 - Accurate date-range totals in reports
 
 - Reports

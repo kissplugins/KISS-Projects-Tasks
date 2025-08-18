@@ -310,7 +310,7 @@ function ptt_reports_page_html() {
 								<input type="checkbox" name="debug_mode" id="debug_mode" value="1" <?php checked( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ); ?>>
 								Show sorting & query logic
 							</label>
-							<p class="description">If checked, this will display the raw query arguments and sorting arrays used to generate the report.</p>
+							<p class="description">If checked, this will display the raw query arguments, date range filtering logic, and sorting arrays used to generate the report.</p>
 						</td>
 					</tr>
 				</tbody>
@@ -441,9 +441,10 @@ function ptt_display_report_results() {
 		 *-------------------------------------------------------------*/
 		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
 			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
-			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
-			echo '<h4>Initial WP_Query Arguments:</h4>';
-			echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
+			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information (Task Focused View)</h3>';
+			echo '<h4>Query & Filtering Logic:</h4>';
+			echo '<p><strong>Date Range:</strong> ' . esc_html( $start_date ? $start_date : 'No start date' ) . ' to ' . esc_html( $end_date ? $end_date : 'No end date' ) . '</p>';
+			echo '<p><em>The query below fetches all candidate tasks based on non-date filters (User, Client, etc.). PHP logic then loops through these results to find tasks that were either created within the date range OR had at least one session within the date range. <strong>Session totals are calculated only for sessions that fall within the selected date range using ptt_sum_sessions_in_range().</strong></em></p>';
 			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
 			echo '<h4>Task Sorting Logic:</h4>';
 			echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
@@ -627,7 +628,7 @@ function ptt_display_report_results() {
 			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information (Single Day View)</h3>';
 			echo '<h4>Query & Filtering Logic:</h4>';
 			echo '<p><strong>Target Date (<code>$target_date_str</code>):</strong> ' . esc_html( $target_date_str ) . '</p>';
-			echo '<p><em>The query below fetches all candidate tasks based on non-date filters (User, Client, etc.). PHP logic then loops through these results to find tasks that were either created on the target date or had a time session on that date.</em></p>';
+			echo '<p><em>The query below fetches all candidate tasks based on non-date filters (User, Client, etc.). PHP logic then loops through these results to find tasks that were either created on the target date or had a time session on that date. <strong>Session totals are calculated only for sessions that fall on the target date.</strong></em></p>';
 			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
 			echo '</div>';
 		}
@@ -826,9 +827,10 @@ function ptt_display_report_results() {
 		 *-------------------------------------------------------------*/
 		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
 			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
-			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
-			echo '<h4>Initial WP_Query Arguments:</h4>';
-			echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
+			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information (Classic View)</h3>';
+			echo '<h4>Query & Filtering Logic:</h4>';
+			echo '<p><strong>Date Range:</strong> ' . esc_html( $start_date ? $start_date : 'No start date' ) . ' to ' . esc_html( $end_date ? $end_date : 'No end date' ) . '</p>';
+			echo '<p><em>The query below fetches all candidate tasks based on non-date filters (User, Client, etc.). PHP logic then loops through these results to find tasks that were either created within the date range OR had at least one session within the date range. <strong>Session totals are calculated only for sessions that fall within the selected date range using ptt_sum_sessions_in_range().</strong></em></p>';
 			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
 			echo '<h4>Task Sorting Logic:</h4>';
 			echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
