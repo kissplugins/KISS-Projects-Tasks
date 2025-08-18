@@ -8,6 +8,11 @@
   - Added assignee-based authorization helper ptt_validate_task_access() and enforced it across Today AJAX handlers (start timer, move session, update duration/field, delete session)
   - Centralized input validation helpers and refactored handlers to use them: ptt_validate_id(), ptt_validate_date(), ptt_validate_session_index(), ptt_validate_duration()
   - Added repeater bounds checks for session_index in update/delete/duration handlers to prevent out-of-range edits
+## Version 2.0.2 - Classic Report Period-Based Billing Fix
+- Fixed Classic report to calculate only sessions within the selected date range instead of lifetime task totals.
+- Added period clarification notice showing the selected date range for billing accuracy.
+- Changed display labels from "User Total", "Client Total", "Project Total" to "Period Total" for clarity.
+- Classic report now shows accurate daily/weekly/monthly totals suitable for billing purposes.
 - Performance
   - Today entries query: capped results (200), ordered by modified; added no_found_rows, suppress_filters; disabled term/meta cache updates
   - Added 60s transient cache for daily entries with coarse invalidation on acf/save_post
