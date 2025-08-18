@@ -831,7 +831,47 @@ function ptt_display_report_results() {
 				}
 				$last_entry_date = ( $latest_session_timestamp > 0 ) ? date( 'Y-m-d', $latest_session_timestamp ) : '–';
 
-				$duration = (float) get_field( 'calculated_duration', $post_id );
+				// Calculate duration ONLY for sessions within the date range (for billing accuracy)
+				$period_duration = 0.0;
+				$sessions = get_field( 'sessions', $post_id );
+				if ( ! empty( $sessions ) && is_array( $sessions ) ) {
+					foreach ( $sessions as $session ) {
+						$session_start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+						if ( empty( $session_start_str ) ) {
+							continue;
+						}
+
+						$session_timestamp = strtotime( $session_start_str );
+						// Only include sessions that fall within the selected date range
+						if ( $session_timestamp >= $start_timestamp && $session_timestamp <= $end_timestamp ) {
+							if ( ! empty( $session['session_manual_override'] ) ) {
+								// Manual override session
+								$session_duration = isset( $session['session_manual_duration'] ) ? (float) $session['session_manual_duration'] : 0.0;
+							} else {
+								// Timer-based session
+								$start = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
+								$stop  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
+								$session_duration = 0.0;
+
+								if ( $start && $stop ) {
+									try {
+										$start_time = new DateTime( $start, new DateTimeZone( 'UTC' ) );
+										$stop_time  = new DateTime( $stop, new DateTimeZone( 'UTC' ) );
+										if ( $stop_time > $start_time ) {
+											$diff_seconds = $stop_time->getTimestamp() - $start_time->getTimestamp();
+											$session_duration = $diff_seconds / 3600; // Convert to hours
+										}
+									} catch ( Exception $e ) {
+										$session_duration = 0.0;
+									}
+								}
+							}
+							$period_duration += $session_duration;
+						}
+					}
+				}
+
+				$duration = $period_duration;
 				$grand_total += $duration;
 
                                $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );
@@ -878,6 +918,7 @@ function ptt_display_report_results() {
                                        'creation_date'   => get_the_date( 'Y-m-d', $post_id ),
                                        'last_entry_date' => $last_entry_date,
                                        'duration'        => $duration,
+                                       'period_duration' => $period_duration, // Store the period-specific duration
                                        'content'         => get_the_content(),
                                        'task_budget'     => $task_budget,
                                        'project_budget'  => $project_budget,
@@ -911,14 +952,29 @@ function ptt_display_report_results() {
 
 		// Render the hierarchical table
 		echo '<div class="ptt-report-results">';
+
+		// Add period clarification for billing
+		$period_note = '';
+		if ( $start_date && $end_date ) {
+			$period_note = ' <em>(Period: ' . esc_html( date( 'M j, Y', strtotime( $start_date ) ) ) . ' - ' . esc_html( date( 'M j, Y', strtotime( $end_date ) ) ) . ')</em>';
+		} elseif ( $start_date ) {
+			$period_note = ' <em>(From: ' . esc_html( date( 'M j, Y', strtotime( $start_date ) ) ) . ')</em>';
+		} elseif ( $end_date ) {
+			$period_note = ' <em>(Through: ' . esc_html( date( 'M j, Y', strtotime( $end_date ) ) ) . ')</em>';
+		}
+
+		if ( $period_note ) {
+			echo '<div class="notice notice-info inline" style="margin-bottom: 15px;"><p><strong>Billing Report:</strong> Hours shown are only for sessions within the selected date range' . $period_note . '</p></div>';
+		}
+
 		foreach ( $report as $author ) {
-			echo '<h3>User: ' . esc_html( $author['name'] ) . ' <span class="subtotal">(User&nbsp;Total: <span class="ptt-time-display">' . number_format( $author['total'], 2 ) . '</span>&nbsp;hrs)</span></h3>';
+			echo '<h3>User: ' . esc_html( $author['name'] ) . ' <span class="subtotal">(Period&nbsp;Total: <span class="ptt-time-display">' . number_format( $author['total'], 2 ) . '</span>&nbsp;hrs)</span></h3>';
 			foreach ( $author['clients'] as $client ) {
 				echo '<div class="client-group">';
-				echo '<h4>Client: ' . esc_html( $client['name'] ) . ' <span class="subtotal">(Client&nbsp;Total: <span class="ptt-time-display">' . number_format( $client['total'], 2 ) . '</span>&nbsp;hrs)</span></h4>';
+				echo '<h4>Client: ' . esc_html( $client['name'] ) . ' <span class="subtotal">(Period&nbsp;Total: <span class="ptt-time-display">' . number_format( $client['total'], 2 ) . '</span>&nbsp;hrs)</span></h4>';
 				foreach ( $client['projects'] as $project ) {
 					echo '<div class="project-group">';
-					echo '<h5>Project: ' . esc_html( $project['name'] ) . ' <span class="subtotal">(Project&nbsp;Total: <span class="ptt-time-display">' . number_format( $project['total'], 2 ) . '</span>&nbsp;hrs)</span></h5>';
+					echo '<h5>Project: ' . esc_html( $project['name'] ) . ' <span class="subtotal">(Period&nbsp;Total: <span class="ptt-time-display">' . number_format( $project['total'], 2 ) . '</span>&nbsp;hrs)</span></h5>';
 					echo '<table class="wp-list-table widefat fixed striped">';
 					echo '<thead><tr>
 							<th style="width:22%">Task Name</th>
@@ -972,6 +1028,7 @@ function ptt_display_report_results() {
 				echo '</div>';
 			}
 		}
+		// Display period total for billing accuracy (not lifetime total)
 		echo '<div class="grand-total"><strong>Grand Total: <span class="ptt-time-display">' . number_format( $grand_total, 2 ) . '</span>&nbsp;hours</strong></div>';
 		echo '</div>'; // .ptt-report-results
 	}
