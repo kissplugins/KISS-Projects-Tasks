@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.12.5
+ * Version:           1.12.6
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.12.5' );
+define( 'PTT_VERSION', '1.12.6' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -884,6 +884,145 @@ function ptt_render_assignee_column( $column, $post_id ) {
     }
 }
 add_action( 'manage_project_task_posts_custom_column', 'ptt_render_assignee_column', 10, 2 );
+
+/**
+ * Makes the Assignee column sortable.
+ *
+ * @param array $columns Existing sortable columns.
+ * @return array Modified sortable columns.
+ */
+function ptt_make_assignee_column_sortable( $columns ) {
+    $columns['ptt_assignee'] = 'ptt_assignee';
+    return $columns;
+}
+add_filter( 'manage_edit-project_task_sortable_columns', 'ptt_make_assignee_column_sortable' );
+
+/**
+ * Handles sorting by assignee in the admin list table.
+ *
+ * @param WP_Query $query The WP_Query instance.
+ */
+function ptt_handle_assignee_sorting( $query ) {
+    if ( ! is_admin() || ! $query->is_main_query() ) {
+        return;
+    }
+
+    if ( 'project_task' !== $query->get( 'post_type' ) ) {
+        return;
+    }
+
+    $orderby = $query->get( 'orderby' );
+    if ( 'ptt_assignee' === $orderby ) {
+        $query->set( 'meta_key', 'ptt_assignee' );
+        $query->set( 'orderby', 'meta_value_num' );
+    }
+}
+add_action( 'pre_get_posts', 'ptt_handle_assignee_sorting' );
+
+/**
+ * Adds assignee filter dropdown to the All Tasks admin page.
+ */
+function ptt_add_assignee_filter_dropdown() {
+    global $typenow;
+
+    if ( 'project_task' !== $typenow ) {
+        return;
+    }
+
+    // Get all users who have been assigned to tasks
+    global $wpdb;
+    $assignee_ids = $wpdb->get_col( $wpdb->prepare( "
+        SELECT DISTINCT meta_value
+        FROM {$wpdb->postmeta}
+        WHERE meta_key = %s
+        AND meta_value != ''
+        AND meta_value != '0'
+        ORDER BY meta_value
+    ", 'ptt_assignee' ) );
+
+    if ( empty( $assignee_ids ) ) {
+        return;
+    }
+
+    $selected_assignee = isset( $_GET['ptt_assignee_filter'] ) ? intval( $_GET['ptt_assignee_filter'] ) : 0;
+
+    echo '<select name="ptt_assignee_filter" id="ptt_assignee_filter">';
+    echo '<option value="">' . esc_html__( 'All Assignees', 'ptt' ) . '</option>';
+
+    foreach ( $assignee_ids as $assignee_id ) {
+        $assignee_id = intval( $assignee_id );
+        $user = get_userdata( $assignee_id );
+        if ( $user ) {
+            $selected = selected( $selected_assignee, $assignee_id, false );
+            echo '<option value="' . esc_attr( $assignee_id ) . '"' . $selected . '>' . esc_html( $user->display_name ) . '</option>';
+        }
+    }
+
+    // Add option for unassigned tasks
+    $selected = selected( $selected_assignee, -1, false );
+    echo '<option value="-1"' . $selected . '>' . esc_html__( 'Unassigned', 'ptt' ) . '</option>';
+
+    echo '</select>';
+}
+add_action( 'restrict_manage_posts', 'ptt_add_assignee_filter_dropdown' );
+
+/**
+ * Handles filtering by assignee in the admin list table.
+ *
+ * @param WP_Query $query The WP_Query instance.
+ */
+function ptt_handle_assignee_filtering( $query ) {
+    if ( ! is_admin() || ! $query->is_main_query() ) {
+        return;
+    }
+
+    if ( 'project_task' !== $query->get( 'post_type' ) ) {
+        return;
+    }
+
+    $assignee_filter = isset( $_GET['ptt_assignee_filter'] ) ? $_GET['ptt_assignee_filter'] : '';
+
+    if ( '' === $assignee_filter ) {
+        return;
+    }
+
+    if ( '-1' === $assignee_filter ) {
+        // Filter for unassigned tasks
+        $meta_query = $query->get( 'meta_query' ) ?: [];
+        $meta_query[] = [
+            'relation' => 'OR',
+            [
+                'key'     => 'ptt_assignee',
+                'compare' => 'NOT EXISTS',
+            ],
+            [
+                'key'     => 'ptt_assignee',
+                'value'   => '',
+                'compare' => '=',
+            ],
+            [
+                'key'     => 'ptt_assignee',
+                'value'   => '0',
+                'compare' => '=',
+            ],
+        ];
+        $query->set( 'meta_query', $meta_query );
+    } else {
+        // Filter for specific assignee
+        $assignee_id = intval( $assignee_filter );
+        if ( $assignee_id > 0 ) {
+            $meta_query = $query->get( 'meta_query' ) ?: [];
+            $meta_query[] = [
+                'key'     => 'ptt_assignee',
+                'value'   => $assignee_id,
+                'compare' => '=',
+                'type'    => 'NUMERIC',
+            ];
+            $query->set( 'meta_query', $meta_query );
+        }
+    }
+}
+add_action( 'pre_get_posts', 'ptt_handle_assignee_filtering' );
 
 
 // =================================================================

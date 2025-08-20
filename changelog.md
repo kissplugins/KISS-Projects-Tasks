@@ -2,6 +2,14 @@
 
 
 
+## Version 1.12.6 - All Tasks page assignee sorting and filtering
+
+- All Tasks page
+  - Made Assignee column sortable (ascending/descending) by clicking column header
+  - Added assignee dropdown filter to filter tasks by specific user or show unassigned tasks
+  - Filter includes all users who have been assigned to tasks plus an "Unassigned" option
+  - Both sorting and filtering work together and maintain state across page loads
+
 ## Version 1.12.5 - Updated Reports debug messages
 
 - Reports
