@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.12.6
+ * Version:           1.12.7
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.12.6' );
+define( 'PTT_VERSION', '1.12.7' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -123,14 +123,15 @@ function ptt_register_post_type() {
 
     $args = [
         'labels'             => $labels,
-        'public'             => true,
+        'public'             => false,
         'publicly_queryable' => true,
         'show_ui'            => true,
         'show_in_menu'       => true,
         'query_var'          => true,
         'rewrite'            => [ 'slug' => 'project_task' ],
         'capability_type'    => 'post',
-        'has_archive'        => true,
+        'has_archive'        => false,
+        'exclude_from_search'=> true,
         'hierarchical'       => false,
         'menu_position'      => 20,
         'menu_icon'          => 'dashicons-clock',
@@ -164,6 +165,34 @@ function ptt_task_id_rewrite() {
     add_rewrite_rule( '^project_task/[^/]+-([0-9]+)/?$', 'index.php?post_type=project_task&p=$matches[1]', 'top' );
 }
 add_action( 'init', 'ptt_task_id_rewrite' );
+
+/**
+ * Redirects Task front-end requests to prevent public exposure.
+ *
+ * Logged-in users with edit capabilities are taken to the post editor.
+ * All other requests receive a 404 response.
+ *
+ * @return void
+ */
+function ptt_redirect_task_frontend() {
+    if ( is_singular( 'project_task' ) || is_post_type_archive( 'project_task' ) ) {
+        if ( is_singular( 'project_task' ) ) {
+            $post_id = get_queried_object_id();
+            if ( is_user_logged_in() && current_user_can( 'edit_post', $post_id ) ) {
+                wp_safe_redirect( admin_url( 'post.php?post=' . $post_id . '&action=edit' ) );
+                exit;
+            }
+        }
+
+        global $wp_query;
+        $wp_query->set_404();
+        status_header( 404 );
+        nocache_headers();
+        include get_query_template( '404' );
+        exit;
+    }
+}
+add_action( 'template_redirect', 'ptt_redirect_task_frontend' );
 
 /**
  * Registers custom taxonomies "Clients" and "Projects".

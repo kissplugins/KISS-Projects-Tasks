@@ -2,6 +2,12 @@
 
 
 
+## Version 1.12.7 - Hide front-end Task content
+
+- Tasks CPT posts are no longer publicly viewable
+  - Logged-in users are redirected to the post editor when visiting a Task URL
+  - Non-logged-in visitors receive a 404 response
+
 ## Version 1.12.6 - All Tasks page assignee sorting and filtering
 
 - All Tasks page
