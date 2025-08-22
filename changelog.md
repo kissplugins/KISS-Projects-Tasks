@@ -2,6 +2,11 @@
 
 
 
+## Version 1.12.8 - Preserve Task permalinks
+
+- Restored public registration so Task permalinks remain accessible
+- Front-end requests still redirect logged-in editors to wp-admin and serve 404s to visitors
+
 ## Version 1.12.7 - Hide front-end Task content
 
 - Tasks CPT posts are no longer publicly viewable
