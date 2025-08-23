@@ -2,6 +2,16 @@
 
 
 
+## Version 1.12.7 - Front-end content protection for project tasks
+
+- Security & Privacy
+  - Hidden all project_task post content from non-logged-in users (shows 404 instead)
+  - Logged-in users with edit permissions are automatically redirected to the post editor when accessing task URLs
+  - Logged-in users without edit permissions see 404 error
+  - Excluded project_task posts from front-end search results and archive listings
+  - Restricted REST API access to project_task endpoints for non-authenticated users
+  - Permalinks remain intact but content is protected from public access
+
 ## Version 1.12.6 - All Tasks page assignee sorting and filtering
 
 - All Tasks page

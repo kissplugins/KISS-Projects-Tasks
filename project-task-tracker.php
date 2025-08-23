@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           1.12.6
+ * Version:           1.12.7
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+
@@ -17,7 +17,7 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
-define( 'PTT_VERSION', '1.12.6' );
+define( 'PTT_VERSION', '1.12.7' );
 define( 'PTT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'PTT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -1023,6 +1023,139 @@ function ptt_handle_assignee_filtering( $query ) {
     }
 }
 add_action( 'pre_get_posts', 'ptt_handle_assignee_filtering' );
+
+
+// =================================================================
+// 7.6 FRONT-END CONTENT PROTECTION
+// =================================================================
+
+/**
+ * Redirects front-end project_task posts based on user login status.
+ * - Non-logged-in users: 404 error
+ * - Logged-in users with edit capability: redirect to post editor
+ * - Other logged-in users: 404 error
+ */
+function ptt_handle_frontend_post_access() {
+    if ( ! is_singular( 'project_task' ) ) {
+        return;
+    }
+
+    global $post;
+
+    if ( ! $post || 'project_task' !== $post->post_type ) {
+        return;
+    }
+
+    // If user is not logged in, show 404
+    if ( ! is_user_logged_in() ) {
+        global $wp_query;
+        $wp_query->set_404();
+        status_header( 404 );
+        get_template_part( 404 );
+        exit;
+    }
+
+    // If user is logged in and can edit posts, redirect to editor
+    if ( current_user_can( 'edit_post', $post->ID ) ) {
+        $edit_link = admin_url( 'post.php?action=edit&post=' . $post->ID );
+        wp_redirect( $edit_link );
+        exit;
+    }
+
+    // If user is logged in but can't edit, show 404
+    global $wp_query;
+    $wp_query->set_404();
+    status_header( 404 );
+    get_template_part( 404 );
+    exit;
+}
+add_action( 'template_redirect', 'ptt_handle_frontend_post_access' );
+
+/**
+ * Excludes project_task posts from front-end queries (search, archives, etc.)
+ * to prevent them from appearing in public listings.
+ */
+function ptt_exclude_from_frontend_queries( $query ) {
+    // Only affect front-end queries, not admin
+    if ( is_admin() || ! $query->is_main_query() ) {
+        return;
+    }
+
+    // Get current post types being queried
+    $post_types = $query->get( 'post_type' );
+
+    // If no specific post type is set, WordPress defaults to 'post'
+    if ( empty( $post_types ) ) {
+        $post_types = [ 'post' ];
+    }
+
+    // Convert to array if it's a string
+    if ( is_string( $post_types ) ) {
+        $post_types = [ $post_types ];
+    }
+
+    // Remove project_task from the post types if it exists
+    $post_types = array_diff( $post_types, [ 'project_task' ] );
+
+    // If we're specifically querying for project_task posts on front-end, make it return nothing
+    if ( $query->get( 'post_type' ) === 'project_task' ) {
+        $query->set( 'post__in', [ 0 ] ); // This will return no results
+        return;
+    }
+
+    // Set the filtered post types back
+    if ( ! empty( $post_types ) ) {
+        $query->set( 'post_type', $post_types );
+    }
+}
+add_action( 'pre_get_posts', 'ptt_exclude_from_frontend_queries' );
+
+/**
+ * Removes project_task posts from search results on the front-end.
+ */
+function ptt_exclude_from_search( $query ) {
+    if ( ! is_admin() && $query->is_main_query() && $query->is_search() ) {
+        $post_types = $query->get( 'post_type' );
+
+        // If no post types specified, WordPress searches all public post types
+        if ( empty( $post_types ) ) {
+            // Get all public post types except project_task
+            $public_post_types = get_post_types( [ 'public' => true ] );
+            unset( $public_post_types['project_task'] );
+            $query->set( 'post_type', array_values( $public_post_types ) );
+        } else {
+            // Remove project_task from existing post types
+            if ( is_string( $post_types ) ) {
+                $post_types = [ $post_types ];
+            }
+            $post_types = array_diff( $post_types, [ 'project_task' ] );
+            $query->set( 'post_type', $post_types );
+        }
+    }
+}
+add_action( 'pre_get_posts', 'ptt_exclude_from_search' );
+
+/**
+ * Prevents project_task posts from appearing in REST API responses for non-authenticated users.
+ */
+function ptt_restrict_rest_api_access( $result, $server, $request ) {
+    $route = $request->get_route();
+
+    // Check if this is a project_task related endpoint
+    if ( strpos( $route, '/wp/v2/project_task' ) !== false ) {
+        // If user is not logged in or doesn't have edit capability, deny access
+        if ( ! is_user_logged_in() || ! current_user_can( 'edit_posts' ) ) {
+            return new WP_Error(
+                'rest_forbidden',
+                __( 'Sorry, you are not allowed to access this resource.', 'ptt' ),
+                [ 'status' => 403 ]
+            );
+        }
+    }
+
+    return $result;
+}
+add_filter( 'rest_pre_dispatch', 'ptt_restrict_rest_api_access', 10, 3 );
 
 
 // =================================================================
