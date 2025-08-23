@@ -9,7 +9,7 @@
 ## Table of Contents
 
 I. [Overview](#i-overview)  
-II. [TL;DR Audit by Claude Opus 4.1](#ii-tldr-audit-by-claude-opus-41) 
+II. [TL;DR Audit by Claude Opus 4.1](#ii-tldr-audit-by-claude-opus-41)  
 III. [Timer System Architecture](#iii-timer-system-architecture)  
 IV. [Concurrent Session Prevention](#iv-concurrent-session-prevention)  
 V. [Key AJAX Endpoints](#v-key-ajax-endpoints)  
