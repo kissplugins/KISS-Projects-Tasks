@@ -253,6 +253,45 @@ class SelfTestController {
         $structure_results = self::dataStructureIntegrity();
         $results = array_merge( $results, $structure_results );
 
+        // TEST – Reports Assets Enqueued on Reports Page
+        ob_start();
+        do_action( 'admin_enqueue_scripts', 'project_task_page_ptt-reports' );
+        ob_end_clean();
+        $enqueued = wp_script_is( 'ptt-scripts', 'enqueued' );
+        $results[] = [
+            'name'    => 'Reports UI: Core assets enqueued',
+            'status'  => $enqueued ? 'Pass' : 'Fail',
+            'message' => $enqueued ? 'scripts.js/styles.css are enqueued on Reports screen.' : 'scripts.js not enqueued on Reports screen; week buttons may not work.'
+        ];
+
+        // TEST – Last Week button handler present in scripts
+        $scripts_path = PTT_PLUGIN_DIR . 'scripts.js';
+        $content = is_readable( $scripts_path ) ? file_get_contents( $scripts_path ) : '';
+        $has_selector = strpos( $content, "#set-last-week" ) !== false;
+        $has_delegate = ( strpos( $content, "$(document).on('click', '#set-last-week'" ) !== false ) || ( strpos( $content, '$(document).on("click", "#set-last-week"' ) !== false );
+        $handler_ok = $has_selector && $has_delegate;
+        $results[] = [
+            'name'    => 'Reports UI: Last Week button handler present',
+            'status'  => $handler_ok ? 'Pass' : 'Fail',
+            'message' => $handler_ok ? 'Delegated click handler found in scripts.js.' : 'Could not find delegated click handler for #set-last-week in scripts.js.'
+        ];
+
+        // TEST – Last Week range calculation (server mirror of JS)
+        $now_ts = current_time( 'timestamp' );
+        $day = (int) date( 'w', $now_ts ); // 0 = Sunday
+        $sunday_this_week = strtotime( '-' . $day . ' days', $now_ts );
+        $last_sunday_ts   = strtotime( '-7 days', $sunday_this_week );
+        $last_saturday_ts = strtotime( '-1 day', $sunday_this_week );
+        $start_str = date( 'Y-m-d', $last_sunday_ts );
+        $end_str   = date( 'Y-m-d', $last_saturday_ts );
+        $span_days = (int) round( ( $last_saturday_ts - $last_sunday_ts ) / DAY_IN_SECONDS );
+        $range_ok  = ( $span_days === 6 ) && ( $last_sunday_ts < $last_saturday_ts );
+        $results[] = [
+            'name'    => 'Reports: Last Week range computation (server mirror)',
+            'status'  => $range_ok ? 'Pass' : 'Fail',
+            'message' => $range_ok ? "Computed range {$start_str} to {$end_str} (7 days inclusive)." : "Unexpected range {$start_str} to {$end_str} (span_days={$span_days})."
+        ];
+
         $timestamp = current_time( 'timestamp' );
         update_option( 'ptt_tests_last_run', $timestamp );
         wp_send_json_success( [ 'results' => $results, 'time' => date_i18n( get_option( 'time_format' ), $timestamp ) ] );
