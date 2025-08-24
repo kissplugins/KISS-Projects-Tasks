@@ -7,6 +7,22 @@
 - Status: Planning complete; next step is Phase 0 (Preparation) and Phase 1 (TimerFSM pilot behind feature flag).
 
 
+## Near‑Term Priorities (August 2025)
+
+1) Ship two targeted bug fixes before further PSR‑4 work
+   - Reports → Classic: date‑range filtering can miss expected rows due to UTC/local parsing of session_start_time. Fix by normalizing to UTC during comparisons.
+   - Today → Quick Start: duplicate entries appear because the page shows a task‑level "created" entry and a session entry on the same day. Suppress the task‑level entry when a same‑day session exists.
+
+2) Resume incremental PSR‑4 tasks after the fixes
+   - Keep Plugin as the simple service container for now.
+   - Add UTC/date helpers to ACFAdapter and route reporting/TODAY comparisons through those (no UI refactor).
+
+Notes on FSM and PSR‑4
+- The Today‑page FSM (TimerFSM/DataFSM) is an independent UI/controller improvement. It is not required to ship the two bug fixes above.
+- FSM will live under src/Presentation/Today/ (controller + effects) and can be introduced behind a feature flag after PSR‑4 Phase 2 hardening steps.
+- Completing PSR‑4 phases helps FSM adoption (clean seams), but FSM is not a blocker for current bug fixes.
+
+
 
 ## Phase 1 – Bootstrap PSR-4 Structure
 - [x] Add Composer-based PSR-4 autoloader
