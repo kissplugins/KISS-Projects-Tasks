@@ -7,6 +7,8 @@
 ## Version 2.1.1 - FSM Phase 0 Scaffolding
 - Scripts: Added non-breaking FSM scaffolding (feature flag, effects stubs, debug hook)
 - Docs: Proceeding toward Phase 1 implementation behind feature flag
+- Phase 1 (start): TimerFSM scaffold added behind feature flag; start/stop hooks routed through FSM when enabled (legacy preserved when disabled)
+
 
 - Admin: New “ACF Schema Status” page under Tasks showing persistent schema diagnostics
 - Admin: Copy diagnostics buttons (Text/JSON) and compact status widget on Settings/Self‑Test page

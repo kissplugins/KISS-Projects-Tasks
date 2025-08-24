@@ -1150,6 +1150,79 @@ jQuery(document).ready(function ($) {
         const $entriesList = $('#ptt-today-entries-list');
         const $totalDisplay = $('#ptt-today-total strong');
 
+        // Phase 1: TimerFSM (behind feature flag)
+        var timerFSM = null;
+        function createTimerFSM(){
+            function TimerFSM(){
+                this.state = 'IDLE';
+                this.ctx = { postId:null, sessionIndex:null, startUtc:null };
+            }
+            TimerFSM.prototype.transition = function(next, payload){
+                var prev = this.state; this.state = next; if(payload){ this.ctx = Object.assign(this.ctx, payload); }
+                if ((window.location.search||'').indexOf('ptt_debug=1')>-1) { console.log('[PTT][FSM]', prev+' -> '+next, this.ctx); }
+                try { if(window.PTT_FSM){ window.PTT_FSM.timerState = this.state; } } catch(e){}
+            };
+            TimerFSM.prototype.start = function(data){
+                var self=this; self.transition('STARTING');
+                return window.pttEffects.startTimer(data).then(function(res){
+                    self.transition('RUNNING', { postId:res.postId, sessionIndex:res.sessionIndex, startUtc:res.startUtc });
+                    window.pttEffects.updateTimerUI('RUNNING', { postId:res.postId, sessionIndex:res.sessionIndex, startUtc:res.startUtc, sessionTitle:res.sessionTitle });
+                }).catch(function(err){ self.transition('ERROR', { error:err }); window.pttEffects.showError(err&&err.message?err.message:String(err)); self.transition('IDLE'); });
+            };
+            TimerFSM.prototype.stop = function(){
+                var self=this; if(self.state!=='RUNNING'){ return Promise.resolve(); }
+                self.transition('STOPPING');
+                return window.pttEffects.stopTimer({ postId:self.ctx.postId, sessionIndex:self.ctx.sessionIndex }).then(function(){
+                    self.transition('IDLE', { postId:null, sessionIndex:null, startUtc:null });
+                    window.pttEffects.updateTimerUI('IDLE', {});
+                }).catch(function(err){ self.transition('ERROR', { error:err }); window.pttEffects.showError(err&&err.message?err.message:String(err)); self.transition('RUNNING'); });
+            };
+            return new TimerFSM();
+        }
+
+        if (window.PTT_FSM_ENABLED) {
+            // Override effects with Today-page aware implementations
+            window.pttEffects = Object.assign({}, window.pttEffects, {
+                startTimer: function(data){
+                    var taskId = data.taskId, title = data.title||'', clientId = data.clientId||'';
+                    // Quick Start path
+                    if (clientId && (!taskId || !title.trim())) {
+                        return $.post(ptt_ajax_object.ajax_url, { action:'ptt_today_quick_start', nonce: ptt_ajax_object.nonce, client_id: clientId })
+                            .then(function(response){ if(!response || !response.success){ throw new Error(response&&response.data&&response.data.message||'Could not start timer'); }
+                                return { postId: response.data.post_id, sessionIndex: response.data.session_index, startUtc: response.data.start_time, sessionTitle: (response.data.session_data&&response.data.session_data.title)||title };
+                            });
+                    }
+                    // Normal start new session
+                    return $.post(ptt_ajax_object.ajax_url, { action:'ptt_today_start_new_session', nonce: ptt_ajax_object.nonce, post_id: taskId, session_title: title })
+                        .then(function(response){ if(!response || !response.success){ throw new Error(response&&response.data&&response.data.message||'Could not start timer'); }
+                            return { postId: response.data.post_id, sessionIndex: response.data.row_index, startUtc: response.data.start_time, sessionTitle: title };
+                        });
+                },
+                stopTimer: function(data){
+                    return $.post(ptt_ajax_object.ajax_url, { action:'ptt_stop_session_timer', nonce: ptt_ajax_object.nonce, post_id: data.postId, row_index: data.sessionIndex })
+                        .then(function(response){ if(!response || !response.success){ throw new Error(response&&response.data&&response.data.message||'Failed to stop timer'); } return response; });
+                },
+                updateTimerUI: function(state, ctx){
+                    if(state==='RUNNING'){
+                        $startStopBtn.addClass('running').text('Stop').removeClass('button-primary').addClass('button-secondary');
+                        $startStopBtn.data('postid', ctx.postId); $startStopBtn.data('rowindex', ctx.sessionIndex);
+                        if (ctx.sessionTitle) { $sessionTitle.val(ctx.sessionTitle); }
+                        $sessionTitle.prop('disabled', true); $taskSelect.prop('disabled', true); $projectFilter.prop('disabled', true); $clientFilter.prop('disabled', true);
+                        startTodayPageTimer(ctx.startUtc);
+                        loadDailyEntries();
+                    } else if(state==='IDLE'){
+                        $startStopBtn.removeClass('running').text('Start').removeClass('button-secondary').addClass('button-primary');
+                        $startStopBtn.data('postid',''); $startStopBtn.data('rowindex','');
+                        $sessionTitle.val('').prop('disabled', false); $taskSelect.prop('disabled', false); $projectFilter.prop('disabled', false); $clientFilter.prop('disabled', false);
+                        stopTodayPageTimer();
+                        loadDailyEntries();
+                    }
+                }
+            });
+            timerFSM = createTimerFSM();
+        }
+
+
         let activeTimerInterval = null;
 
         // Fetch tasks based on filters
@@ -1186,6 +1259,26 @@ jQuery(document).ready(function ($) {
             const $btn = $(this);
             const isRunning = $btn.hasClass('running');
 
+            if (window.PTT_FSM_ENABLED) {
+                // FSM-powered Start/Stop
+                if (isRunning) {
+                    $btn.prop('disabled', true).text('Stopping...');
+                    timerFSM.stop().finally(function(){ $btn.prop('disabled', false); });
+                } else {
+                    const taskId = $taskSelect.val();
+                    const title = $sessionTitle.val();
+                    const clientId = $clientFilter.val();
+                    if (!clientId && (!taskId || !title.trim())) {
+                        alert('Please enter a session title and select a task (or choose a Client for Quick Start).');
+                        return;
+                    }
+                    $btn.prop('disabled', true).text('Starting...');
+                    timerFSM.start({ taskId: taskId, title: title, clientId: clientId }).finally(function(){ $btn.prop('disabled', false); });
+                }
+                return;
+            }
+
+            // Legacy behavior (flag off)
             if (isRunning) {
                 // --- STOP TIMER ---
                 const postId = $btn.data('postid');
