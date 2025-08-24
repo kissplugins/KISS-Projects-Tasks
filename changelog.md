@@ -1,6 +1,11 @@
 # Changelog
 
 
+## Version 2.1.6 - UTC helpers adoption + Today self-test
+- Reports: Replaced remaining session timestamp comparisons with centralized ACFAdapter::isUtcWithinLocalRange() for consistent timezone handling.
+- Tests: Added self-test coverage to validate Today page session inclusion uses local date (mirrors JS) and won’t regress.
+
+
 ## Version 2.1.5 - Reports week buttons fix + debugging
 - Reports: Core assets now load on the Reports page so week buttons are active.
 - Reports: "This Week" and "Last Week" buttons now reliably set start/end date inputs and trigger change events.

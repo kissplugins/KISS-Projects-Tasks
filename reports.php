@@ -429,9 +429,8 @@ function ptt_display_report_results() {
 					if ( ! empty( $sessions ) && is_array( $sessions ) ) {
 						foreach ( $sessions as $session ) {
 							if ( ! empty( $session['session_start_time'] ) ) {
-								// Normalize to UTC to avoid local/UTC boundary issues
-								$session_timestamp = strtotime( $session['session_start_time'] . ' UTC' );
-								if ( $session_timestamp >= $start_timestamp && $session_timestamp <= $end_timestamp ) {
+								// Use centralized adapter to compare UTC datetime against local date range
+								if ( \KISS\PTT\Plugin::$acf->isUtcWithinLocalRange( $session['session_start_time'], $start_date, $end_date ) ) {
 									$is_relevant = true;
 									break;
 								}
@@ -807,9 +806,8 @@ function ptt_display_report_results() {
 					if ( ! empty( $sessions ) && is_array( $sessions ) ) {
 						foreach ( $sessions as $session ) {
 							if ( ! empty( $session['session_start_time'] ) ) {
-								// Normalize to UTC to avoid local/UTC boundary issues
-								$session_timestamp = strtotime( $session['session_start_time'] . ' UTC' );
-								if ( $session_timestamp >= $start_timestamp && $session_timestamp <= $end_timestamp ) {
+								// Use centralized adapter to compare UTC datetime against local date range
+								if ( \KISS\PTT\Plugin::$acf->isUtcWithinLocalRange( $session['session_start_time'], $start_date, $end_date ) ) {
 									$is_relevant = true;
 									break;
 								}

@@ -292,6 +292,40 @@ class SelfTestController {
             'message' => $range_ok ? "Computed range {$start_str} to {$end_str} (7 days inclusive)." : "Unexpected range {$start_str} to {$end_str} (span_days={$span_days})."
         ];
 
+        // TEST – Today session appears on local date boundary
+        $tz = function_exists('wp_timezone') ? wp_timezone() : new \DateTimeZone(get_option('timezone_string') ?: 'UTC');
+        // Build a UTC datetime that maps to "today" in local time
+        $local_now = new \DateTime('now', $tz);
+        $local_today_str = $local_now->format('Y-m-d');
+        $utc_now = clone $local_now; $utc_now->setTimezone(new \DateTimeZone('UTC'));
+        $utc_str = $utc_now->format('Y-m-d H:i:s');
+
+        $task_id = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'TODAY DATE INCLUSION TEST', 'post_status' => 'publish' ]);
+        if ( $task_id && ! is_wp_error($task_id) ) {
+            // Add one session at current UTC timestamp
+            if ( function_exists('add_row') ) {
+                add_row('sessions', [ 'session_title' => 'Test', 'session_start_time' => $utc_str, 'session_stop_time' => $utc_str ], $task_id);
+            }
+            // Call the provider used by Today page
+            if ( function_exists('ptt_get_tasks_for_user') ) {
+                $user_id = get_current_user_id();
+                $entries = \PTT_Today_Data_Provider::get_daily_entries( $user_id, $local_today_str, [] );
+                $found = false;
+                foreach ( $entries as $e ) { if ( $e['post_id'] === $task_id ) { $found = true; break; } }
+                $results[] = [
+                    'name'    => 'Today: Session included on local date',
+                    'status'  => $found ? 'Pass' : 'Fail',
+                    'message' => $found ? 'Session with UTC timestamp visible on the same local day.' : 'Session not visible on Today for local date.',
+                ];
+            } else {
+                $results[] = [ 'name' => 'Today: Session included on local date', 'status' => 'Fail', 'message' => 'Provider not available in this environment.' ];
+            }
+            wp_delete_post( $task_id, true );
+        } else {
+            $results[] = [ 'name' => 'Today: Session included on local date', 'status' => 'Fail', 'message' => 'Could not create test task.' ];
+        }
+
+
         $timestamp = current_time( 'timestamp' );
         update_option( 'ptt_tests_last_run', $timestamp );
         wp_send_json_success( [ 'results' => $results, 'time' => date_i18n( get_option( 'time_format' ), $timestamp ) ] );
