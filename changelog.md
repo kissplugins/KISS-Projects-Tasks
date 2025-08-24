@@ -2,6 +2,16 @@
 
 
 
+## Version 1.12.11 - Today page Finite State Manager plan
+
+- Documentation
+  - Added PROJECT-FSM-v1.x.md outlining a phased Finite State Manager for the Today page to improve debugging and stability
+
+## Version 1.12.10 - Project development log documentation
+
+- Documentation
+  - Added projectlog.md to record development sessions and version progression
+
 ## Version 1.12.9 - Enhanced PROJECT-SESSION-TIMERS.md documentation
 
 - Documentation
