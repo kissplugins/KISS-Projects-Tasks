@@ -20,6 +20,12 @@ class Assets {
             return;
         }
 
+        // Reports page
+        if ( $hook === 'project_task_page_ptt-reports' ) {
+            self::enqueueCore($hook);
+            return;
+        }
+
         // Project Task post editor (post.php / post-new.php)
         if ( $hook === 'post.php' || $hook === 'post-new.php' ) {
             $screen = function_exists('get_current_screen') ? get_current_screen() : null;

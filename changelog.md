@@ -1,5 +1,16 @@
 # Changelog
 
+
+## Version 2.1.5 - Reports week buttons fix + debugging
+- Reports: Core assets now load on the Reports page so week buttons are active.
+- Reports: "This Week" and "Last Week" buttons now reliably set start/end date inputs and trigger change events.
+- Dev: Added console.debug logs for view mode initialization and week button clicks to aid troubleshooting.
+
+
+## Version 2.1.4 - Bugfix: Today + Reports
+- Today: Suppress duplicate "created" task-level entry when a same-day session exists (affects Quick Start tasks that create a task and start a session immediately).
+- Reports (Classic/Task Focused): Normalize session_start_time parsing to UTC when filtering by date range to fix missing items in ranges like "Last Week".
+
 ## Version 2.0.0 - PSR-4 bootstrap
 
 ## Version 2.1.0 - ACF Schema Status + FSM Planning

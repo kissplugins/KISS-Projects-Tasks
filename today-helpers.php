@@ -373,8 +373,11 @@ class PTT_Today_Data_Provider {
 			$session_entries = self::process_task_sessions( $post_id, $target_date, $task_title, $project_name, $client_name, $project_id, $client_id, $edit_link );
 		}
 
+		$has_session_for_date = ! empty( $session_entries );
+
 		// If task was created on date OR has parent-level time tracking, create a task-level entry
-		if ( $task_created_on_date || $parent_matches_date ) {
+		// BUT suppress this if a session exists on the same date (avoid duplicate visual entries)
+		if ( ( $task_created_on_date || $parent_matches_date ) && ! $has_session_for_date ) {
 			$entry_type = [];
 			if ( $task_created_on_date ) {
 				$entry_type[] = 'created';

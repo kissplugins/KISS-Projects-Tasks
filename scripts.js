@@ -1049,6 +1049,18 @@ jQuery(document).ready(function ($) {
         const $dateLabel = $dateRow.find('th label');
         const $weekButtons = $('#set-this-week, #set-last-week');
 
+        if (window.console) {
+            console.debug('[PTT Reports] handleReportViewModeChange()', {
+                viewMode,
+                present: {
+                    start: $('#start_date').length,
+                    end: $('#end_date').length,
+                    thisWeekBtn: $('#set-this-week').length,
+                    lastWeekBtn: $('#set-last-week').length
+                }
+            });
+        }
+
         if (viewMode === 'single_day') {
             $endDate.hide();
             $separator.hide();
@@ -1063,11 +1075,12 @@ jQuery(document).ready(function ($) {
     }
 
     // Handle view mode change
-    $('input[name="view_mode"]').on('change', handleReportViewModeChange);
+    $(document).on('change', 'input[name="view_mode"]', handleReportViewModeChange);
 
     // Run on page load to set initial state
     if ($('input[name="view_mode"]').length) {
         handleReportViewModeChange();
+        if (window.console) console.debug('[PTT Reports] Initialized view mode controls');
     }
 
 
@@ -1078,7 +1091,7 @@ jQuery(document).ready(function ($) {
         return `${y}-${m}-${d}`;
     };
 
-    $('#set-this-week').on('click', function(e) {
+    $(document).on('click', '#set-this-week', function(e) {
         e.preventDefault();
         const today = new Date();
         const day = today.getDay(); // Sunday - 0, Monday - 1, ..., Saturday - 6
@@ -1089,11 +1102,14 @@ jQuery(document).ready(function ($) {
         const saturday = new Date(today);
         saturday.setDate(today.getDate() - day + 6);
 
-        $('#start_date').val(formatDate(sunday));
-        $('#end_date').val(formatDate(saturday));
+        const start = formatDate(sunday);
+        const end = formatDate(saturday);
+        $('#start_date').val(start).trigger('change');
+        $('#end_date').val(end).trigger('change');
+        if (window.console) console.debug('[PTT Reports] Set This Week', { start, end });
     });
 
-    $('#set-last-week').on('click', function(e) {
+    $(document).on('click', '#set-last-week', function(e) {
         e.preventDefault();
         const today = new Date();
         const day = today.getDay();
@@ -1104,8 +1120,11 @@ jQuery(document).ready(function ($) {
         const lastSaturday = new Date(today);
         lastSaturday.setDate(today.getDate() - day - 1);
 
-        $('#start_date').val(formatDate(lastSunday));
-        $('#end_date').val(formatDate(lastSaturday));
+        const start = formatDate(lastSunday);
+        const end = formatDate(lastSaturday);
+        $('#start_date').val(start).trigger('change');
+        $('#end_date').val(end).trigger('change');
+        if (window.console) console.debug('[PTT Reports] Set Last Week', { start, end });
     });
 
     // Handle status change on reports page

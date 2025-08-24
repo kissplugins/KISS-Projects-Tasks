@@ -427,7 +427,8 @@ function ptt_display_report_results() {
 					if ( ! empty( $sessions ) && is_array( $sessions ) ) {
 						foreach ( $sessions as $session ) {
 							if ( ! empty( $session['session_start_time'] ) ) {
-								$session_timestamp = strtotime( $session['session_start_time'] );
+								// Normalize to UTC to avoid local/UTC boundary issues
+								$session_timestamp = strtotime( $session['session_start_time'] . ' UTC' );
 								if ( $session_timestamp >= $start_timestamp && $session_timestamp <= $end_timestamp ) {
 									$is_relevant = true;
 									break;
@@ -802,7 +803,8 @@ function ptt_display_report_results() {
 					if ( ! empty( $sessions ) && is_array( $sessions ) ) {
 						foreach ( $sessions as $session ) {
 							if ( ! empty( $session['session_start_time'] ) ) {
-								$session_timestamp = strtotime( $session['session_start_time'] );
+								// Normalize to UTC to avoid local/UTC boundary issues
+								$session_timestamp = strtotime( $session['session_start_time'] . ' UTC' );
 								if ( $session_timestamp >= $start_timestamp && $session_timestamp <= $end_timestamp ) {
 									$is_relevant = true;
 									break;
