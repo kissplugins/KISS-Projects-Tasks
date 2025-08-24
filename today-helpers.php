@@ -532,22 +532,7 @@ class PTT_Today_Data_Provider {
 	 * @return array Total time in seconds and formatted string.
 	 */
 	public static function calculate_total_duration( $entries ) {
-		$total_seconds = 0;
-
-		foreach ( $entries as $entry ) {
-			if ( isset( $entry['duration_seconds'] ) ) {
-				$total_seconds += $entry['duration_seconds'];
-			}
-		}
-
-		$total_hours = floor( $total_seconds / 3600 );
-		$total_minutes = floor( ( $total_seconds / 60 ) % 60 );
-		$formatted = sprintf( '%02d:%02d', $total_hours, $total_minutes );
-
-		return [
-			'seconds'   => $total_seconds,
-			'formatted' => $formatted,
-		];
+		return \KISS\PTT\Presentation\Today\TodayService::calculateTotalDuration( is_array( $entries ) ? $entries : [] );
 	}
 }
 
