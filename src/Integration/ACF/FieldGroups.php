@@ -49,7 +49,7 @@ function ptt_register_local_acf_groups() {
                     [ 'key' => 'field_ptt_session_manual_override', 'label' => 'Manual Override', 'name' => 'session_manual_override', 'type' => 'true_false', 'ui' => 1 ],
                     [ 'key' => 'field_ptt_session_manual_duration', 'label' => 'Manual Duration (hrs)', 'name' => 'session_manual_duration', 'type' => 'number', 'min' => 0, 'step' => '0.01' ],
                     [ 'key' => 'field_ptt_session_calculated_duration', 'label' => 'Calculated (hrs)', 'name' => 'session_calculated_duration', 'type' => 'text', 'readonly' => 1 ],
-                    [ 'key' => 'field_ptt_session_timer_controls', 'label' => 'Timer Controls', 'name' => 'session_timer_controls', 'type' => 'message', 'message' => 'Rendered via JS', 'esc_html' => 0 ],
+                    [ 'key' => 'field_ptt_session_timer_controls', 'label' => 'Timer Controls', 'name' => 'session_timer_controls', 'type' => 'message', 'message' => 'Timer UI loads here (via JS)', 'esc_html' => 0 ],
                 ],
             ],
         ],

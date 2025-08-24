@@ -24,6 +24,7 @@ class Plugin {
         // Register admin assets and controllers
         AdminAssets::register();
         SelfTestController::register();
+        \KISS\PTT\Admin\SchemaStatusPage::register();
 
         self::register_hooks();
         // Load remaining procedural modules

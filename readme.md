@@ -164,6 +164,8 @@ The debug panel at the bottom shows:
 - Complete query rules explanation
 - Raw data for troubleshooting
 
+Developer tip: Enable on‑screen timer UI debugging by appending `?ptt_debug=1` to the admin edit URL (or run `localStorage.setItem('PTT_DEBUG','1'); location.reload();`).
+
 ### 4. Viewing Reports
 
 1.  Navigate to **Tasks → Reports** from the admin menu.

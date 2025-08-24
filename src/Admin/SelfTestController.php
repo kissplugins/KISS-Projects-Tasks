@@ -58,6 +58,22 @@ class SelfTestController {
         echo '<div class="wrap">';
         echo '<h1>Plugin Settings &amp; Self Test</h1>';
         echo '<p>This module verifies core plugin functionality. It creates test data and immediately deletes it.</p>';
+
+        // Compact ACF Schema summary widget
+        if ( class_exists('KISS\\PTT\\Integration\\ACF\\Diagnostics') ) {
+            $issues = \KISS\PTT\Integration\ACF\Diagnostics::collectIssues();
+            $hasIssues = !empty($issues);
+            echo '<div class="card" style="max-width:800px;">';
+            echo '<h2>ACF Schema Status</h2>';
+            if (!$hasIssues) {
+                echo '<p><span class="dashicons dashicons-yes" style="color:green;"></span> No issues detected.</p>';
+            } else {
+                echo '<p><span class="dashicons dashicons-warning" style="color:#d35400;"></span> ' . count($issues) . ' warning(s) detected. ';
+                echo '<a href="' . esc_url( admin_url('edit.php?post_type=project_task&page=ptt-acf-schema') ) . '">View details</a>.</p>';
+            }
+            echo '</div>';
+        }
+
         echo '<button id="ptt-run-self-tests" class="button button-primary">Re‑Run Tests</button>';
         echo '<p id="ptt-last-test-time">';
         $last_run = get_option( 'ptt_tests_last_run' );

@@ -257,7 +257,8 @@ jQuery(document).ready(function ($) {
     function initSessionRows($context) {
         $context = $context || $(document);
 
-        $context.find('.ptt-session-timer').each(function() {
+        // Find the ACF Message field used for timer controls inside each session row
+        $context.find('.acf-field[data-key="field_ptt_session_timer_controls"]').each(function() {
             const $container = $(this);
             if ($container.data('initialized')) return;
             $container.data('initialized', true);
@@ -266,6 +267,9 @@ jQuery(document).ready(function ($) {
             const $startInput = $row.find('[data-key="field_ptt_session_start_time"] input');
             const $stopInput = $row.find('[data-key="field_ptt_session_stop_time"] input');
             const $durationInput = $row.find('[data-key="field_ptt_session_calculated_duration"] input');
+
+            const debugEnabled = !!(window.PTT_DEBUG || (window.localStorage && localStorage.getItem('PTT_DEBUG')==='1') || (window.location.search||'').indexOf('ptt_debug=1')>-1);
+            const debugHtml = `<div class="ptt-debug" style="margin-top:6px;color:#666;font-size:12px;">[PTT] Timer UI initialized${debugEnabled? ' (debug on)':''}</div>`;
 
             const controlsHtml = `
                 <div class="ptt-session-controls">
@@ -277,7 +281,7 @@ jQuery(document).ready(function ($) {
                     </div>
                     <div class="ptt-session-message" style="display: none;"></div>
                     <div class="ptt-ajax-spinner" style="display: none; margin-left: 8px;"></div>
-                </div>`;
+                </div>` + debugHtml;
             $container.find('.acf-input').html(controlsHtml);
 
             const $controls = $container.find('.ptt-session-controls');
@@ -358,9 +362,8 @@ jQuery(document).ready(function ($) {
 
     // Handle ACF Repeater "Add Row" event
     if (window.acf) {
-        window.acf.addAction('append', function($el) {
-            initSessionRows($el);
-        });
+        window.acf.addAction('ready', function($el) { initSessionRows($el); });
+        window.acf.addAction('append', function($el) { initSessionRows($el); });
     }
 
     // New unified click handlers using event delegation

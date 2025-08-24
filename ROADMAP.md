@@ -1,5 +1,13 @@
 # Roadmap
 
+## NEXT MAJOR PROJECT: FSM
+
+- Objective: Introduce a Finite State Machine (FSM) architecture for the Today page to improve reliability, debuggability, and code clarity.
+- Plan: See PROJECT-FSM.md for the phased, actionable checklist (TimerFSM + DataFSM, controller, effects, rollout plan).
+- Status: Planning complete; next step is Phase 0 (Preparation) and Phase 1 (TimerFSM pilot behind feature flag).
+
+
+
 ## Phase 1 – Bootstrap PSR-4 Structure
 - [x] Add Composer-based PSR-4 autoloader
 - [x] Refactor main plugin bootstrap into `KISS\PTT\Plugin`
@@ -21,6 +29,41 @@
   - [x] Create TimerService skeleton (src/Domain/Timer/TimerService.php)
 
   - [x] Register local ACF field groups for clean installs (src/Integration/ACF/FieldGroups.php)
+
+### ACF Field Schema (Authoritative Mapping)
+
+Parent Task fields (group_ptt_task_fields):
+- field_ptt_start_time → name: start_time → type: date_time_picker (Y-m-d H:i:s)
+- field_ptt_stop_time → name: stop_time → type: date_time_picker (Y-m-d H:i:s)
+- field_ptt_calculated_duration → name: calculated_duration → type: text (read-only)
+- field_ptt_manual_override → name: manual_override → type: true_false (ui)
+- field_ptt_manual_duration → name: manual_duration → type: number
+- field_ptt_task_max_budget → name: task_max_budget → type: number
+- field_ptt_task_deadline → name: task_deadline → type: date_time_picker (Y-m-d H:i:s)
+- field_ptt_sessions → name: sessions → type: repeater
+
+Sessions repeater sub-fields:
+- field_ptt_session_title → name: session_title → type: text
+- field_ptt_session_notes → name: session_notes → type: textarea
+- field_ptt_session_start_time → name: session_start_time → type: date_time_picker (Y-m-d H:i:s)
+- field_ptt_session_stop_time → name: session_stop_time → type: date_time_picker (Y-m-d H:i:s)
+- field_ptt_session_manual_override → name: session_manual_override → type: true_false (ui)
+- field_ptt_session_manual_duration → name: session_manual_duration → type: number
+- field_ptt_session_calculated_duration → name: session_calculated_duration → type: text (read-only)
+- field_ptt_session_timer_controls → name: session_timer_controls → type: message (JS renders timer UI)
+
+Notes:
+- Date fields use display_format and return_format: Y-m-d H:i:s
+- Timer controls field is a message field; UI is injected via JS; content placeholder is non-semantic.
+
+### Migration Notes
+
+If your site has different field keys or names:
+1) Prefer renaming via ACF UI to match the keys above, or programmatically register local groups (FieldGroups.php) and export/import.
+2) If only names differ but keys match, update names to match the canonical mapping to avoid code depending on names diverging.
+3) If keys differ and you cannot rename, create a small compatibility map in ACFAdapter to resolve to canonical keys; long-term recommendation is to normalize keys.
+4) Diagnostics (src/Integration/ACF/Diagnostics.php) will emit admin warnings when keys, names, or types do not match.
+
 
 - [ ] Session Domain & Repository (Core)
   - [x] src/Domain/Session/SessionRepository (minimal-read access; avoid full repeater hydration)
