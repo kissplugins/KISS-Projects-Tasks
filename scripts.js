@@ -37,17 +37,18 @@ jQuery(document).ready(function ($) {
             if(!debugOn) return;
             var el = document.querySelector('#ptt-debug-content');
             if(!el) return;
-            var info = window.PTT_FSM.getDebugInfo();
-            var pre = document.createElement('pre');
-            pre.textContent = JSON.stringify({ fsm: info }, null, 2);
-            var container = document.createElement('div');
-            container.style.marginTop = '8px';
-            container.innerHTML = '<strong>FSM (Phase 0)</strong>';
-            container.appendChild(pre);
-            el.appendChild(container);
+            var info = (window.PTT_FSM && window.PTT_FSM.getDebugInfo) ? window.PTT_FSM.getDebugInfo() : {};
+            var container = document.querySelector('#ptt-fsm-debug');
+            if(!container){
+                container = document.createElement('div');
+                container.id = 'ptt-fsm-debug';
+                container.style.marginTop = '8px';
+                el.appendChild(container);
+            }
+            container.innerHTML = '<strong>FSM</strong><pre style="white-space:pre-wrap">'+JSON.stringify({ fsm: info }, null, 2)+'</pre>';
         }catch(e){}
     }
-    // Render Phase 0 debug snapshot (safe no-op if panel absent)
+    // Initial render (safe no-op if panel absent)
     pttUpdateFsmDebug();
 
 
@@ -1184,15 +1185,16 @@ jQuery(document).ready(function ($) {
             // Override effects with Today-page aware implementations
             window.pttEffects = Object.assign({}, window.pttEffects, {
                 startTimer: function(data){
-                    var taskId = data.taskId, title = data.title||'', clientId = data.clientId||'';
+                    var taskId = data.taskId, title = (data.title||'').trim(), clientId = data.clientId||'';
                     // Quick Start path
-                    if (clientId && (!taskId || !title.trim())) {
+                    if (clientId && (!taskId || !title)) {
                         return $.post(ptt_ajax_object.ajax_url, { action:'ptt_today_quick_start', nonce: ptt_ajax_object.nonce, client_id: clientId })
                             .then(function(response){ if(!response || !response.success){ throw new Error(response&&response.data&&response.data.message||'Could not start timer'); }
                                 return { postId: response.data.post_id, sessionIndex: response.data.session_index, startUtc: response.data.start_time, sessionTitle: (response.data.session_data&&response.data.session_data.title)||title };
                             });
                     }
                     // Normal start new session
+                    if (!taskId || !title) { return Promise.reject(new Error('title_or_task_required')); }
                     return $.post(ptt_ajax_object.ajax_url, { action:'ptt_today_start_new_session', nonce: ptt_ajax_object.nonce, post_id: taskId, session_title: title })
                         .then(function(response){ if(!response || !response.success){ throw new Error(response&&response.data&&response.data.message||'Could not start timer'); }
                             return { postId: response.data.post_id, sessionIndex: response.data.row_index, startUtc: response.data.start_time, sessionTitle: title };
@@ -1217,9 +1219,31 @@ jQuery(document).ready(function ($) {
                         stopTodayPageTimer();
                         loadDailyEntries();
                     }
+                    // Update FSM debug panel
+                    try { pttUpdateFsmDebug(); } catch(e){}
+                },
+                rehydrate: function(){
+                    // Ask server if there's an active session for current user
+                    return $.post(ptt_ajax_object.ajax_url, { action:'ptt_get_active_task_info', nonce: ptt_ajax_object.nonce })
+                        .then(function(response){
+                            if (response && response.success) {
+                                return { running:true, postId: response.data.post_id, startUtc: response.data.start_time, sessionIndex: response.data.session_index, sessionTitle: response.data.task_name || response.data.session_title };
+                            }
+                            return { running:false };
+                        }).catch(function(){ return { running:false }; });
                 }
             });
             timerFSM = createTimerFSM();
+            // Rehydrate on load
+            window.pttEffects.rehydrate().then(function(info){
+                if (info && info.running) {
+                    timerFSM.state = 'RUNNING';
+                    timerFSM.ctx = { postId: info.postId, sessionIndex: info.sessionIndex, startUtc: info.startUtc };
+                    window.pttEffects.updateTimerUI('RUNNING', { postId: info.postId, sessionIndex: info.sessionIndex, startUtc: info.startUtc, sessionTitle: info.sessionTitle });
+                } else {
+                    window.pttEffects.updateTimerUI('IDLE', {});
+                }
+            });
         }
 
 

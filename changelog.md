@@ -5,6 +5,16 @@
 ## Version 2.1.0 - ACF Schema Status + FSM Planning
 
 ## Version 2.1.1 - FSM Phase 0 Scaffolding
+
+## Version 2.1.3 - Phase 1 Finishing Touches
+- Scripts: Rehydrate TimerFSM on Today page load (queries server for active session)
+- Scripts: Live FSM debug panel updates under ptt_debug=1
+- Scripts: Start validation via FSM effects (guards title/task for non-Quick Start)
+
+
+## Version 2.1.2 - Hotfix: Duplicate function guard
+- Fixed fatal error by guarding ptt_get_active_session_index_for_user() in today.php with function_exists to avoid redeclaration with helpers.php
+
 - Scripts: Added non-breaking FSM scaffolding (feature flag, effects stubs, debug hook)
 - Docs: Proceeding toward Phase 1 implementation behind feature flag
 - Phase 1 (start): TimerFSM scaffold added behind feature flag; start/stop hooks routed through FSM when enabled (legacy preserved when disabled)
