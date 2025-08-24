@@ -3,6 +3,11 @@
 ## Version 2.0.0 - PSR-4 bootstrap
 
 ## Version 2.1.0 - ACF Schema Status + FSM Planning
+
+## Version 2.1.1 - FSM Phase 0 Scaffolding
+- Scripts: Added non-breaking FSM scaffolding (feature flag, effects stubs, debug hook)
+- Docs: Proceeding toward Phase 1 implementation behind feature flag
+
 - Admin: New “ACF Schema Status” page under Tasks showing persistent schema diagnostics
 - Admin: Copy diagnostics buttons (Text/JSON) and compact status widget on Settings/Self‑Test page
 - Diagnostics: Extended ACF schema checks (keys, names, types, date formats) and allowed empty name for message fields

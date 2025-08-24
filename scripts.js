@@ -1,6 +1,56 @@
 jQuery(document).ready(function ($) {
     'use strict';
 
+    // Phase 0: FSM scaffolding (non-breaking)
+    // - Feature flag (default: false)
+    // - Effects stubs
+    // - Debug hook to render placeholder FSM info
+    window.PTT_FSM_ENABLED = (window.PTT_FSM_ENABLED === true);
+    window.pttEffects = window.pttEffects || {
+        startTimer: function(){ return Promise.reject('FSM not enabled'); },
+        stopTimer: function(){ return Promise.reject('FSM not enabled'); },
+        loadEntries: function(){ return Promise.reject('FSM not enabled'); },
+        updateTimerUI: function(){},
+        toggleLoading: function(){},
+        renderEntries: function(){},
+        showError: function(msg){ if (window.console) console.warn('[PTT]', msg); },
+        rehydrate: function(){ return Promise.resolve({ running: false }); }
+    };
+    window.PTT_FSM = window.PTT_FSM || {
+        timerState: 'DISABLED',
+        dataState: 'DISABLED',
+        nextTimerEvents: [],
+        nextDataEvents: [],
+        getDebugInfo: function(){
+            return {
+                enabled: !!window.PTT_FSM_ENABLED,
+                timerState: this.timerState,
+                dataState: this.dataState,
+                nextTimerEvents: this.nextTimerEvents,
+                nextDataEvents: this.nextDataEvents
+            };
+        }
+    };
+    function pttUpdateFsmDebug(){
+        try{
+            var debugOn = (window.location.search||'').indexOf('ptt_debug=1')>-1 || (window.localStorage && localStorage.getItem('PTT_DEBUG')==='1');
+            if(!debugOn) return;
+            var el = document.querySelector('#ptt-debug-content');
+            if(!el) return;
+            var info = window.PTT_FSM.getDebugInfo();
+            var pre = document.createElement('pre');
+            pre.textContent = JSON.stringify({ fsm: info }, null, 2);
+            var container = document.createElement('div');
+            container.style.marginTop = '8px';
+            container.innerHTML = '<strong>FSM (Phase 0)</strong>';
+            container.appendChild(pre);
+            el.appendChild(container);
+        }catch(e){}
+    }
+    // Render Phase 0 debug snapshot (safe no-op if panel absent)
+    pttUpdateFsmDebug();
+
+
     // Session recovery - store active task in localStorage
     const PTT_STORAGE_KEY = 'ptt_active_task';
 
