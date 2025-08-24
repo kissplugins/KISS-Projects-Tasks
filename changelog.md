@@ -1,6 +1,11 @@
 # Changelog
 
 
+## Version 2.1.9 - PSR-4 Sessions builder
+- Delegated Today session entry construction to src/Presentation/Today/EntryBuilder::buildSessionEntriesForDate.
+- Legacy provider now delegates; no UI changes.
+
+
 ## Version 2.1.8 - PSR-4 EntryBuilder (Today)
 - Moved task-level Today entry construction to src/Presentation/Today/EntryBuilder and routed legacy code to use it.
 - Maint: Continued incremental PSR‑4 migration for Today data-building.

@@ -453,70 +453,14 @@ class PTT_Today_Data_Provider {
 	 * @return array Array of session entry data.
 	 */
 	private static function process_task_sessions( $post_id, $target_date, $task_title, $project_name, $client_name, $project_id, $client_id, $edit_link ) {
-		$entries = [];
-		$sessions = get_field( 'sessions', $post_id );
-
-		if ( empty( $sessions ) || ! is_array( $sessions ) ) {
-			return $entries;
-		}
-
-		foreach ( $sessions as $index => $session ) {
-			$start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
-			if ( empty( $start_str ) ) {
-				continue;
-			}
-
-			$start_ts = \KISS\PTT\Plugin::$acf->toUtcTimestamp( $start_str );
-			if ( ! $start_ts ) {
-				continue;
-			}
-
-			// Compare using PSR-4 helper to keep logic centralized
-			if ( \KISS\PTT\Presentation\Today\DateHelper::isUtcOnLocalDate( $start_str, $target_date ) ) {
-				$stop_str = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
-				$duration_seconds = 0;
-				$stop_ts = $stop_str ? \KISS\PTT\Plugin::$acf->toUtcTimestamp( $stop_str ) : null;
-
-				if ( $start_ts && $stop_ts ) {
-					$duration_seconds = $stop_ts - $start_ts;
-				} elseif ( $start_ts && ! $stop_str ) {
-					// For running timers
-					$duration_seconds = time() - $start_ts;
-				}
-
-				// Manual override always takes precedence
-				if ( ! empty( $session['session_manual_override'] ) ) {
-					$manual_hours = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
-					if ( $manual_hours > 0 ) {
-						$duration_seconds = (int) round( $manual_hours * 3600 );
-					}
-				}
-
-				$entries[] = [
-					'entry_id'         => $post_id . '_' . $index,
-					'post_id'          => $post_id,
-					'session_index'    => $index,
-					'session_title'    => $session['session_title'] ?? '',
-					'session_notes'    => $session['session_notes'] ?? '',
-					'task_title'       => $task_title,
-					'project_name'     => $project_name,
-					'client_name'      => $client_name,
-					'project_id'       => $project_id,
-					'client_id'        => $client_id,
-					'is_quick_start'   => ( $project_name === 'Quick Start' ),
-					'start_time'       => $start_ts,
-					'stop_time'        => $stop_ts,
-					'duration_seconds' => $duration_seconds,
-					'is_manual'        => ! empty( $session['session_manual_override'] ),
-					'duration'         => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
-					'is_running'       => empty( $stop_str ),
-					'edit_link'        => $edit_link,
-					'entry_type'       => ['session'],
-				];
-			}
-		}
-
-		return $entries;
+		return \KISS\PTT\Presentation\Today\EntryBuilder::buildSessionEntriesForDate( (int) $post_id, (string) $target_date, [
+			'task_title'   => $task_title,
+			'project_name' => $project_name,
+			'client_name'  => $client_name,
+			'project_id'   => $project_id,
+			'client_id'    => $client_id,
+			'edit_link'    => $edit_link,
+		] );
 	}
 
 	/**

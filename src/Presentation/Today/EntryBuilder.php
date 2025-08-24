@@ -37,5 +37,58 @@ class EntryBuilder
             'entry_type'       => (array)($ctx['entry_type'] ?? []),
         ];
     }
+
+    /**
+     * Build session-level entries for a given task and local date.
+     * Mirrors legacy structure from today-helpers.php.
+     */
+    public static function buildSessionEntriesForDate(int $postId, string $targetDate, array $context): array
+    {
+        $entries = [];
+        $sessions = function_exists('get_field') ? get_field('sessions', $postId) : [];
+        if (empty($sessions) || !is_array($sessions)) { return $entries; }
+
+        foreach ($sessions as $index => $session) {
+            $startStr = $session['session_start_time'] ?? '';
+            if (!$startStr) { continue; }
+            $startTs = \KISS\PTT\Plugin::$acf->toUtcTimestamp($startStr);
+            if (!$startTs) { continue; }
+            if (!DateHelper::isUtcOnLocalDate($startStr, $targetDate)) { continue; }
+
+            $stopStr = $session['session_stop_time'] ?? '';
+            $stopTs = $stopStr ? \KISS\PTT\Plugin::$acf->toUtcTimestamp($stopStr) : null;
+            $durationSeconds = 0;
+            if ($startTs && $stopTs) { $durationSeconds = $stopTs - $startTs; }
+            elseif ($startTs && !$stopStr) { $durationSeconds = time() - $startTs; }
+
+            if (!empty($session['session_manual_override'])) {
+                $manual = isset($session['session_manual_duration']) ? (float)$session['session_manual_duration'] : 0.0;
+                if ($manual > 0) { $durationSeconds = (int) round($manual * 3600); }
+            }
+
+            $entries[] = [
+                'entry_id'         => $postId . '_' . $index,
+                'post_id'          => $postId,
+                'session_index'    => $index,
+                'session_title'    => $session['session_title'] ?? '',
+                'session_notes'    => $session['session_notes'] ?? '',
+                'task_title'       => $context['task_title'] ?? '',
+                'project_name'     => $context['project_name'] ?? '',
+                'client_name'      => $context['client_name'] ?? '',
+                'project_id'       => (int)($context['project_id'] ?? 0),
+                'client_id'        => (int)($context['client_id'] ?? 0),
+                'is_quick_start'   => (($context['project_name'] ?? '') === 'Quick Start'),
+                'start_time'       => $startTs,
+                'stop_time'        => $stopTs,
+                'duration_seconds' => $durationSeconds,
+                'is_manual'        => !empty($session['session_manual_override']),
+                'duration'         => $durationSeconds > 0 ? gmdate('H:i:s', $durationSeconds) : 'Running',
+                'is_running'       => empty($stopStr),
+                'edit_link'        => $context['edit_link'] ?? '',
+                'entry_type'       => ['session'],
+            ];
+        }
+        return $entries;
+    }
 }
 

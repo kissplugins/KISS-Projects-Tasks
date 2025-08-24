@@ -52,6 +52,8 @@ Effects to inject:
 - Progress note (v2.1.7): Introduced PSR‑4 Today\DateHelper::isUtcOnLocalDate and routed Today session-date checks through it. This reduces duplication and supports later DataFSM work without UI refactor.
 - Progress note (v2.1.8): Introduced Today\EntryBuilder and delegated task-level entry construction to it; more helpers to follow.
 
+- Progress note (v2.1.9): Delegated session-level entry building to Today\EntryBuilder::buildSessionEntriesForDate; sets up for a lean TodayService.
+
 
 - Not required for initial FSM pilot:
   - [x] Full PSR‑4 completion across all admin pages
