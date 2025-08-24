@@ -36,6 +36,22 @@ Effects to inject:
 
 ---
 
+
+## Dependencies and Sequencing with PSR‑4
+
+- Pre‑requisites for FSM rollout (lightweight, do not block bug fixes):
+  - [ ] PSR‑4 Phase 2: Add UTC/date helpers in ACFAdapter and route Today/Reports timestamp parsing through them
+  - [ ] Ensure Plugin acts as stable service container (KISS\PTT\Plugin::$timer,::$sessions,::$acf)
+  - [ ] Keep Today procedural handlers intact while FSM is behind feature flag
+
+- Nice‑to‑have (post‑FSM acceptable):
+  - [ ] PSR‑4 Phase 3: Introduce thin Services locator (optional)
+  - [ ] Migrate Today data builder to src/Presentation/Today/ service after FSM Phase 2
+
+- Not required for initial FSM pilot:
+  - [x] Full PSR‑4 completion across all admin pages
+  - [x] Session CPT or custom table (Roadmap Phase 4)
+
 ## Actionable checklist by phase
 
 ### Phase 0 – Preparation (non‑breaking)
@@ -135,10 +151,10 @@ class TodayPageFSM {
             isLoading: false,
             error: null
         };
-        
+
         this.listeners = new Set();
         this.timerInterval = null;
-        
+
         // Bind methods
         this.transition = this.transition.bind(this);
         this.send = this.send.bind(this);
@@ -156,7 +172,7 @@ class TodayPageFSM {
                 },
                 entry: () => this.stopTimerDisplay()
             },
-            
+
             LOADING: {
                 on: {
                     ENTRIES_LOADED: 'IDLE',
@@ -165,21 +181,21 @@ class TodayPageFSM {
                 entry: () => this.showLoading(),
                 exit: () => this.hideLoading()
             },
-            
+
             STARTING_TIMER: {
                 on: {
                     TIMER_STARTED: 'TIMER_RUNNING',
                     START_FAILED: 'IDLE'
                 }
             },
-            
+
             STARTING_QUICK_START: {
                 on: {
                     QUICK_START_CREATED: 'TIMER_RUNNING',
                     QUICK_START_FAILED: 'IDLE'
                 }
             },
-            
+
             TIMER_RUNNING: {
                 on: {
                     STOP_TIMER: 'STOPPING_TIMER',
@@ -189,7 +205,7 @@ class TodayPageFSM {
                 entry: () => this.startTimerDisplay(),
                 exit: () => this.stopTimerDisplay()
             },
-            
+
             LOADING_WITH_TIMER: {
                 on: {
                     ENTRIES_LOADED: 'TIMER_RUNNING',
@@ -197,14 +213,14 @@ class TodayPageFSM {
                 },
                 entry: () => this.showLoading()
             },
-            
+
             STOPPING_TIMER: {
                 on: {
                     TIMER_STOPPED: 'IDLE',
                     STOP_FAILED: 'TIMER_RUNNING'
                 }
             },
-            
+
             ERROR: {
                 on: {
                     RETRY: 'IDLE',
@@ -225,25 +241,25 @@ class TodayPageFSM {
 
         const nextState = currentStateConfig.on[event];
         const prevState = this.currentState;
-        
+
         // Exit current state
         if (currentStateConfig.exit) {
             currentStateConfig.exit(payload);
         }
-        
+
         // Update state
         this.currentState = nextState;
         this.context = { ...this.context, ...payload };
-        
+
         // Enter new state
         const nextStateConfig = this.machine[nextState];
         if (nextStateConfig && nextStateConfig.entry) {
             nextStateConfig.entry(payload);
         }
-        
+
         // Notify listeners
         this.notifyListeners(prevState, nextState, event, payload);
-        
+
         console.log(`FSM: ${prevState} → ${nextState} (${event})`);
         return true;
     }
@@ -293,7 +309,7 @@ class TodayPageFSM {
 
         const timerDisplay = document.querySelector('.ptt-today-timer-display');
         const startBtn = document.querySelector('#ptt-today-start-stop-btn');
-        
+
         if (startBtn) {
             startBtn.textContent = 'Stop';
             startBtn.classList.remove('button-primary');
@@ -306,12 +322,12 @@ class TodayPageFSM {
                 const now = new Date();
                 const start = new Date(timerStartTime + 'Z'); // Treat as UTC
                 const diff = now - start;
-                
+
                 const hours = Math.floor(diff / 3600000);
                 const minutes = Math.floor((diff % 3600000) / 60000);
                 const seconds = Math.floor((diff % 60000) / 1000);
-                
-                timerDisplay.textContent = 
+
+                timerDisplay.textContent =
                     `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             }
         }, 1000);
@@ -325,11 +341,11 @@ class TodayPageFSM {
 
         const timerDisplay = document.querySelector('.ptt-today-timer-display');
         const startBtn = document.querySelector('#ptt-today-start-stop-btn');
-        
+
         if (timerDisplay) {
             timerDisplay.textContent = '00:00:00';
         }
-        
+
         if (startBtn) {
             startBtn.textContent = 'Start';
             startBtn.classList.add('button-primary');
@@ -394,7 +410,7 @@ function loadDailyEntries() {
     }
 
     const selectedDate = document.querySelector('#ptt-today-date-select')?.value || new Date().toISOString().split('T')[0];
-    
+
     $.post(ptt_ajax_object.ajax_url, {
         action: 'ptt_get_daily_entries',
         nonce: ptt_ajax_object.nonce,
@@ -405,7 +421,7 @@ function loadDailyEntries() {
                 entries: response.data.entries || [],
                 selectedDate: selectedDate
             });
-            
+
             // Update UI
             document.querySelector('#ptt-today-entries-list').innerHTML = response.data.html;
             document.querySelector('#ptt-today-total strong').textContent = response.data.total;
@@ -441,13 +457,13 @@ function startTimer() {
 // Subscribe to state changes for UI updates
 todayPageFSM.subscribe(({ nextState, context, event }) => {
     console.log('State changed:', { nextState, context, event });
-    
+
     // Enable/disable controls based on state
     const controls = document.querySelectorAll('#ptt-today-start-stop-btn, #ptt-today-task-select, #ptt-today-project-filter');
     controls.forEach(control => {
         control.disabled = todayPageFSM.isLoading;
     });
-    
+
     // Update debug panel if exists
     const debugPanel = document.querySelector('#ptt-debug-content');
     if (debugPanel) {
