@@ -1,6 +1,11 @@
 # Changelog
 
 
+## Version 2.1.7 - PSR-4 Today DateHelper
+- Added src/Presentation/Today/DateHelper (isUtcOnLocalDate) and updated Today entry filtering to use it for centralized date logic.
+- Maint: Continued PSR‑4 adoption around time/date utilities.
+
+
 ## Version 2.1.6 - UTC helpers adoption + Today self-test
 - Reports: Replaced remaining session timestamp comparisons with centralized ACFAdapter::isUtcWithinLocalRange() for consistent timezone handling.
 - Tests: Added self-test coverage to validate Today page session inclusion uses local date (mirrors JS) and won’t regress.

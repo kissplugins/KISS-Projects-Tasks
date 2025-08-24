@@ -48,6 +48,9 @@ Effects to inject:
   - [ ] PSR‑4 Phase 3: Introduce thin Services locator (optional)
   - [ ] Migrate Today data builder to src/Presentation/Today/ service after FSM Phase 2
 
+
+- Progress note (v2.1.7): Introduced PSR‑4 Today\DateHelper::isUtcOnLocalDate and routed Today session-date checks through it. This reduces duplication and supports later DataFSM work without UI refactor.
+
 - Not required for initial FSM pilot:
   - [x] Full PSR‑4 completion across all admin pages
   - [x] Session CPT or custom table (Roadmap Phase 4)

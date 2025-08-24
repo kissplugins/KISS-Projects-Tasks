@@ -477,8 +477,8 @@ class PTT_Today_Data_Provider {
 				continue;
 			}
 
-			// Compare as local date by converting UTC start_ts to local Y-m-d
-			if ( wp_date( 'Y-m-d', $start_ts ) === $target_date ) {
+			// Compare using PSR-4 helper to keep logic centralized
+			if ( \KISS\PTT\Presentation\Today\DateHelper::isUtcOnLocalDate( $start_str, $target_date ) ) {
 				$stop_str = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
 				$duration_seconds = 0;
 				$stop_ts = $stop_str ? \KISS\PTT\Plugin::$acf->toUtcTimestamp( $stop_str ) : null;
