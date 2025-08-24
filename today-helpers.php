@@ -472,15 +472,16 @@ class PTT_Today_Data_Provider {
 				continue;
 			}
 
-			$start_ts = strtotime( $start_str );
+			$start_ts = \KISS\PTT\Plugin::$acf->toUtcTimestamp( $start_str );
 			if ( ! $start_ts ) {
 				continue;
 			}
 
-			if ( date( 'Y-m-d', $start_ts ) === $target_date ) {
+			// Compare as local date by converting UTC start_ts to local Y-m-d
+			if ( wp_date( 'Y-m-d', $start_ts ) === $target_date ) {
 				$stop_str = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
 				$duration_seconds = 0;
-				$stop_ts = strtotime( $stop_str );
+				$stop_ts = $stop_str ? \KISS\PTT\Plugin::$acf->toUtcTimestamp( $stop_str ) : null;
 
 				if ( $start_ts && $stop_ts ) {
 					$duration_seconds = $stop_ts - $start_ts;

@@ -407,8 +407,10 @@ function ptt_display_report_results() {
                 $task_list = [];
                 if ( $q->have_posts() ) {
                         // Attn: LLM Maintainers do not refactor this date search code unless specifically directed.
-                        $start_timestamp = $start_date ? strtotime( $start_date . ' 00:00:00' ) : 0;
-                        $end_timestamp   = $end_date ? strtotime( $end_date . ' 23:59:59' ) : PHP_INT_MAX;
+                        // Converted to centralized UTC helpers (no behavior change intended)
+                        $bounds = \KISS\PTT\Plugin::$acf->localDateRangeToUtcBounds( $start_date, $end_date );
+                        $start_timestamp = $bounds['start_ts_utc'];
+                        $end_timestamp   = $bounds['end_ts_utc'];
 
 			while ( $q->have_posts() ) {
 				$q->the_post();
@@ -783,8 +785,10 @@ function ptt_display_report_results() {
                 $report = [];
                 if ( $q->have_posts() ) {
                         // Attn: LLM Maintainers do not refactor this date search code unless specifically directed.
-                        $start_timestamp = $start_date ? strtotime( $start_date . ' 00:00:00' ) : 0;
-                        $end_timestamp   = $end_date ? strtotime( $end_date . ' 23:59:59' ) : PHP_INT_MAX;
+                        // Converted to centralized UTC helpers (no behavior change intended)
+                        $bounds = \KISS\PTT\Plugin::$acf->localDateRangeToUtcBounds( $start_date, $end_date );
+                        $start_timestamp = $bounds['start_ts_utc'];
+                        $end_timestamp   = $bounds['end_ts_utc'];
 
 			while ( $q->have_posts() ) {
 				$q->the_post();
