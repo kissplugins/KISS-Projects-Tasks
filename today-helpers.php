@@ -416,27 +416,21 @@ class PTT_Today_Data_Provider {
 				$start_ts = strtotime( $post_date . ' 00:00:00' );
 			}
 
-			$entries[] = [
-				'entry_id'         => $post_id . '_task',
+			$entries[] = \KISS\PTT\Presentation\Today\EntryBuilder::buildTaskLevelEntry([
 				'post_id'          => $post_id,
-				'session_index'    => -1, // Indicates this is a task-level entry
-				'session_title'    => implode( ', ', $entry_type ) . ': ' . $task_title,
-				'session_notes'    => $task_created_on_date ? 'Task created on this date' : 'Parent-level time tracking',
 				'task_title'       => $task_title,
 				'project_name'     => $project_name,
 				'client_name'      => $client_name,
 				'project_id'       => $project_id,
 				'client_id'        => $client_id,
-				'is_quick_start'   => ( $project_name === 'Quick Start' ),
-				'start_time'       => $start_ts,
-				'stop_time'        => $stop_ts,
-				'duration_seconds' => $duration_seconds,
-				'is_manual'        => $parent_matches_date && get_field( 'manual_override', $post_id ),
-				'duration'         => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : ( $is_running ? 'Running' : '00:00:00' ),
-				'is_running'       => $is_running,
-				'edit_link'        => $edit_link,
 				'entry_type'       => $entry_type,
-			];
+				'start_ts'         => $start_ts,
+				'stop_ts'          => $stop_ts,
+				'duration_seconds' => $duration_seconds,
+				'is_running'       => $is_running,
+				'is_manual'        => $parent_matches_date && get_field( 'manual_override', $post_id ),
+				'edit_link'        => $edit_link,
+			]);
 		}
 
 		// Add session entries

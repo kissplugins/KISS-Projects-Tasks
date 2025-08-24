@@ -1,6 +1,11 @@
 # Changelog
 
 
+## Version 2.1.8 - PSR-4 EntryBuilder (Today)
+- Moved task-level Today entry construction to src/Presentation/Today/EntryBuilder and routed legacy code to use it.
+- Maint: Continued incremental PSR‑4 migration for Today data-building.
+
+
 ## Version 2.1.7 - PSR-4 Today DateHelper
 - Added src/Presentation/Today/DateHelper (isUtcOnLocalDate) and updated Today entry filtering to use it for centralized date logic.
 - Maint: Continued PSR‑4 adoption around time/date utilities.
