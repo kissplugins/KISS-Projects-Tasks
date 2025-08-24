@@ -1,5 +1,13 @@
 # Roadmap
 
+## NEXT MAJOR PROJECT: FSM
+
+- Objective: Introduce a Finite State Machine (FSM) architecture for the Today page to improve reliability, debuggability, and code clarity.
+- Plan: See PROJECT-FSM.md for the phased, actionable checklist (TimerFSM + DataFSM, controller, effects, rollout plan).
+- Status: Planning complete; next step is Phase 0 (Preparation) and Phase 1 (TimerFSM pilot behind feature flag).
+
+
+
 ## Phase 1 – Bootstrap PSR-4 Structure
 - [x] Add Composer-based PSR-4 autoloader
 - [x] Refactor main plugin bootstrap into `KISS\PTT\Plugin`

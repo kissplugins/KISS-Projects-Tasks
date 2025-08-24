@@ -1,6 +1,14 @@
 # Changelog
 
 ## Version 2.0.0 - PSR-4 bootstrap
+
+## Version 2.1.0 - ACF Schema Status + FSM Planning
+- Admin: New “ACF Schema Status” page under Tasks showing persistent schema diagnostics
+- Admin: Copy diagnostics buttons (Text/JSON) and compact status widget on Settings/Self‑Test page
+- Diagnostics: Extended ACF schema checks (keys, names, types, date formats) and allowed empty name for message fields
+- Docs: PROJECT-FSM.md revised with actionable phased plan; ROADMAP updated with “NEXT MAJOR PROJECT: FSM” at the top
+- Readme: Added developer tip to enable UI debugging with ?ptt_debug=1
+
 - Major version bump to 2.0.0 to reflect PSR-4 architecture.
 - Introduced Composer-based PSR-4 autoloader and plugin bootstrap class.
 - Migrated time calculation helpers and task helpers to namespaced classes.
@@ -19,7 +27,7 @@
 ### Documentation
 - Added other-docs/sessions-quickstart.md (Session Recordings Quick Start overview, history, and roadmap)
 - Linked sessions-quickstart.md from readme.md
-  
+
 ### Quick Start Features
 - Added Client selector to the "What are you working on?" row on Today page
 - Quick Start: Users can click Start after choosing a Client; plugin creates/uses a per-user daily Quick Start task under the "Quick Start" project (scoped by user and client)
