@@ -1,6 +1,17 @@
 # Changelog
 
 
+## Version 2.2.10 - Preserve legacy detailed self-test count
+- SelfTests::run() now merges results from legacy ptt_test_data_structure_integrity() when available to keep the larger test count intact.
+
+
+## Version 2.2.8 - PSR-4: Diagnostics SelfTests
+- Extracted the self-test suite to KISS\\PTT\\Diagnostics\\SelfTests::run(); controller delegates to it. No behavior changes.
+
+## Version 2.2.9 - PSR-4: Settings helper
+- Added KISS\\PTT\\Admin\\Settings for FSM flags read/save; Assets and SelfTestController now use it. No behavior changes.
+
+
 ## Version 2.2.7 - Hide legacy ACF Schema card
 - Hidden the large ACF Schema Status card on Settings page now that it’s part of the main self-tests summary.
 
