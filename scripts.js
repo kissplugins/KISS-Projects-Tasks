@@ -1708,8 +1708,8 @@ jQuery(document).ready(function ($) {
             if (response.success && response.data && Array.isArray(response.data.results)) {
                 const results = response.data.results;
                 const total = results.length;
-                const failed = results.filter(r => r.status && r.status.toLowerCase() === 'failed').length;
-                const firstFailedIndex = results.findIndex(r => r.status && r.status.toLowerCase() === 'failed');
+                const failed = results.filter(r => r.status && r.status.toLowerCase() === 'fail').length;
+                const firstFailedIndex = results.findIndex(r => r.status && r.status.toLowerCase() === 'fail');
                 const jumpLink = failed ? `<a href="#ptt-first-failed" style="margin-left:8px;">Jump to first failed</a>` : '';
                 const passedNote = failed === 0 ? ` <span style="color:#2e7d32;font-weight:bold;">All tests have passed.</span>` : '';
                 const summaryHtml = `<div class="notice ${failed ? 'notice-error' : 'notice-success'}"><strong>Number of Tests:</strong> ${failed} out of ${total} Failed.${passedNote} ${jumpLink}</div>`;

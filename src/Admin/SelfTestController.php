@@ -309,6 +309,15 @@ class SelfTestController {
             // Call the provider used by Today page
             if ( function_exists('ptt_get_tasks_for_user') ) {
                 $user_id = get_current_user_id();
+                // Ensure the test task is assigned to the current user so Today includes it
+                update_post_meta( $task_id, 'ptt_assignee', $user_id );
+                // Ensure task has a visible status
+                $candidate_statuses = [ 'In Progress', 'Not Started', 'Completed', 'Blocked' ];
+                $assigned = false;
+                foreach ( $candidate_statuses as $name ) {
+                    $term = get_term_by( 'name', $name, 'task_status' );
+                    if ( $term && ! is_wp_error( $term ) ) { wp_set_object_terms( $task_id, [ $term->term_id ], 'task_status', false ); $assigned = true; break; }
+                }
                 $entries = \PTT_Today_Data_Provider::get_daily_entries( $user_id, $local_today_str, [] );
                 $found = false;
                 foreach ( $entries as $e ) { if ( $e['post_id'] === $task_id ) { $found = true; break; } }
