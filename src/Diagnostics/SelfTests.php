@@ -55,14 +55,18 @@ class SelfTests {
         // TEST 3 – Calculate Total Time (basic & rounding)
         $calc_post = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'CALC TEST POST', 'post_status' => 'publish' ] );
         if ( $calc_post && ! is_wp_error( $calc_post ) ) {
-            update_field( 'start_time', '2025-07-19 10:00:00', $calc_post );
-            update_field( 'stop_time',  '2025-07-19 11:30:00', $calc_post );
-            $duration = \ptt_calculate_and_save_duration( $calc_post );
-            $results[] = [ 'name' => 'Calculate Total Time (1h 30m)', 'status' => ( $duration === '1.50' ) ? 'Pass' : 'Fail', 'message' => ( $duration === '1.50' ) ? 'Correctly calculated 1.50 hours.' : "Calculation incorrect. Expected 1.50, got {$duration}." ];
-            update_field( 'start_time', '2025-07-19 12:00:00', $calc_post );
-            update_field( 'stop_time',  '2025-07-19 12:01:00', $calc_post );
-            $round = \ptt_calculate_and_save_duration( $calc_post );
-            $results[] = [ 'name' => 'Calculate Total Time (Rounding)', 'status' => ( $round === '0.02' ) ? 'Pass' : 'Fail', 'message' => ( $round === '0.02' ) ? 'Correctly rounded to 0.02 hours.' : "Expected 0.02 hours, got {$round}." ];
+            if ( function_exists('update_field') ) {
+                update_field( 'start_time', '2025-07-19 10:00:00', $calc_post );
+                update_field( 'stop_time',  '2025-07-19 11:30:00', $calc_post );
+                $duration = \ptt_calculate_and_save_duration( $calc_post );
+                $results[] = [ 'name' => 'Calculate Total Time (1h 30m)', 'status' => ( $duration === '1.50' ) ? 'Pass' : 'Fail', 'message' => ( $duration === '1.50' ) ? 'Correctly calculated 1.50 hours.' : "Calculation incorrect. Expected 1.50, got {$duration}." ];
+                update_field( 'start_time', '2025-07-19 12:00:00', $calc_post );
+                update_field( 'stop_time',  '2025-07-19 12:01:00', $calc_post );
+                $round = \ptt_calculate_and_save_duration( $calc_post );
+                $results[] = [ 'name' => 'Calculate Total Time (Rounding)', 'status' => ( $round === '0.02' ) ? 'Pass' : 'Fail', 'message' => ( $round === '0.02' ) ? 'Correctly rounded to 0.02 hours.' : "Expected 0.02 hours, got {$round}." ];
+            } else {
+                $results[] = [ 'name' => 'Calculate Total Time', 'status' => 'Skip', 'message' => 'ACF functions are not available; skipping duration calculation test.' ];
+            }
             wp_delete_post( $calc_post, true );
         } else {
             $results[] = [ 'name' => 'Calculate Total Time', 'status' => 'Fail', 'message' => 'Could not create post for calculation test.' ];
@@ -130,16 +134,20 @@ class SelfTests {
         $source_task = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Session Move Source', 'post_status' => 'publish' ] );
         $target_task = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Session Move Target', 'post_status' => 'publish' ] );
         if ( $source_task && ! is_wp_error( $source_task ) && $target_task && ! is_wp_error( $target_task ) ) {
-            $session_data = [ 'session_title' => 'Move Test', 'session_notes' => '', 'session_start_time' => '', 'session_stop_time' => '', 'session_manual_override' => 1, 'session_manual_duration' => 1.5, 'session_calculated_duration' => '1.50' ];
-            $row = add_row( 'sessions', $session_data, $source_task );
-            \ptt_calculate_and_save_duration( $source_task );
-            $move_result = \ptt_move_session_to_task( $source_task, $row - 1, $target_task );
-            $source_sessions = get_field( 'sessions', $source_task );
-            $target_sessions = get_field( 'sessions', $target_task );
-            $source_total = get_field( 'calculated_duration', $source_task );
-            $target_total = get_field( 'calculated_duration', $target_task );
-            $pass = ( $move_result !== false && empty( $source_sessions ) && is_array( $target_sessions ) && count( $target_sessions ) === 1 && $source_total === '0.00' && $target_total === '1.50' );
-            $results[] = [ 'name' => 'Move Session Between Tasks', 'status' => $pass ? 'Pass' : 'Fail', 'message' => $pass ? 'Session reassigned successfully.' : 'Failed to reassign session correctly.' ];
+            if ( function_exists('add_row') && function_exists('get_field') ) {
+                $session_data = [ 'session_title' => 'Move Test', 'session_notes' => '', 'session_start_time' => '', 'session_stop_time' => '', 'session_manual_override' => 1, 'session_manual_duration' => 1.5, 'session_calculated_duration' => '1.50' ];
+                $row = add_row( 'sessions', $session_data, $source_task );
+                \ptt_calculate_and_save_duration( $source_task );
+                $move_result = \ptt_move_session_to_task( $source_task, $row - 1, $target_task );
+                $source_sessions = get_field( 'sessions', $source_task );
+                $target_sessions = get_field( 'sessions', $target_task );
+                $source_total = get_field( 'calculated_duration', $source_task );
+                $target_total = get_field( 'calculated_duration', $target_task );
+                $pass = ( $move_result !== false && empty( $source_sessions ) && is_array( $target_sessions ) && count( $target_sessions ) === 1 && $source_total === '0.00' && $target_total === '1.50' );
+                $results[] = [ 'name' => 'Move Session Between Tasks', 'status' => $pass ? 'Pass' : 'Fail', 'message' => $pass ? 'Session reassigned successfully.' : 'Failed to reassign session correctly.' ];
+            } else {
+                $results[] = [ 'name' => 'Move Session Between Tasks', 'status' => 'Skip', 'message' => 'ACF functions are not available; skipping session move test.' ];
+            }
             wp_delete_post( $source_task, true ); wp_delete_post( $target_task, true );
         } else {
             $results[] = [ 'name' => 'Move Session Between Tasks', 'status' => 'Fail', 'message' => 'Could not create test tasks for session move.' ];
@@ -148,35 +156,35 @@ class SelfTests {
         // TEST 12 – Manual Session Auto-Timestamping
         $timestamp_post = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'SELF TEST - AUTO TIMESTAMP', 'post_status' => 'publish' ] );
         if ( $timestamp_post && ! is_wp_error( $timestamp_post ) ) {
-            $session_row = [ 'session_title' => 'Manual session to be timestamped', 'session_start_time' => '', 'session_manual_override' => 1, 'session_manual_duration' => 0.5 ];
-            update_field( 'sessions', [ $session_row ], $timestamp_post );
-            $saved_pre = get_field( 'sessions', $timestamp_post );
-            if ( empty( $saved_pre[0]['session_start_time'] ) && ! empty( $saved_pre[0]['field_ptt_session_start_time'] ) ) {
-                $saved_pre[0]['session_start_time'] = $saved_pre[0]['field_ptt_session_start_time'];
-                $saved_pre[0]['session_stop_time']  = $saved_pre[0]['field_ptt_session_stop_time'];
+            if ( function_exists('update_field') && function_exists('get_field') ) {
+                $session_row = [ 'session_title' => 'Manual session to be timestamped', 'session_start_time' => '', 'session_manual_override' => 1, 'session_manual_duration' => 0.5 ];
+                update_field( 'sessions', [ $session_row ], $timestamp_post );
+                $saved_pre = get_field( 'sessions', $timestamp_post );
+                if ( empty( $saved_pre[0]['session_start_time'] ) && ! empty( $saved_pre[0]['field_ptt_session_start_time'] ) ) {
+                    $saved_pre[0]['session_start_time'] = $saved_pre[0]['field_ptt_session_start_time'];
+                    $saved_pre[0]['session_stop_time']  = $saved_pre[0]['field_ptt_session_stop_time'];
+                }
+                if ( function_exists( 'ptt_ensure_manual_session_timestamps' ) ) { \ptt_ensure_manual_session_timestamps( $timestamp_post ); }
+                $saved = get_field( 'sessions', $timestamp_post );
+                $pass = false; $fail = 'An unknown error occurred during verification.'; $debug = '';
+                if ( empty( $saved ) || ! is_array( $saved ) ) { $fail = 'Failed at step 1: The session data was not saved or was empty after retrieval.'; }
+                else {
+                    $first = $saved[0];
+                    if ( empty( $first['session_start_time'] ) ) { $fail = 'Failed at step 2: The session start time was not automatically populated.'; }
+                    elseif ( $first['session_start_time'] !== $first['session_stop_time'] ) { $fail = 'Failed at step 3: The session start and stop times were populated but do not match.'; }
+                    else { $pass = true; }
+                }
+                $results[] = [ 'name' => 'Manual Session Auto-Timestamping', 'status' => $pass ? 'Pass' : 'Fail', 'message' => $pass ? 'A manual session without a date was correctly timestamped on save.' : $fail . $debug ];
+            } else {
+                $results[] = [ 'name' => 'Manual Session Auto-Timestamping', 'status' => 'Skip', 'message' => 'ACF functions are not available; skipping auto-timestamping test.' ];
             }
-            if ( function_exists( 'ptt_ensure_manual_session_timestamps' ) ) { \ptt_ensure_manual_session_timestamps( $timestamp_post ); }
-            $saved = get_field( 'sessions', $timestamp_post );
-            $pass = false; $fail = 'An unknown error occurred during verification.'; $debug = '';
-            if ( empty( $saved ) || ! is_array( $saved ) ) { $fail = 'Failed at step 1: The session data was not saved or was empty after retrieval.'; }
-            else {
-                $first = $saved[0];
-                if ( empty( $first['session_start_time'] ) ) { $fail = 'Failed at step 2: The session start time was not automatically populated.'; }
-                elseif ( $first['session_start_time'] !== $first['session_stop_time'] ) { $fail = 'Failed at step 3: The session start and stop times were populated but do not match.'; }
-                else { $pass = true; }
-            }
-            $results[] = [ 'name' => 'Manual Session Auto-Timestamping', 'status' => $pass ? 'Pass' : 'Fail', 'message' => $pass ? 'A manual session without a date was correctly timestamped on save.' : $fail . $debug ];
             wp_delete_post( $timestamp_post, true );
         } else {
             $results[] = [ 'name' => 'Manual Session Auto-Timestamping', 'status' => 'Fail', 'message' => 'Could not create the test post required for the test.' ];
         }
 
         // TEST 8 – Data Structure Integrity (full sweep)
-        if (function_exists('ptt_test_data_structure_integrity')) {
-            $results = array_merge($results, ptt_test_data_structure_integrity());
-        } else {
-            $results = array_merge($results, self::dataStructureIntegrity());
-        }
+        $results = array_merge($results, self::dataStructureIntegrityLegacy());
 
         // TEST – Reports Assets Enqueued on Reports Page
         ob_start();
@@ -281,5 +289,119 @@ class SelfTests {
         }
         return $results;
     }
-}
 
+    // Full legacy-detailed integrity suite (ported from self-test.php -> ptt_test_data_structure_integrity)
+    private static function dataStructureIntegrityLegacy(): array {
+        $results = [];
+        // Post Type Registration
+        $post_types = get_post_types( [], 'objects' );
+        $project_task_exists = isset( $post_types['project_task'] );
+        $results[] = [ 'name' => 'Post Type: project_task', 'status' => $project_task_exists ? 'Pass' : 'Fail', 'message' => $project_task_exists ? 'project_task post type is properly registered.' : 'CRITICAL: project_task post type is missing!' ];
+
+        // Taxonomy Registration
+        $taxonomies = get_taxonomies( [], 'objects' );
+        foreach ( ['client','project','task_status'] as $taxonomy ) {
+            $exists = isset( $taxonomies[$taxonomy] );
+            $results[] = [ 'name' => "Taxonomy: {$taxonomy}", 'status' => $exists ? 'Pass' : 'Fail', 'message' => $exists ? "$taxonomy taxonomy is properly registered." : "CRITICAL: {$taxonomy} taxonomy is missing!" ];
+        }
+
+        // ACF Field Groups
+        if ( function_exists( 'acf_get_field_groups' ) ) {
+            $field_groups = acf_get_field_groups();
+            foreach ( ['group_ptt_task_fields','group_ptt_project_fields'] as $group_key ) {
+                $group_exists = false;
+                foreach ( $field_groups as $group ) { if ( ($group['key'] ?? '') === $group_key ) { $group_exists = true; break; } }
+                $results[] = [ 'name' => "ACF Group: {$group_key}", 'status' => $group_exists ? 'Pass' : 'Fail', 'message' => $group_exists ? "ACF field group {$group_key} exists." : "CRITICAL: ACF field group {$group_key} is missing!" ];
+            }
+        } else {
+            $results[] = [ 'name' => 'ACF Plugin', 'status' => 'Fail', 'message' => 'CRITICAL: ACF Pro is not active or acf_get_field_groups() function is missing!' ];
+        }
+
+        // Core Task Fields
+        if ( function_exists( 'acf_get_field' ) ) {
+            $required_fields = [
+                'field_ptt_task_max_budget' => 'task_max_budget',
+                'field_ptt_task_deadline' => 'task_deadline',
+                'field_ptt_start_time' => 'start_time',
+                'field_ptt_stop_time' => 'stop_time',
+                'field_ptt_calculated_duration' => 'calculated_duration',
+                'field_ptt_manual_override' => 'manual_override',
+                'field_ptt_manual_duration' => 'manual_duration',
+                'field_ptt_sessions' => 'sessions',
+            ];
+            foreach ( $required_fields as $field_key => $field_name ) {
+                $field = acf_get_field( $field_key );
+                $exists = ( $field && ($field['name'] ?? null) === $field_name );
+                $results[] = [ 'name' => "Task Field: {$field_name}", 'status' => $exists ? 'Pass' : 'Fail', 'message' => $exists ? "Task field {$field_name} ({$field_key}) exists." : "CRITICAL: Task field {$field_name} ({$field_key}) is missing!" ];
+            }
+        }
+
+        // Sessions repeater sub-fields
+        if ( function_exists( 'acf_get_field' ) ) {
+            $sessions_field = acf_get_field( 'field_ptt_sessions' );
+            if ( $sessions_field && isset( $sessions_field['sub_fields'] ) ) {
+                $required_session_fields = [
+                    'field_ptt_session_title' => 'session_title',
+                    'field_ptt_session_notes' => 'session_notes',
+                    'field_ptt_session_start_time' => 'session_start_time',
+                    'field_ptt_session_stop_time' => 'session_stop_time',
+                    'field_ptt_session_manual_override' => 'session_manual_override',
+                    'field_ptt_session_manual_duration' => 'session_manual_duration',
+                    'field_ptt_session_calculated_duration' => 'session_calculated_duration',
+                    'field_ptt_session_timer_controls' => 'session_timer_controls',
+                ];
+                $session_field_keys = array_column( $sessions_field['sub_fields'], 'key' );
+                foreach ( $required_session_fields as $field_key => $field_name ) {
+                    $exists = in_array( $field_key, $session_field_keys, true );
+                    $results[] = [ 'name' => "Session Field: {$field_name}", 'status' => $exists ? 'Pass' : 'Fail', 'message' => $exists ? "Session field {$field_name} ({$field_key}) exists." : "CRITICAL: Session field {$field_name} ({$field_key}) is missing!" ];
+                }
+            } else {
+                $results[] = [ 'name' => 'Sessions Repeater Structure', 'status' => 'Fail', 'message' => 'CRITICAL: Sessions repeater field structure is missing or malformed!' ];
+            }
+        }
+
+        // Project Fields
+        if ( function_exists( 'acf_get_field' ) ) {
+            $required_project_fields = [
+                'field_ptt_project_max_budget' => 'project_max_budget',
+                'field_ptt_project_deadline' => 'project_deadline',
+            ];
+            foreach ( $required_project_fields as $field_key => $field_name ) {
+                $field = acf_get_field( $field_key );
+                $exists = ( $field && ($field['name'] ?? null) === $field_name );
+                $results[] = [ 'name' => "Project Field: {$field_name}", 'status' => $exists ? 'Pass' : 'Fail', 'message' => $exists ? "Project field {$field_name} ({$field_key}) exists." : "CRITICAL: Project field {$field_name} ({$field_key}) is missing!" ];
+            }
+        }
+
+        // Core functions exist
+        foreach ( [ 'ptt_get_tasks_for_user','ptt_calculate_and_save_duration','ptt_get_total_sessions_duration','ptt_calculate_session_duration','ptt_get_active_session_index_for_user' ] as $fn ) {
+            $exists = function_exists( $fn );
+            $results[] = [ 'name' => "Function: {$fn}", 'status' => $exists ? 'Pass' : 'Fail', 'message' => $exists ? "Core function {$fn}() exists." : "CRITICAL: Core function {$fn}() is missing!" ];
+        }
+
+        // Database tables (core)
+        global $wpdb;
+        $required_tables = [ $wpdb->posts => 'posts', $wpdb->postmeta => 'postmeta', $wpdb->terms => 'terms', $wpdb->term_taxonomy => 'term_taxonomy', $wpdb->term_relationships => 'term_relationships' ];
+        foreach ( $required_tables as $table => $name ) {
+            $table_exists = ( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) === $table );
+            $results[] = [ 'name' => "Database Table: {$name}", 'status' => $table_exists ? 'Pass' : 'Fail', 'message' => $table_exists ? "Database table {$name} exists." : "CRITICAL: Database table {$name} is missing!" ];
+        }
+
+        // Sample data validation (optional)
+        $sample_tasks = get_posts( [ 'post_type' => 'project_task', 'numberposts' => 1, 'post_status' => 'any' ] );
+        if ( ! empty( $sample_tasks ) ) {
+            $sample_task = $sample_tasks[0];
+            $calculated_duration = function_exists('get_field') ? get_field( 'calculated_duration', $sample_task->ID ) : false;
+            $sessions = function_exists('get_field') ? get_field( 'sessions', $sample_task->ID ) : false;
+            $results[] = [ 'name' => 'Sample Data: ACF Field Retrieval', 'status' => ( $calculated_duration !== false || $sessions !== false ) ? 'Pass' : 'Fail', 'message' => ( $calculated_duration !== false || $sessions !== false ) ? 'ACF fields can be retrieved from existing tasks.' : 'WARNING: Cannot retrieve ACF fields from existing tasks.' ];
+            $projects = get_the_terms( $sample_task->ID, 'project' );
+            $clients = get_the_terms( $sample_task->ID, 'client' );
+            $results[] = [ 'name' => 'Sample Data: Taxonomy Relationships', 'status' => ( ! is_wp_error( $projects ) && ! is_wp_error( $clients ) ) ? 'Pass' : 'Fail', 'message' => ( ! is_wp_error( $projects ) && ! is_wp_error( $clients ) ) ? 'Taxonomy relationships are functioning properly.' : 'WARNING: Issues detected with taxonomy relationships.' ];
+        } else {
+            $results[] = [ 'name' => 'Sample Data Validation', 'status' => 'Skip', 'message' => 'No existing tasks found - sample data validation skipped.' ];
+        }
+
+        return $results;
+    }
+
+}

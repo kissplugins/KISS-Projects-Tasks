@@ -119,10 +119,15 @@ class SelfTestController {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => 'Permission denied.' ] );
         }
-        $results = \KISS\PTT\Diagnostics\SelfTests::run();
-        $timestamp = current_time( 'timestamp' );
-        update_option( 'ptt_tests_last_run', $timestamp );
-        wp_send_json_success( [ 'results' => $results, 'time' => date_i18n( get_option( 'time_format' ), $timestamp ) ] );
+        try {
+            $results = \KISS\PTT\Diagnostics\SelfTests::run();
+            $timestamp = current_time( 'timestamp' );
+            update_option( 'ptt_tests_last_run', $timestamp );
+            wp_send_json_success( [ 'results' => $results, 'time' => date_i18n( get_option( 'time_format' ), $timestamp ) ] );
+        } catch (\Throwable $e) {
+            if ( function_exists('error_log') ) { error_log('[PTT] SelfTests error: ' . $e->getMessage()); }
+            wp_send_json_error( [ 'message' => 'Self-tests failed: ' . $e->getMessage() ] );
+        }
     }
 
     public static function ajaxSyncAuthors() {
