@@ -43,6 +43,22 @@ class Assets {
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce'    => wp_create_nonce('ptt_ajax_nonce'),
         ] );
+
+        // FSM bundles (Today + Editor share core; flags disabled by default)
+        wp_enqueue_script( 'ptt-fsm-timer-core', PTT_PLUGIN_URL . 'assets/js/fsm/timer/TimerFSM.js', [], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-timer-today', PTT_PLUGIN_URL . 'assets/js/fsm/timer/TodayEffects.js', [ 'ptt-fsm-timer-core', 'jquery' ], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-timer-today-controller', PTT_PLUGIN_URL . 'assets/js/fsm/timer/TodayTimerController.js', [ 'ptt-fsm-timer-today' ], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-timer-editor', PTT_PLUGIN_URL . 'assets/js/fsm/timer/EditorEffects.js', [ 'ptt-fsm-timer-core', 'jquery' ], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-timer-editor-controller', PTT_PLUGIN_URL . 'assets/js/fsm/timer/EditorTimerController.js', [ 'ptt-fsm-timer-editor' ], PTT_VERSION, true );
+        // FSM flags from settings (defaults ON). Applies to all users (internal testers).
+        $global = get_option('ptt_fsm_enabled', '1') === '1';
+        $today  = get_option('ptt_fsm_today_enabled', '1') === '1';
+        $editor = get_option('ptt_fsm_editor_enabled', '1') === '1';
+        wp_localize_script( 'ptt-fsm-timer-today-controller', 'PTT_FSM_FLAGS', [
+            'PTT_FSM_ENABLED' => $global,
+            'PTT_FSM_TODAY_ENABLED' => $global && $today,
+            'PTT_FSM_EDITOR_ENABLED' => $global && $editor,
+        ] );
     }
 }
 

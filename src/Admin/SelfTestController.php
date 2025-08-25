@@ -4,6 +4,8 @@ namespace KISS\PTT\Admin;
 class SelfTestController {
     public static function register() {
         add_action('admin_menu', [__CLASS__, 'menu'], 60);
+        add_action('admin_init', [__CLASS__, 'handleFlagSave']);
+
         add_action('wp_ajax_ptt_run_self_tests', [__CLASS__, 'ajaxRunSelfTests']);
         add_action('wp_ajax_ptt_sync_authors_assignee', [__CLASS__, 'ajaxSyncAuthors']);
     }
@@ -25,6 +27,16 @@ class SelfTestController {
             'ptt-changelog',
             [__CLASS__, 'renderChangelogPage']
         );
+    }
+
+    public static function handleFlagSave(){
+        if (!isset($_POST['ptt_flags_nonce'])) return;
+        if (!wp_verify_nonce($_POST['ptt_flags_nonce'], 'ptt_save_flags')) return;
+        if (!current_user_can('manage_options')) return;
+        update_option('ptt_fsm_enabled', isset($_POST['ptt_fsm_enabled']) ? '1' : '0');
+        update_option('ptt_fsm_today_enabled', isset($_POST['ptt_fsm_today_enabled']) ? '1' : '0');
+        update_option('ptt_fsm_editor_enabled', isset($_POST['ptt_fsm_editor_enabled']) ? '1' : '0');
+        add_action('admin_notices', function(){ echo '<div class="notice notice-success"><p>FSM flags saved.</p></div>'; });
     }
 
     // ------------------- Renderers -------------------
@@ -69,6 +81,20 @@ class SelfTestController {
                 echo '<p><span class="dashicons dashicons-yes" style="color:green;"></span> No issues detected.</p>';
             } else {
                 echo '<p><span class="dashicons dashicons-warning" style="color:#d35400;"></span> ' . count($issues) . ' warning(s) detected. ';
+
+            echo '<hr />';
+            echo '<h2>Feature Flags</h2>';
+            $global = get_option('ptt_fsm_enabled','1');
+            $today  = get_option('ptt_fsm_today_enabled','1');
+            $editor = get_option('ptt_fsm_editor_enabled','1');
+            echo '<form method="post">';
+            wp_nonce_field('ptt_save_flags','ptt_flags_nonce');
+            echo '<label><input type="checkbox" name="ptt_fsm_enabled" value="1" '.checked($global,'1',false).'> Enable FSM (global)</label><br />';
+            echo '<label><input type="checkbox" name="ptt_fsm_today_enabled" value="1" '.checked($today,'1',false).'> Today page</label><br />';
+            echo '<label><input type="checkbox" name="ptt_fsm_editor_enabled" value="1" '.checked($editor,'1',false).'> CPT Editor</label><br />';
+            echo '<p><button class="button button-primary">Save Flags</button></p>';
+            echo '</form>';
+
                 echo '<a href="' . esc_url( admin_url('edit.php?post_type=project_task&page=ptt-acf-schema') ) . '">View details</a>.</p>';
             }
             echo '</div>';

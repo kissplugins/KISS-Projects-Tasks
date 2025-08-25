@@ -104,11 +104,37 @@ Acceptance:
 - [ ] No duplicate event handlers remain
 - [ ] FSMs are pure and testable; effects mocked in tests
 
+
+### Dual‑Context Application (Today + Post Editor)
+
+- Core principle: A single pure TimerFSM reused across contexts; context differences live in Effects.
+- Effects interfaces are identical; each context provides its own DOM/AJAX wiring.
+
+Controllers and Effects:
+- TodayTimerController + TodayEffects
+- EditorTimerController + EditorEffects
+
+Feature flags:
+- window.PTT_FSM_ENABLED (global)
+- window.PTT_FSM_TODAY_ENABLED (scoped)
+- window.PTT_FSM_EDITOR_ENABLED (scoped)
+
+Benefits for the Post Editor:
+- Prevents “lost” sessions by making START/STOP idempotent and state‑aware
+- Guards against double‑starts when a session is already RUNNING elsewhere
+- Rehydration on load detects an existing running session and sets UI accordingly
+- Centralizes error handling (e.g., conflict_active_elsewhere) with consistent UI feedback
+
 ### Phase 4 – Optional enhancements
 - [ ] Local state persistence: store minimal FSM context in localStorage on transitions; restore when rehydration fails
 - [ ] Error taxonomy: network_error, permission_error, validation_error, conflict_active_elsewhere
 - [ ] Visualization: add simple diagram JSON and render in debug when ptt_debug=1 (or use XState Diagram later)
 - [ ] Replace hand‑rolled FSMs with XState if/when hierarchical states are needed
+
+- Progress note (v2.2.0‑alpha scaffolding): Added TimerFSM core, TodayEffects, TodayTimerController with flags off by default. No behavior changes yet; legacy handlers remain active.
+- Progress note (v2.2.1): Added Editor scaffolding (EditorEffects, EditorTimerController) with flags off; sharing TimerFSM core across contexts.
+
+
 
 ---
 

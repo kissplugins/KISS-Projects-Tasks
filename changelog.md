@@ -1,6 +1,35 @@
 # Changelog
 
 
+## Version 2.2.5 - FSM debug panels (semi‑permanent)
+- Added small on‑screen FSM debug panels for Today (bottom‑right) and Editor (bottom‑left) with Show toggle.
+- Note: Do not remove these panels unless explicitly requested; comments added in code for future maintainers/LLMs.
+
+
+## Version 2.2.4 - FSM flags in Settings (defaults ON)
+- Added Settings toggles for FSM (Global, Today, Editor) defaulting to ON; flags now read from options.
+
+
+## Version 2.2.3 - Enable Editor FSM for admins with ptt_debug=1
+- Editor FSM now enabled alongside Today when `?ptt_debug=1` is present for admin users.
+
+
+## Version 2.2.2 - Enable Today FSM for admins with ptt_debug=1
+- Localized flags now turn on TimerFSM on Today page for admin users when `?ptt_debug=1` is present.
+- Editor FSM remains disabled.
+
+
+## Version 2.2.1 - FSM scaffolding (Editor)
+- Added EditorEffects and EditorTimerController scaffolding (flags disabled by default; no behavior changes).
+- Enqueued bundles for Editor; using the same TimerFSM core.
+
+
+## Version 2.2.0 - FSM Phase 1a scaffolding (Today)
+- Added TimerFSM core, TodayEffects, and TodayTimerController (feature flags disabled by default; no behavior change yet).
+- Enqueued FSM bundles on Today and Editor screens via admin assets; localized flags for future rollout.
+- Updated PROJECT-FSM.md with dual-context plan and scaffolding progress note.
+
+
 ## Version 2.1.9 - PSR-4 Sessions builder
 - Delegated Today session entry construction to src/Presentation/Today/EntryBuilder::buildSessionEntriesForDate.
 - Legacy provider now delegates; no UI changes.
