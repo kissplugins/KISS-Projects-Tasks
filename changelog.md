@@ -1,6 +1,11 @@
 # Changelog
 
 
+
+## Version 2.2.11 - PSR-4: Reports Helpers
+- Added KISS\\PTT\\Reports\\Helpers with formatTaskNotes() and getAssigneeName() read-only helpers.
+- Wired reports.php to use the new helpers with back-compat wrappers; no behavior changes.
+
 ## Version 2.2.10 - Preserve legacy detailed self-test count
 - SelfTests::run() now merges results from legacy ptt_test_data_structure_integrity() when available to keep the larger test count intact.
 

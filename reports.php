@@ -16,54 +16,22 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 /*===================================================================
- * Helper: Format Task Notes (URLs → links, truncate > 200 chars)
+ * Helper: Format Task Notes (URLs → links, truncate > 200 chars)
  *==================================================================*/
-function ptt_format_task_notes( $content, $max_length = 200 ) {
-	$content = wp_strip_all_tags( $content );
-	$content = trim( $content );
-
-	if ( empty( $content ) ) {
-		return '';
-	}
-
-	$truncated = false;
-	if ( strlen( $content ) > $max_length ) {
-		$content   = substr( $content, 0, $max_length - 3 );
-		$truncated = true;
-	}
-
-	$content = esc_html( $content );
-
-	$url_pattern = '/(https?:\/\/[^\s<>"{}|\\^`\[\]]+)/i';
-	$content     = preg_replace_callback(
-		$url_pattern,
-		function ( $m ) {
-			$url         = $m[1];
-			$display_url = strlen( $url ) > 50 ? substr( $url, 0, 47 ) . '…' : $url;
-			return '<a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . $display_url . '</a>';
-		},
-		$content
-	);
-
-	if ( $truncated ) {
-		$content .= '…';
-	}
-
-	return $content;
+if ( ! function_exists( 'ptt_format_task_notes' ) ) {
+    function ptt_format_task_notes( $content, $max_length = 200 ) {
+        return \KISS\PTT\Reports\Helpers::formatTaskNotes( $content, (int) $max_length );
+    }
 }
 
 /**
  * Retrieves the Assignee display name for a task.
- *
- * @param int $post_id Task ID.
- * @return string Assignee name or "No Assignee".
+ * Back-compat wrapper for PSR-4 helper.
  */
-function ptt_get_assignee_name( $post_id ) {
-       $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );
-       if ( $assignee_id ) {
-               return get_the_author_meta( 'display_name', $assignee_id );
-       }
-       return __( 'No Assignee', 'ptt' );
+if ( ! function_exists( 'ptt_get_assignee_name' ) ) {
+    function ptt_get_assignee_name( $post_id ) {
+        return \KISS\PTT\Reports\Helpers::getAssigneeName( (int) $post_id );
+    }
 }
 
 /*===================================================================
@@ -82,25 +50,12 @@ function ptt_add_reports_page() {
 add_action( 'admin_menu', 'ptt_add_reports_page' );
 
 /*===================================================================
- * Handle sort-by-status cookie early
+ * Handle sort-by-status cookie early (delegates to PSR-4)
  *==================================================================*/
-function ptt_handle_sort_status_cookie() {
-       if ( ! isset( $_GET['page'] ) || 'ptt-reports' !== $_GET['page'] ) {
-               return;
-       }
-
-       if ( ! current_user_can( 'edit_posts' ) ) {
-               return;
-       }
-
-       if ( isset( $_GET['run_report'] ) ) {
-               $sort_pref = isset( $_GET['sort_status'] ) ? sanitize_text_field( $_GET['sort_status'] ) : 'default';
-               if ( isset( $_GET['remember_sort'] ) && '1' === $_GET['remember_sort'] ) {
-                       setcookie( 'ptt_sort_status', $sort_pref, time() + YEAR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN );
-               } else {
-                       setcookie( 'ptt_sort_status', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
-               }
-       }
+if ( ! function_exists( 'ptt_handle_sort_status_cookie' ) ) {
+    function ptt_handle_sort_status_cookie() {
+        \KISS\PTT\Reports\Preferences::handleSortStatusCookie();
+    }
 }
 add_action( 'admin_init', 'ptt_handle_sort_status_cookie' );
 
@@ -109,22 +64,14 @@ add_action( 'admin_init', 'ptt_handle_sort_status_cookie' );
  *==================================================================*/
 function ptt_reports_page_html() {
 
-		$saved_sort = isset( $_REQUEST['sort_status'] )
-			? sanitize_text_field( $_REQUEST['sort_status'] )
-			: ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
+		$saved_sort = \KISS\PTT\Reports\Preferences::getSavedSort();
 
 		$view_mode = isset( $_REQUEST['view_mode'] ) ? sanitize_text_field( $_REQUEST['view_mode'] ) : 'classic';
 		?>
 		<div class="wrap">
 				<h1>Project &amp; Task Time Reports</h1>
 
-		<div class="notice notice-info inline">
-			<p><strong>How the Date Filter Works:</strong></p>
-			<ul style="list-style: disc; padding-left: 20px;">
-				<li><strong>Classic &amp; Task Focused Views:</strong> The date range shows tasks that were either created or had work sessions logged within that period.</li>
-				<li><strong>Single Day View:</strong> The single date picker shows all tasks that were created or had work sessions logged on that specific day.</li>
-			</ul>
-		</div>
+		<?php echo \KISS\PTT\Reports\UI::dateFilterHelpHtml(); ?>
 
 		<form method="get" action="">
 			<?php wp_nonce_field( 'ptt_run_report_nonce' ); ?>
@@ -289,7 +236,7 @@ function ptt_display_report_results() {
        $status_id   = isset( $_REQUEST['status_id'] )   ? intval( $_REQUEST['status_id'] )   : 0;
        $start_date  = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
        $end_date    = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
-       $sort_status = isset( $_REQUEST['sort_status'] ) ? sanitize_text_field( $_REQUEST['sort_status'] ) : ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
+       $sort_status = \KISS\PTT\Reports\Preferences::getSavedSort();
        $view_mode   = isset( $_REQUEST['view_mode'] )   ? sanitize_text_field( $_REQUEST['view_mode'] )   : 'classic';
 
 	/*--------------------------------------------------------------
@@ -467,7 +414,7 @@ function ptt_display_report_results() {
 				$task_base = [
 					'id'              => $post_id,
 					'title'           => get_the_title(),
-                                       'assignee_name'   => ptt_get_assignee_name( $post_id ),
+                                       'assignee_name'   => \KISS\PTT\Reports\Helpers::getAssigneeName( (int) $post_id ),
 					'client_name'     => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
 					'project_name'    => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
 					'creation_date'   => get_the_date( 'Y-m-d', $post_id ),
