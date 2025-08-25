@@ -75,7 +75,8 @@ class SelfTestController {
         if ( class_exists('KISS\\PTT\\Integration\\ACF\\Diagnostics') ) {
             $issues = \KISS\PTT\Integration\ACF\Diagnostics::collectIssues();
             $hasIssues = !empty($issues);
-            echo '<div class="card" style="max-width:800px;">';
+            // Legacy ACF Schema card hidden now that it is part of main tests
+            echo '<div class="card ptt-legacy-acf-schema-card" style="display:none;max-width:800px;">';
             echo '<h2>ACF Schema Status</h2>';
             if (!$hasIssues) {
                 echo '<p><span class="dashicons dashicons-yes" style="color:green;"></span> No issues detected.</p>';
@@ -124,6 +125,18 @@ class SelfTestController {
         }
 
         $results = [];
+
+            // TEST 0 – ACF Schema Status (rolled into main group)
+            if ( class_exists('KISS\\PTT\\Integration\\ACF\\Diagnostics') ) {
+                $issues = \KISS\PTT\Integration\ACF\Diagnostics::collectIssues();
+                $ok = empty($issues);
+                $results[] = [
+                    'name'    => 'ACF Schema Status',
+                    'status'  => $ok ? 'Pass' : 'Fail',
+                    'message' => $ok ? 'All required ACF groups/fields look good.' : ( 'Warnings: ' . implode('; ', $issues) ),
+                ];
+            }
+
 
         // TEST 1 – Task Post Save & Assignee Update
         $test_post_id = wp_insert_post( [

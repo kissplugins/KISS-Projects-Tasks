@@ -1,6 +1,14 @@
 # Changelog
 
 
+## Version 2.2.7 - Hide legacy ACF Schema card
+- Hidden the large ACF Schema Status card on Settings page now that it’s part of the main self-tests summary.
+
+
+## Version 2.2.6 - ACF Schema Status rolled into main self-tests
+- The "ACF Schema Status" is now part of the main Self-Test group so the summary includes it.
+
+
 ## Version 2.2.5 - FSM debug panels (semi‑permanent)
 - Added small on‑screen FSM debug panels for Today (bottom‑right) and Editor (bottom‑left) with Show toggle.
 - Note: Do not remove these panels unless explicitly requested; comments added in code for future maintainers/LLMs.

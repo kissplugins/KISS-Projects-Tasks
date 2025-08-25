@@ -119,6 +119,9 @@ Feature flags:
 - window.PTT_FSM_TODAY_ENABLED (scoped)
 - window.PTT_FSM_EDITOR_ENABLED (scoped)
 
+
+Note: As of v2.2.4, these flags are controlled via Settings (options: ptt_fsm_enabled, ptt_fsm_today_enabled, ptt_fsm_editor_enabled) and default to ON for internal users; no URL param required.
+
 Benefits for the Post Editor:
 - Prevents “lost” sessions by making START/STOP idempotent and state‑aware
 - Guards against double‑starts when a session is already RUNNING elsewhere
@@ -130,6 +133,8 @@ Benefits for the Post Editor:
 - [ ] Error taxonomy: network_error, permission_error, validation_error, conflict_active_elsewhere
 - [ ] Visualization: add simple diagram JSON and render in debug when ptt_debug=1 (or use XState Diagram later)
 - [ ] Replace hand‑rolled FSMs with XState if/when hierarchical states are needed
+- Progress note (v2.2.4): FSM flags moved to Settings (default ON). Panels added for semi‑permanent debug on Today & Editor in v2.2.5. ACF Schema test included in main self‑tests in v2.2.6; legacy card hidden in v2.2.7.
+
 
 - Progress note (v2.2.0‑alpha scaffolding): Added TimerFSM core, TodayEffects, TodayTimerController with flags off by default. No behavior changes yet; legacy handlers remain active.
 - Progress note (v2.2.1): Added Editor scaffolding (EditorEffects, EditorTimerController) with flags off; sharing TimerFSM core across contexts.
