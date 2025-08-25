@@ -1,6 +1,8 @@
 # Changelog
 
-
+## Version 2.2.12 - Function redeclaration fix + timezone documentation
+- Fixed fatal error: Cannot redeclare ptt_get_active_session_index_for_user() by adding function_exists() check in helpers.php.
+- Added PROJECT-TIMEZONE.md documenting timezone handling architecture, potential issues, and recommendations.
 
 ## Version 2.2.11 - PSR-4: Reports Helpers
 - Added KISS\\PTT\\Reports\\Helpers with formatTaskNotes() and getAssigneeName() read-only helpers.

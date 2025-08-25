@@ -1,5 +1,40 @@
 # Roadmap
 
+## Human QA Testing
+Missing: A comprehensive end-to-end test that simulates real user workflow.
+
+My Thoughts on Your "Special 15 Minute End to End Test" Idea
+This is an excellent idea for several reasons:
+
+Real-world validation - Tests the actual user journey, not just isolated functions
+User confidence - Gives users a way to verify everything works before using it for real work
+Debugging aid - When users report issues, you can ask them to run this test first
+Demo functionality - New users can see how the plugin works without creating real data
+Regression testing - After updates, users can quickly verify nothing broke
+Proposed Implementation
+I suggest creating a "Demo & Test" page that:
+
+Opens in a new tab (as you suggested) to avoid disrupting their current work
+Creates temporary demo data with clear naming (e.g., "DEMO - Client ABC", "DEMO - Project XYZ")
+Walks through the complete workflow:
+Create a client
+Create a project under that client
+Create a task under that project
+Start a timer session
+Stop the timer after a few seconds
+Show the results on the Today page
+Provides step-by-step feedback showing what's happening
+Cleans up after itself (with user confirmation)
+Includes a "Skip to Results" option for quick validation
+Would you like me to implement this "15 Minute End to End Test" page? I can:
+
+Create a new admin page accessible from the Tasks menu
+Build an interactive test that guides users through the complete workflow
+Make it open in a new tab as you suggested
+Include real-time progress indicators and validation
+Add cleanup functionality to remove demo data when done
+This would complement the existing self-tests perfectly - the current tests validate the technical foundation, while this new test would validate the user experience.
+
 ## NEXT MAJOR PROJECT: FSM
 
 - Objective: Introduce a Finite State Machine (FSM) architecture for the Today page to improve reliability, debuggability, and code clarity.
