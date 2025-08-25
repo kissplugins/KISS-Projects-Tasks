@@ -6,6 +6,7 @@
 
 - Documentation
   - Added PROJECT-FSM-v1.x.md outlining a phased Finite State Manager for the Today page to improve debugging and stability
+  - **Status:** NOT STARTED / PAUSED - DEFERRING TO PSR-4 CONVERSION version instead
 
 ## Version 1.12.10 - Project development log documentation
 
