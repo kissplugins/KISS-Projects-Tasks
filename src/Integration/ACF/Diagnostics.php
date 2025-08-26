@@ -28,16 +28,12 @@ class Diagnostics {
             }
         }
 
-        // Validate fields (keys, names, types)
+        // Validate fields (keys, names, types) - parent-level timer fields removed
         if ( function_exists('acf_get_field') ) {
             $expectedParents = [
                 'field_ptt_task_max_budget'      => ['name'=>'task_max_budget',      'type'=>'number'],
                 'field_ptt_task_deadline'        => ['name'=>'task_deadline',        'type'=>'date_time_picker', 'display_format'=>'Y-m-d H:i:s', 'return_format'=>'Y-m-d H:i:s'],
-                'field_ptt_start_time'           => ['name'=>'start_time',           'type'=>'date_time_picker', 'display_format'=>'Y-m-d H:i:s', 'return_format'=>'Y-m-d H:i:s'],
-                'field_ptt_stop_time'            => ['name'=>'stop_time',            'type'=>'date_time_picker', 'display_format'=>'Y-m-d H:i:s', 'return_format'=>'Y-m-d H:i:s'],
-                'field_ptt_calculated_duration'  => ['name'=>'calculated_duration',  'type'=>'text'],
-                'field_ptt_manual_override'      => ['name'=>'manual_override',      'type'=>'true_false'],
-                'field_ptt_manual_duration'      => ['name'=>'manual_duration',      'type'=>'number'],
+                'field_ptt_total_duration_display' => ['name'=>'total_duration_display', 'type'=>'text'],
                 'field_ptt_sessions'             => ['name'=>'sessions',             'type'=>'repeater'],
             ];
 

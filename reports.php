@@ -405,7 +405,12 @@ function ptt_display_report_results() {
 				}
 				$last_entry_date = ( $latest_session_timestamp > 0 ) ? date( 'Y-m-d', $latest_session_timestamp ) : '–';
 
-				$duration    = (float) get_field( 'calculated_duration', $post_id );
+				// Use new total duration display field or calculate on-demand
+				$duration = (float) get_field( 'total_duration_display', $post_id );
+				if ( !$duration && function_exists( 'ptt_calculate_and_save_duration' ) ) {
+					// Fallback: calculate on-demand if display field is empty
+					$duration = (float) ptt_calculate_and_save_duration( $post_id );
+				}
 				$grand_total += $duration;
 
 				$client_terms = get_the_terms( $post_id, 'client' );
@@ -585,7 +590,11 @@ function ptt_display_report_results() {
 					if ( $post_creation_date === $target_date_str ) {
 						$is_relevant_for_day = true;
 						$sort_timestamp      = get_the_date( 'U', $post_id );
-						$daily_duration      = (float) get_field( 'calculated_duration', $post_id );
+						// Use new total duration display field or calculate on-demand
+						$daily_duration = (float) get_field( 'total_duration_display', $post_id );
+						if ( !$daily_duration && function_exists( 'ptt_calculate_and_save_duration' ) ) {
+							$daily_duration = (float) ptt_calculate_and_save_duration( $post_id );
+						}
 					}
 				}
 
@@ -782,7 +791,11 @@ function ptt_display_report_results() {
 				}
 				$last_entry_date = ( $latest_session_timestamp > 0 ) ? date( 'Y-m-d', $latest_session_timestamp ) : '–';
 
-				$duration = (float) get_field( 'calculated_duration', $post_id );
+				// Use new total duration display field or calculate on-demand
+				$duration = (float) get_field( 'total_duration_display', $post_id );
+				if ( !$duration && function_exists( 'ptt_calculate_and_save_duration' ) ) {
+					$duration = (float) ptt_calculate_and_save_duration( $post_id );
+				}
 				$grand_total += $duration;
 
                                $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );

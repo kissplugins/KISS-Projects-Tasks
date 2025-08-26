@@ -1416,38 +1416,12 @@
 }
 
 /* =========================================
- * HIDE PARENT-LEVEL TIME TRACKING FIELDS
+ * PARENT-LEVEL TIMER FIELDS REMOVED
  * =========================================
- * Hide the parent-level timer and manual time entry fields
- * while preserving backend functionality for fallback calculations.
- *
- * To re-enable these fields, simply comment out or remove the CSS rules below.
- * The backend functionality remains intact for existing data and calculations.
+ * Parent-level timer fields have been removed from the ACF schema.
+ * Sessions repeater is now the single source of truth for all timer data.
+ * CSS rules no longer needed as fields don't exist in the schema.
  */
-
-/* Hide parent-level Start Time field */
-.acf-field[data-key="field_ptt_start_time"],
-.acf-field[data-name="start_time"] {
-    display: none !important;
-}
-
-/* Hide parent-level Stop Time field */
-.acf-field[data-key="field_ptt_stop_time"],
-.acf-field[data-name="stop_time"] {
-    display: none !important;
-}
-
-/* Hide parent-level Manual Time Entry toggle */
-.acf-field[data-key="field_ptt_manual_override"],
-.acf-field[data-name="manual_override"] {
-    display: none !important;
-}
-
-/* Hide parent-level Manual Duration field */
-.acf-field[data-key="field_ptt_manual_duration"],
-.acf-field[data-name="manual_duration"] {
-    display: none !important;
-}
 
 /* =========================================
  * DEBUG PANEL STYLES

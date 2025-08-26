@@ -183,11 +183,7 @@ function ptt_test_data_structure_integrity() {
             $required_fields = [
                 'field_ptt_task_max_budget' => 'task_max_budget',
                 'field_ptt_task_deadline' => 'task_deadline',
-                'field_ptt_start_time' => 'start_time',
-                'field_ptt_stop_time' => 'stop_time',
-                'field_ptt_calculated_duration' => 'calculated_duration',
-                'field_ptt_manual_override' => 'manual_override',
-                'field_ptt_manual_duration' => 'manual_duration',
+                'field_ptt_total_duration_display' => 'total_duration_display',
                 'field_ptt_sessions' => 'sessions',
             ];
 
@@ -321,16 +317,15 @@ function ptt_test_data_structure_integrity() {
     if ( ! empty( $sample_tasks ) ) {
         $sample_task = $sample_tasks[0];
 
-        // Check if ACF fields can be retrieved
-        $calculated_duration = get_field( 'calculated_duration', $sample_task->ID );
+        // Check if ACF session fields can be retrieved (calculated_duration field removed in v2.2.14)
         $sessions = get_field( 'sessions', $sample_task->ID );
 
         $results[] = [
             'name'    => 'Sample Data: ACF Field Retrieval',
-            'status'  => ( $calculated_duration !== false || $sessions !== false ) ? 'Pass' : 'Fail',
-            'message' => ( $calculated_duration !== false || $sessions !== false )
-                ? 'ACF fields can be retrieved from existing tasks.'
-                : 'WARNING: Cannot retrieve ACF fields from existing tasks.',
+            'status'  => ( $sessions !== false ) ? 'Pass' : 'Fail',
+            'message' => ( $sessions !== false )
+                ? 'ACF session fields can be retrieved from existing tasks.'
+                : 'WARNING: Cannot retrieve ACF session fields from existing tasks.',
         ];
 
         // Check taxonomy assignments

@@ -229,13 +229,13 @@ class SelfTestController {
             $exists = ( $wpdb->get_var( "SHOW TABLES LIKE '{$table}'" ) === $table );
             $results[] = [ 'name' => "Database Table: {$name}", 'status' => $exists ? 'Pass' : 'Fail', 'message' => $exists ? "Database table {$name} exists." : "CRITICAL: Database table {$name} is missing!" ];
         }
-        // Sample Data validation
+        // Sample Data validation (session-only approach)
         $sample_tasks = get_posts( [ 'post_type' => 'project_task', 'numberposts' => 1, 'post_status' => 'any' ] );
         if ( ! empty( $sample_tasks ) ) {
             $sample_task = $sample_tasks[0];
-            $calculated_duration = get_field( 'calculated_duration', $sample_task->ID );
+            // Test session field retrieval (calculated_duration field removed in v2.2.14)
             $sessions = get_field( 'sessions', $sample_task->ID );
-            $results[] = [ 'name' => 'Sample Data: ACF Field Retrieval', 'status' => ( $calculated_duration !== false || $sessions !== false ) ? 'Pass' : 'Fail', 'message' => ( $calculated_duration !== false || $sessions !== false ) ? 'ACF fields can be retrieved from existing tasks.' : 'WARNING: Cannot retrieve ACF fields from existing tasks.' ];
+            $results[] = [ 'name' => 'Sample Data: ACF Field Retrieval', 'status' => ( $sessions !== false ) ? 'Pass' : 'Fail', 'message' => ( $sessions !== false ) ? 'ACF session fields can be retrieved from existing tasks.' : 'WARNING: Cannot retrieve ACF session fields from existing tasks.' ];
             $projects = get_the_terms( $sample_task->ID, 'project' );
             $clients  = get_the_terms( $sample_task->ID, 'client' );
             $results[] = [ 'name' => 'Sample Data: Taxonomy Relationships', 'status' => ( ! is_wp_error( $projects ) && ! is_wp_error( $clients ) ) ? 'Pass' : 'Fail', 'message' => ( ! is_wp_error( $projects ) && ! is_wp_error( $clients ) ) ? 'Taxonomy relationships are functioning properly.' : 'WARNING: Issues detected with taxonomy relationships.' ];

@@ -494,10 +494,14 @@ function ptt_get_task_card_data( $post_id ) {
     $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );
     $assignee_name = $assignee_id ? get_the_author_meta( 'display_name', $assignee_id ) : __( 'Unassigned', 'ptt' );
     
-    // Get time logged - handle ACF not being available
+    // Get time logged - use new total duration display field or calculate on-demand
     $duration = 0;
     if ( function_exists( 'get_field' ) ) {
-        $duration = get_field( 'calculated_duration', $post_id );
+        $duration = get_field( 'total_duration_display', $post_id );
+        if ( !$duration && function_exists( 'ptt_calculate_and_save_duration' ) ) {
+            // Fallback: calculate on-demand if display field is empty
+            $duration = ptt_calculate_and_save_duration( $post_id );
+        }
         $duration = $duration ? floatval( $duration ) : 0;
     }
     

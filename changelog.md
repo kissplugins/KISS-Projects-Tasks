@@ -1,5 +1,60 @@
 # Changelog
 
+## Version 2.2.17 - Added total duration display field
+- **Added**: New "Total Duration (hrs)" read-only field in task edit screen that shows the sum of all session durations.
+- **Updated**: Calculator class now populates the total_duration_display field when calculating durations.
+- **Updated**: Reports and Kanban views now use the new total_duration_display field with fallback to on-demand calculation.
+- **Updated**: ACF diagnostics and self-tests include validation for the new total duration display field.
+- The total duration is now visible in the admin interface again, calculated from sessions only.
+
+## Version 2.2.16 - Fixed fatal errors from removed calculated_duration field
+- **Fixed**: Removed all references to calculated_duration field that was causing fatal errors in self-tests and other functions.
+- **Fixed**: Calculator class no longer tries to update the removed calculated_duration field.
+- **Updated**: Self-tests now use session-only approach for duration calculations and validation.
+- **Updated**: Sample data validation tests now check session fields instead of removed parent-level fields.
+
+## Version 2.2.15 - Fixed self-tests for session-only approach
+- **Fixed**: "Calculate Total Time" self-tests now use session repeater data instead of removed parent-level timer fields.
+- **Updated**: Self-tests create proper session entries with start/stop times for duration calculation testing.
+- Self-tests should now pass correctly with the new session-only architecture.
+
+## Version 2.2.14 - Single Source of Truth Migration
+- **BREAKING**: Removed parent-level timer fields from ACF schema (start_time, stop_time, calculated_duration, manual_override, manual_duration).
+- **Added**: Data migration tool accessible via Tasks → Data Migration to convert existing parent-level data to session format.
+- **Disabled**: Legacy AJAX handlers for parent-level timer operations to prevent dual storage conflicts.
+- **Updated**: All validation and detection functions to use session-only approach.
+- **Updated**: Calculator class to use sessions-only for duration calculations (no parent-level fallback).
+- Sessions repeater is now the single source of truth for all timer data.
+
+### Migration Instructions (IMPORTANT)
+**If you have existing timer data, you MUST run the migration tool:**
+
+1. **Access Migration Tool**: Go to WordPress Admin → Tasks → Data Migration
+2. **Review Preview**: The tool will show all tasks with parent-level timer data that need migration
+3. **Run Dry Run** (Optional): Click "Dry Run" to preview what will happen without making changes
+4. **Start Migration**: Click "Start Migration" to convert all parent-level data to session format
+5. **Monitor Progress**: Watch the real-time progress bar and log for any issues
+6. **Verify Results**: Check that your existing timer data appears correctly in the Sessions repeater
+
+**What the migration does:**
+- Converts parent-level timer data (start_time, stop_time, duration) to session repeater entries
+- Preserves all timing data and manual overrides
+- Creates backup of original data before migration
+- Clears parent-level fields after successful migration
+- Skips tasks that already have sessions to avoid duplicates
+
+**After migration:**
+- All timer functionality will use the Sessions repeater exclusively
+- Parent-level timer fields no longer exist in the admin interface
+- Existing workflows remain the same, but data is stored in session format
+- Reports and calculations will use session data only
+
+**Note**: This migration is one-way. Once completed, you cannot revert to parent-level timer fields without restoring from a database backup.
+
+## Version 2.2.13 - Today page duplicate entries fix
+- Fixed Today page showing duplicate entries for Quick Start tasks (both "created" and session entries on same day).
+- Added logic to suppress task-level "created" entries when session entries exist for the same date.
+
 ## Version 2.2.12 - Function redeclaration fix + timezone documentation
 - Fixed fatal error: Cannot redeclare ptt_get_active_session_index_for_user() by adding function_exists() check in helpers.php.
 - Added PROJECT-TIMEZONE.md documenting timezone handling architecture, potential issues, and recommendations.

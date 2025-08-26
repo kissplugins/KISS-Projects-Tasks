@@ -389,8 +389,8 @@ function ptt_disable_parent_level_timer_handlers() {
     remove_action( 'wp_ajax_ptt_save_manual_time', 'ptt_save_manual_time_callback' );
     remove_action( 'wp_ajax_ptt_force_stop_timer', 'ptt_force_stop_timer_callback' );
 }
-// Uncomment the line below to disable parent-level timer handlers
-// add_action( 'init', 'ptt_disable_parent_level_timer_handlers', 20 );
+// Disable parent-level timer handlers to enforce session-only storage (single source of truth)
+add_action( 'init', 'ptt_disable_parent_level_timer_handlers', 20 );
 
 /**
  * AJAX handler to start a session timer.

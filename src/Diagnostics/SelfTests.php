@@ -52,18 +52,35 @@ class SelfTests {
             $results[] = [ 'name' => 'Create Client & Project', 'status' => 'Fail', 'message' => 'Failed to create test taxonomies.' ];
         }
 
-        // TEST 3 – Calculate Total Time (basic & rounding)
+        // TEST 3 – Calculate Total Time (session-based approach)
         $calc_post = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'CALC TEST POST', 'post_status' => 'publish' ] );
         if ( $calc_post && ! is_wp_error( $calc_post ) ) {
             if ( function_exists('update_field') ) {
-                update_field( 'start_time', '2025-07-19 10:00:00', $calc_post );
-                update_field( 'stop_time',  '2025-07-19 11:30:00', $calc_post );
+                // Test 1: 1h 30m session (10:00 to 11:30)
+                $session_1h30m = [
+                    'session_title' => 'Test Session 1h30m',
+                    'session_start_time' => '2025-07-19 10:00:00',
+                    'session_stop_time' => '2025-07-19 11:30:00',
+                    'session_manual_override' => false,
+                    'session_manual_duration' => '',
+                ];
+                update_field( 'sessions', [ $session_1h30m ], $calc_post );
                 $duration = \ptt_calculate_and_save_duration( $calc_post );
-                $results[] = [ 'name' => 'Calculate Total Time (1h 30m)', 'status' => ( $duration === '1.50' ) ? 'Pass' : 'Fail', 'message' => ( $duration === '1.50' ) ? 'Correctly calculated 1.50 hours.' : "Calculation incorrect. Expected 1.50, got {$duration}." ];
-                update_field( 'start_time', '2025-07-19 12:00:00', $calc_post );
-                update_field( 'stop_time',  '2025-07-19 12:01:00', $calc_post );
-                $round = \ptt_calculate_and_save_duration( $calc_post );
-                $results[] = [ 'name' => 'Calculate Total Time (Rounding)', 'status' => ( $round === '0.02' ) ? 'Pass' : 'Fail', 'message' => ( $round === '0.02' ) ? 'Correctly rounded to 0.02 hours.' : "Expected 0.02 hours, got {$round}." ];
+                $results[] = [ 'name' => 'Calculate Total Time (1h 30m)', 'status' => ( $duration === '1.50' ) ? 'Pass' : 'Fail', 'message' => ( $duration === '1.50' ) ? 'Correctly calculated 1.50 hours from session.' : "Calculation incorrect. Expected 1.50, got {$duration}." ];
+
+                // Test 2: 1 minute session (12:00 to 12:01) - should round to 0.02 hours
+                $session_1min = [
+                    'session_title' => 'Test Session 1min',
+                    'session_start_time' => '2025-07-19 12:00:00',
+                    'session_stop_time' => '2025-07-19 12:01:00',
+                    'session_manual_override' => false,
+                    'session_manual_duration' => '',
+                ];
+                update_field( 'sessions', [ $session_1h30m, $session_1min ], $calc_post );
+                $total_duration = \ptt_calculate_and_save_duration( $calc_post );
+                // Total should be 1.50 + 0.02 = 1.52 (1h30m + 1min rounded)
+                $expected_total = 1.52; // 1.50 + 0.02
+                $results[] = [ 'name' => 'Calculate Total Time (Rounding)', 'status' => ( abs((float)$total_duration - $expected_total) < 0.01 ) ? 'Pass' : 'Fail', 'message' => ( abs((float)$total_duration - $expected_total) < 0.01 ) ? 'Correctly calculated and rounded session durations.' : "Expected ~{$expected_total} hours, got {$total_duration}." ];
             } else {
                 $results[] = [ 'name' => 'Calculate Total Time', 'status' => 'Skip', 'message' => 'ACF functions are not available; skipping duration calculation test.' ];
             }
@@ -141,8 +158,9 @@ class SelfTests {
                 $move_result = \ptt_move_session_to_task( $source_task, $row - 1, $target_task );
                 $source_sessions = get_field( 'sessions', $source_task );
                 $target_sessions = get_field( 'sessions', $target_task );
-                $source_total = get_field( 'calculated_duration', $source_task );
-                $target_total = get_field( 'calculated_duration', $target_task );
+                // Calculate totals using session-only approach (calculated_duration field removed)
+                $source_total = \ptt_calculate_and_save_duration( $source_task );
+                $target_total = \ptt_calculate_and_save_duration( $target_task );
                 $pass = ( $move_result !== false && empty( $source_sessions ) && is_array( $target_sessions ) && count( $target_sessions ) === 1 && $source_total === '0.00' && $target_total === '1.50' );
                 $results[] = [ 'name' => 'Move Session Between Tasks', 'status' => $pass ? 'Pass' : 'Fail', 'message' => $pass ? 'Session reassigned successfully.' : 'Failed to reassign session correctly.' ];
             } else {
@@ -317,16 +335,12 @@ class SelfTests {
             $results[] = [ 'name' => 'ACF Plugin', 'status' => 'Fail', 'message' => 'CRITICAL: ACF Pro is not active or acf_get_field_groups() function is missing!' ];
         }
 
-        // Core Task Fields
+        // Core Task Fields (parent-level timer fields removed - session-only approach)
         if ( function_exists( 'acf_get_field' ) ) {
             $required_fields = [
                 'field_ptt_task_max_budget' => 'task_max_budget',
                 'field_ptt_task_deadline' => 'task_deadline',
-                'field_ptt_start_time' => 'start_time',
-                'field_ptt_stop_time' => 'stop_time',
-                'field_ptt_calculated_duration' => 'calculated_duration',
-                'field_ptt_manual_override' => 'manual_override',
-                'field_ptt_manual_duration' => 'manual_duration',
+                'field_ptt_total_duration_display' => 'total_duration_display',
                 'field_ptt_sessions' => 'sessions',
             ];
             foreach ( $required_fields as $field_key => $field_name ) {
@@ -387,13 +401,13 @@ class SelfTests {
             $results[] = [ 'name' => "Database Table: {$name}", 'status' => $table_exists ? 'Pass' : 'Fail', 'message' => $table_exists ? "Database table {$name} exists." : "CRITICAL: Database table {$name} is missing!" ];
         }
 
-        // Sample data validation (optional)
+        // Sample data validation (session-only approach)
         $sample_tasks = get_posts( [ 'post_type' => 'project_task', 'numberposts' => 1, 'post_status' => 'any' ] );
         if ( ! empty( $sample_tasks ) ) {
             $sample_task = $sample_tasks[0];
-            $calculated_duration = function_exists('get_field') ? get_field( 'calculated_duration', $sample_task->ID ) : false;
+            // Test session field retrieval (calculated_duration field removed in v2.2.14)
             $sessions = function_exists('get_field') ? get_field( 'sessions', $sample_task->ID ) : false;
-            $results[] = [ 'name' => 'Sample Data: ACF Field Retrieval', 'status' => ( $calculated_duration !== false || $sessions !== false ) ? 'Pass' : 'Fail', 'message' => ( $calculated_duration !== false || $sessions !== false ) ? 'ACF fields can be retrieved from existing tasks.' : 'WARNING: Cannot retrieve ACF fields from existing tasks.' ];
+            $results[] = [ 'name' => 'Sample Data: ACF Field Retrieval', 'status' => ( $sessions !== false ) ? 'Pass' : 'Fail', 'message' => ( $sessions !== false ) ? 'ACF session fields can be retrieved from existing tasks.' : 'WARNING: Cannot retrieve ACF session fields from existing tasks.' ];
             $projects = get_the_terms( $sample_task->ID, 'project' );
             $clients = get_the_terms( $sample_task->ID, 'client' );
             $results[] = [ 'name' => 'Sample Data: Taxonomy Relationships', 'status' => ( ! is_wp_error( $projects ) && ! is_wp_error( $clients ) ) ? 'Pass' : 'Fail', 'message' => ( ! is_wp_error( $projects ) && ! is_wp_error( $clients ) ) ? 'Taxonomy relationships are functioning properly.' : 'WARNING: Issues detected with taxonomy relationships.' ];

@@ -61,7 +61,17 @@ class TodayService
         $hasSessionForDate = !empty($sessionEntries);
 
         // Task-level entry when applicable and no session entries
-        if (($taskCreatedOnDate || $parentMatchesDate) && !$hasSessionForDate) {
+        // Suppress task-level "created" entry if sessions exist for the same date (fixes duplicate Quick Start entries)
+        // Special case: For Quick Start tasks, prefer session entries over task creation entries
+        $isQuickStart = ($projectName === 'Quick Start');
+        $shouldShowTaskEntry = ($taskCreatedOnDate || $parentMatchesDate) && !$hasSessionForDate;
+
+        // Additional suppression: Don't show "created" entry for Quick Start tasks if they have sessions
+        if ($isQuickStart && $taskCreatedOnDate && $hasSessionForDate) {
+            $shouldShowTaskEntry = false;
+        }
+
+        if ($shouldShowTaskEntry) {
             $entryType = [];
             if ($taskCreatedOnDate) { $entryType[] = 'created'; }
             if ($parentMatchesDate) { $entryType[] = 'parent_time'; }
