@@ -144,7 +144,8 @@ class Calculator {
 
     public static function recalculate_on_save( $post_id ) {
         if ( get_post_type( $post_id ) === 'project_task' ) {
-            self::ensure_manual_session_timestamps( $post_id );
+            // Do not auto-timestamp past manual sessions on save to avoid altering historical data.
+            // Manual sessions without timestamps should remain unchanged unless explicitly edited.
             $sessions = get_field( 'sessions', $post_id );
             if ( ! empty( $sessions ) ) {
                 foreach ( array_keys( $sessions ) as $index ) {

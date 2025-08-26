@@ -275,34 +275,34 @@ class SelfTests {
             $results[] = [ 'name' => 'Move Session Between Tasks', 'status' => 'Fail', 'message' => 'Could not create test tasks for session move.' ];
         }
 
-        // TEST 12 – Manual Session Auto-Timestamping
-        $timestamp_post = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'SELF TEST - AUTO TIMESTAMP', 'post_status' => 'publish' ] );
+        // TEST 12 – Manual Session Not Auto-Timestamped
+        $timestamp_post = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'SELF TEST - MANUAL NO AUTOSTAMP', 'post_status' => 'publish' ] );
         if ( $timestamp_post && ! is_wp_error( $timestamp_post ) ) {
             if ( function_exists('update_field') && function_exists('get_field') ) {
-                $session_row = [ 'session_title' => 'Manual session to be timestamped', 'session_start_time' => '', 'session_manual_override' => 1, 'session_manual_duration' => 0.5 ];
+                $session_row = [ 'session_title' => 'Manual session without timestamps', 'session_start_time' => '', 'session_stop_time' => '', 'session_manual_override' => 1, 'session_manual_duration' => 0.5 ];
                 update_field( 'sessions', [ $session_row ], $timestamp_post );
-                $saved_pre = get_field( 'sessions', $timestamp_post );
-                if ( empty( $saved_pre[0]['session_start_time'] ) && ! empty( $saved_pre[0]['field_ptt_session_start_time'] ) ) {
-                    $saved_pre[0]['session_start_time'] = $saved_pre[0]['field_ptt_session_start_time'];
-                    $saved_pre[0]['session_stop_time']  = $saved_pre[0]['field_ptt_session_stop_time'];
-                }
-                if ( function_exists( 'ptt_ensure_manual_session_timestamps' ) ) { \ptt_ensure_manual_session_timestamps( $timestamp_post ); }
+
+                // Trigger any duration calc without assigning timestamps
+                if ( function_exists( 'ptt_calculate_and_save_duration' ) ) { \ptt_calculate_and_save_duration( $timestamp_post ); }
+
                 $saved = get_field( 'sessions', $timestamp_post );
                 $pass = false; $fail = 'An unknown error occurred during verification.'; $debug = '';
                 if ( empty( $saved ) || ! is_array( $saved ) ) { $fail = 'Failed at step 1: The session data was not saved or was empty after retrieval.'; }
                 else {
                     $first = $saved[0];
-                    if ( empty( $first['session_start_time'] ) ) { $fail = 'Failed at step 2: The session start time was not automatically populated.'; }
-                    elseif ( $first['session_start_time'] !== $first['session_stop_time'] ) { $fail = 'Failed at step 3: The session start and stop times were populated but do not match.'; }
-                    else { $pass = true; }
+                    if ( !empty( $first['session_start_time'] ) || !empty( $first['session_stop_time'] ) ) {
+                        $fail = 'Manual session without timestamps was altered (timestamps were added unexpectedly).';
+                    } else {
+                        $pass = true;
+                    }
                 }
-                $results[] = [ 'name' => 'Manual Session Auto-Timestamping', 'status' => $pass ? 'Pass' : 'Fail', 'message' => $pass ? 'A manual session without a date was correctly timestamped on save.' : $fail . $debug ];
+                $results[] = [ 'name' => 'Manual Session Not Auto-Timestamped', 'status' => $pass ? 'Pass' : 'Fail', 'message' => $pass ? 'Manual session without timestamps remains unchanged; no auto-timestamp applied.' : $fail . $debug ];
             } else {
-                $results[] = [ 'name' => 'Manual Session Auto-Timestamping', 'status' => 'Skip', 'message' => 'ACF functions are not available; skipping auto-timestamping test.' ];
+                $results[] = [ 'name' => 'Manual Session Not Auto-Timestamped', 'status' => 'Skip', 'message' => 'ACF functions are not available; skipping test.' ];
             }
             wp_delete_post( $timestamp_post, true );
         } else {
-            $results[] = [ 'name' => 'Manual Session Auto-Timestamping', 'status' => 'Fail', 'message' => 'Could not create the test post required for the test.' ];
+            $results[] = [ 'name' => 'Manual Session Not Auto-Timestamped', 'status' => 'Fail', 'message' => 'Could not create the test post required for the test.' ];
         }
 
         // TEST 8 – Data Structure Integrity (full sweep)
