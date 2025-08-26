@@ -53,12 +53,14 @@ This would complement the existing self-tests perfectly - the current tests vali
    - Add UTC/date helpers to ACFAdapter and route reporting/TODAY comparisons through those (no UI refactor).
 
 3) QA/User Validation Enhancements
-   - Implement the "15 Minute End‑to‑End Test" Demo page that opens in a new tab and cleans up after itself (preferred workflow test).
+   - Deferred ~1 week: Implement the "15 Minute End‑to‑End Test" Demo page that opens in a new tab and cleans up after itself (preferred workflow test).
    - Add a quick admin command/button to run Self‑Tests and display results inline, with a link to detailed logs.
 
 4) PSR‑4 Hardening for Today Helpers
-   - Split TodayHelpers classes (EntryRenderer, DataProvider, PageManager) into separate files to align with Composer’s PSR‑4 expectations and remove explicit requires.
-   - After splitting, retire the explicit include in Plugin::init and keep autoload-only.
+   - [x] Split TodayHelpers classes (EntryRenderer, DataProvider, PageManager) into separate files to align with Composer’s PSR‑4 expectations and remove explicit requires.
+   - [x] Retired explicit include in Plugin::init; Composer autoload now loads classes.
+   - [x] Removed the TodayHelpers placeholder class/file.
+   - [ ] Consider deprecating today-helpers-compat.php wrappers (add notices behind a flag) once plugin usage migrates to PSR‑4 everywhere.
 
 5) Compatibility & Hooks
    - Call TodayController::register() directly from Plugin::init; gradually retire today-compat hook registrations.
@@ -77,7 +79,7 @@ Notes on FSM and PSR‑4
 - [x] Move time calculation logic into `KISS\PTT\Time\Calculator`
 - [x] Wrap existing helper functions to call namespaced classes
 - [x] Self-Tests suite stabilized (67/67 passing)
-- [ ] Human QA Testing (End‑to‑End): Provide "15 Minute E2E Test" page that opens in a new tab and cleans up after itself
+- [ ] Human QA Testing (End‑to‑End): Provide "15 Minute E2E Test" page that opens in a new tab and cleans up after itself (Deferred ~1 week)
 
 
 ## Phase 2 – Core Domain & Storage (High Priority)
@@ -172,10 +174,11 @@ Option B2 – Custom table (wp_ptt_sessions)
 - [ ] Instrument timings of get_field/update_field and track improvements
 
 ## Phase 6 – Today UI and Controllers (Lower Priority)
-- [x] Migrate Today page data/renderer into classes (Presentation\Today) — implemented in TodayHelpers.php with compatibility wrappers
+- [x] Migrate Today page data/renderer into classes (Presentation\Today) — implemented via PSR‑4 classes with compatibility wrappers
 - [x] Centralize AJAX callbacks in Plugin::init via namespaced callables — TodayController provides PSR‑4 endpoints; compat file registers procedural handlers
 - [ ] Replace procedural handlers with service calls; defer UI polish to later
-- [ ] Split TodayHelpers classes into separate files and remove explicit requires (see Near‑Term Priority 4)
+- [x] Split TodayHelpers classes into separate files and remove explicit requires (see Near‑Term Priority 4)
+- [x] Remove TodayHelpers placeholder class/file
 
 ## Phase 7 – Public API and Extensibility
 - [ ] Enable show_in_rest for CPT/taxonomies (read-only), or

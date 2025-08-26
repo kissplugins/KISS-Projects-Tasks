@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 2.2.29 - Preserve historical manual sessions; disable auto-timestamp on save
+- **Changed**: Manual session entries without start/stop timestamps are no longer auto-stamped on save. This prevents older manual entries from being pulled into the current day when a new timer is stopped.
+- **Updated**: Self-tests adjusted to verify that manual sessions without timestamps remain unchanged.
+
+## Version 2.2.28 - PSR-4 hardening for Today helpers
+- **Changed**: Split Today helpers into separate PSR‑4 files: EntryRenderer.php, DataProvider.php, PageManager.php
+- **Removed**: Explicit requires for TodayHelpers.php in Plugin and SelfTests; Composer autoload now loads classes reliably
+- **Kept**: today-helpers-compat.php wrapper so legacy procedural calls continue to work
+- **Housekeeping**: Updated roadmap with PSR‑4 Hardening next steps
+
 ## Version 2.2.27 - Fix PSR-4 Today classes autoloading during Self-Tests
 - **Fixed**: Explicitly include TodayHelpers.php where the PSR-4 Today classes (EntryRenderer, DataProvider, PageManager) are defined.
 - **Reason**: These classes are defined in a single file; Composer PSR-4 expects one class per file, so the autoloader may not load them before Self-Tests run in some contexts.

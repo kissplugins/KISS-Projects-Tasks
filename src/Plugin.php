@@ -4,7 +4,7 @@ namespace KISS\PTT;
 use KISS\PTT\Time\Calculator;
 use KISS\PTT\Time\TimeFunctions;
 use KISS\PTT\Utilities\Helpers;
-use KISS\PTT\Presentation\Today\TodayHelpers;
+
 use KISS\PTT\Presentation\Today\TodayController;
 use KISS\PTT\Integration\ACF\ACFAdapter;
 use KISS\PTT\Domain\Session\SessionRepository;
@@ -38,10 +38,8 @@ class Plugin {
         require_once PTT_PLUGIN_DIR . 'src/Utilities/helpers-compat.php';
         // PSR-4 migrated: time-functions.php → Time\TimeFunctions class with backward compatibility
         require_once PTT_PLUGIN_DIR . 'src/Time/time-functions-compat.php';
-        // PSR-4 migrated: today-helpers.php → Presentation\Today\TodayHelpers classes with backward compatibility
-        // Note: TodayHelpers defines multiple PSR-4 classes (EntryRenderer, DataProvider, PageManager) in one file.
-        // Composer PSR-4 expects one class per file, so we include TodayHelpers.php explicitly to ensure classes load.
-        require_once PTT_PLUGIN_DIR . 'src/Presentation/Today/TodayHelpers.php';
+        // PSR-4 migrated: today-helpers.php → Presentation\Today (EntryRenderer, DataProvider, PageManager)
+        // Classes are autoloaded by Composer; no explicit require needed.
         // PSR-4 migrated: today.php → Presentation\Today\TodayController class with backward compatibility
         // Register local ACF groups and diagnostics if ACF is active
         require_once PTT_PLUGIN_DIR . 'src/Integration/ACF/FieldGroups.php';
