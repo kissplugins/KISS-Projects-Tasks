@@ -1,6 +1,22 @@
 # Changelog
 
 
+
+
+## Version 2.2.35 - Editor FSM live ticking wired to shared timer
+Released: 2025-08-26
+- Fixed timer stuck at 00:00:00 on Editor when FSM is enabled.
+- Reused existing manageLiveTimer/stopLiveTimer via window.PTT helpers and invoked from EditorEffects.updateTimerUI.
+- Start input is set immediately from server UTC in FSM RUNNING state for consistent display.
+- Note: If you still see an admin-ajax 400, please share the failing action name from Network tab; rehydrate/start should be ptt_get_active_session_for_user and ptt_start_session_timer respectively.
+
+## Version 2.2.34 - Editor timer: prevent legacy handler during FSM
+Released: 2025-08-26
+- Fixed an issue where clicking Start Timer in the Task Editor caused a full page reload and timer loss when FSM was enabled.
+- Root cause: legacy jQuery handler also ran alongside FSM and triggered reload + Update click.
+- Change: legacy .ptt-session-start/.ptt-session-stop handlers now no-op when PTT_FSM_ENABLED && PTT_FSM_EDITOR_ENABLED are true.
+- No UI changes; behavior now aligns with FSM and persists immediately via AJAX without reloading.
+
 ## Version 2.2.33 - All Tasks: Assignee sorting/filter restored + self-test
 Released: 2025-08-26
 - Restored Assignee column sorting (ASC/DESC) on All Tasks admin list

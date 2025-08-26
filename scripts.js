@@ -317,6 +317,12 @@ jQuery(document).ready(function ($) {
         }
     }
 
+        // Expose live timer helpers for FSM Editor effects (DRY reuse)
+        window.PTT = window.PTT || {};
+        window.PTT.manageLiveTimer = manageLiveTimer;
+        window.PTT.stopLiveTimer = stopLiveTimer;
+
+
     /**
      * Initializes the timer controls for each session row.
      */
@@ -448,6 +454,8 @@ jQuery(document).ready(function ($) {
     // New unified click handlers using event delegation
     $(document).on('click', '.ptt-session-start', function(e) {
         e.preventDefault();
+        // When the Editor FSM is enabled, do not run the legacy handler.
+        if (window.PTT_FSM_ENABLED && window.PTT_FSM_EDITOR_ENABLED) { return; }
         const $btn = $(this);
         const $controls = $btn.closest('.ptt-session-controls');
         const $row = $btn.closest('.acf-row');
@@ -495,6 +503,8 @@ jQuery(document).ready(function ($) {
 
     $(document).on('click', '.ptt-session-stop', function(e) {
         e.preventDefault();
+        // When the Editor FSM is enabled, do not run the legacy handler.
+        if (window.PTT_FSM_ENABLED && window.PTT_FSM_EDITOR_ENABLED) { return; }
         const $btn = $(this);
         const $controls = $btn.closest('.ptt-session-controls');
         const $row = $btn.closest('.acf-row');

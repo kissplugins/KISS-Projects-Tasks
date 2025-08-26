@@ -55,7 +55,16 @@
       var $row = $rows.eq(ctx.sessionIndex);
       $row.find('.ptt-session-start').hide();
       $row.find('.ptt-session-active-timer').css('display','inline-flex');
+      // Ensure the start input reflects server UTC immediately for consistency
+      $row.find('[data-key="field_ptt_session_start_time"] input').val(ctx.startUtc).trigger('change');
+      // Kick off live ticking using shared helper
+      if (root.PTT && typeof root.PTT.manageLiveTimer === 'function') {
+        root.PTT.manageLiveTimer($row.find('.ptt-session-controls'), ctx.startUtc);
+      }
     } else {
+      if (root.PTT && typeof root.PTT.stopLiveTimer === 'function') {
+        $rows.each(function(){ root.PTT.stopLiveTimer(jQuery(this).find('.ptt-session-controls')); });
+      }
       $rows.find('.ptt-session-start').show();
       $rows.find('.ptt-session-active-timer').hide();
     }
