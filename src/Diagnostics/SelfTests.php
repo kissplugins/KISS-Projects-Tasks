@@ -9,69 +9,147 @@ class SelfTests {
      */
     public static function run(): array {
         $results = [];
+        $currentTest = 'Initialization';
 
-        // TEST 0 – ACF Schema Status (rolled into main group)
-        if ( class_exists('KISS\\PTT\\Integration\\ACF\\Diagnostics') ) {
-            $issues = \KISS\PTT\Integration\ACF\Diagnostics::collectIssues();
-            $ok = empty($issues);
-            $results[] = [
-                'name'    => 'ACF Schema Status',
-                'status'  => $ok ? 'Pass' : 'Fail',
-                'message' => $ok ? 'All required ACF groups/fields look good.' : ( 'Warnings: ' . implode('; ', $issues) ),
-            ];
-        }
+        // Ensure compatibility layers are loaded for PSR-4 migrated classes
+        self::ensureCompatibilityLayersLoaded();
 
-        // TEST 0.5 – Cleanup orphaned test posts from previous runs
-        $all_test_posts = get_posts([
-            'post_type' => 'project_task',
-            'post_status' => 'any',
-            'numberposts' => -1,
-            's' => 'CALC TEST POST'
-        ]);
-
-        $cleanup_count = 0;
-        foreach ($all_test_posts as $post) {
-            if (strpos($post->post_title, 'CALC TEST POST') !== false) {
-                wp_delete_post($post->ID, true);
-                $cleanup_count++;
+        try {
+            // TEST 0 – ACF Schema Status (rolled into main group)
+            $currentTest = 'ACF Schema Status';
+            if ( class_exists('KISS\\PTT\\Integration\\ACF\\Diagnostics') ) {
+                $issues = \KISS\PTT\Integration\ACF\Diagnostics::collectIssues();
+                $ok = empty($issues);
+                $results[] = [
+                    'name'    => 'ACF Schema Status',
+                    'status'  => $ok ? 'Pass' : 'Fail',
+                    'message' => $ok ? 'All required ACF groups/fields look good.' : ( 'Warnings: ' . implode('; ', $issues) ),
+                ];
             }
-        }
-
-        $results[] = [
-            'name' => 'Cleanup Orphaned Test Posts',
-            'status' => 'Pass',
-            'message' => $cleanup_count > 0 ? "Cleaned up {$cleanup_count} orphaned test posts." : 'No orphaned test posts found.'
-        ];
-
-        // TEST 1 – Task Post Save & Assignee Update
-        $test_post_id = wp_insert_post( [
-            'post_type'   => 'project_task',
-            'post_title'  => 'SELF TEST POST',
-            'post_status' => 'publish',
-        ] );
-        if ( $test_post_id && ! is_wp_error( $test_post_id ) ) {
-            $admin_id = get_current_user_id();
-            update_post_meta( $test_post_id, 'ptt_assignee', $admin_id );
-            $saved_assignee = (int) get_post_meta( $test_post_id, 'ptt_assignee', true );
+        } catch (\Throwable $e) {
             $results[] = [
-                'name'    => 'Task Post Save & Assignee Update',
-                'status'  => ( $saved_assignee === $admin_id ) ? 'Pass' : 'Fail',
-                'message' => ( $saved_assignee === $admin_id ) ? 'Successfully created post and updated its assignee meta field.' : 'Created post but failed to update or verify assignee meta field.',
+                'name' => $currentTest,
+                'status' => 'Error',
+                'message' => 'FATAL ERROR: ' . $e->getMessage() . ' (File: ' . $e->getFile() . ', Line: ' . $e->getLine() . ')'
             ];
-            wp_delete_post( $test_post_id, true );
-        } else {
-            $results[] = [ 'name' => 'Task Post Save & Assignee Update', 'status' => 'Fail', 'message' => 'Failed to create test post.' ];
         }
 
-        // TEST 2 – Create Client & Project taxonomies
-        $client_term  = wp_insert_term( 'SELF TEST CLIENT',  'client'  );
-        $project_term = wp_insert_term( 'SELF TEST PROJECT', 'project' );
-        if ( ! is_wp_error( $client_term ) && ! is_wp_error( $project_term ) ) {
-            $results[] = [ 'name' => 'Create Client & Project', 'status' => 'Pass', 'message' => 'Successfully created test taxonomies.' ];
-            wp_delete_term( $client_term['term_id'],  'client' );
-            wp_delete_term( $project_term['term_id'], 'project' );
-        } else {
-            $results[] = [ 'name' => 'Create Client & Project', 'status' => 'Fail', 'message' => 'Failed to create test taxonomies.' ];
+        try {
+            // TEST 0.5 – Cleanup orphaned test posts from previous runs
+            $currentTest = 'Cleanup Orphaned Test Posts';
+
+            // Define all test post patterns to clean up
+            $test_patterns = [
+                'CALC TEST POST',
+                'SELF TEST POST',
+                'TODAY DATE INCLUSION TEST',
+                'STATUS TEST',
+                'Session Move Source',
+                'Session Move Target',
+                'SELF TEST - AUTO TIMESTAMP',
+                'Test Task A1',
+                'Test Task B1',
+                'Test Task A2/B2',
+                'Convert Legacy Task Timer to New Sessions',
+                'Today' // Exact match for single word "Today"
+            ];
+
+            $cleanup_count = 0;
+            $cleanup_details = [];
+
+            foreach ($test_patterns as $pattern) {
+                // Search for posts containing this pattern
+                $test_posts = get_posts([
+                    'post_type' => 'project_task',
+                    'post_status' => 'any',
+                    'numberposts' => -1,
+                    's' => $pattern
+                ]);
+
+                foreach ($test_posts as $post) {
+                    // Check if this is actually a test post (avoid false positives)
+                    $is_test_post = false;
+
+                    if ($pattern === 'Today') {
+                        // For "Today", only match exact title to avoid false positives
+                        $is_test_post = ($post->post_title === 'Today');
+                    } else {
+                        // For other patterns, check if title contains the pattern
+                        $is_test_post = (strpos($post->post_title, $pattern) !== false);
+                    }
+
+                    if ($is_test_post) {
+                        wp_delete_post($post->ID, true);
+                        $cleanup_count++;
+                        $cleanup_details[] = $post->post_title;
+                    }
+                }
+            }
+
+            $message = $cleanup_count > 0
+                ? "Cleaned up {$cleanup_count} orphaned test posts: " . implode(', ', array_slice($cleanup_details, 0, 5)) . ($cleanup_count > 5 ? '...' : '')
+                : 'No orphaned test posts found.';
+
+            $results[] = [
+                'name' => 'Cleanup Orphaned Test Posts',
+                'status' => 'Pass',
+                'message' => $message
+            ];
+        } catch (\Throwable $e) {
+            $results[] = [
+                'name' => $currentTest,
+                'status' => 'Error',
+                'message' => 'FATAL ERROR: ' . $e->getMessage() . ' (File: ' . $e->getFile() . ', Line: ' . $e->getLine() . ')'
+            ];
+        }
+
+        try {
+            // TEST 1 – Task Post Save & Assignee Update
+            $currentTest = 'Task Post Save & Assignee Update';
+            $test_post_id = wp_insert_post( [
+                'post_type'   => 'project_task',
+                'post_title'  => 'SELF TEST POST',
+                'post_status' => 'publish',
+            ] );
+            if ( $test_post_id && ! is_wp_error( $test_post_id ) ) {
+                $admin_id = get_current_user_id();
+                update_post_meta( $test_post_id, 'ptt_assignee', $admin_id );
+                $saved_assignee = (int) get_post_meta( $test_post_id, 'ptt_assignee', true );
+                $results[] = [
+                    'name'    => 'Task Post Save & Assignee Update',
+                    'status'  => ( $saved_assignee === $admin_id ) ? 'Pass' : 'Fail',
+                    'message' => ( $saved_assignee === $admin_id ) ? 'Successfully created post and updated its assignee meta field.' : 'Created post but failed to update or verify assignee meta field.',
+                ];
+                wp_delete_post( $test_post_id, true );
+            } else {
+                $results[] = [ 'name' => 'Task Post Save & Assignee Update', 'status' => 'Fail', 'message' => 'Failed to create test post.' ];
+            }
+        } catch (\Throwable $e) {
+            $results[] = [
+                'name' => $currentTest,
+                'status' => 'Error',
+                'message' => 'FATAL ERROR: ' . $e->getMessage() . ' (File: ' . $e->getFile() . ', Line: ' . $e->getLine() . ')'
+            ];
+        }
+
+        try {
+            // TEST 2 – Create Client & Project taxonomies
+            $currentTest = 'Create Client & Project';
+            $client_term  = wp_insert_term( 'SELF TEST CLIENT',  'client'  );
+            $project_term = wp_insert_term( 'SELF TEST PROJECT', 'project' );
+            if ( ! is_wp_error( $client_term ) && ! is_wp_error( $project_term ) ) {
+                $results[] = [ 'name' => 'Create Client & Project', 'status' => 'Pass', 'message' => 'Successfully created test taxonomies.' ];
+                wp_delete_term( $client_term['term_id'],  'client' );
+                wp_delete_term( $project_term['term_id'], 'project' );
+            } else {
+                $results[] = [ 'name' => 'Create Client & Project', 'status' => 'Fail', 'message' => 'Failed to create test taxonomies.' ];
+            }
+        } catch (\Throwable $e) {
+            $results[] = [
+                'name' => $currentTest,
+                'status' => 'Error',
+                'message' => 'FATAL ERROR: ' . $e->getMessage() . ' (File: ' . $e->getFile() . ', Line: ' . $e->getLine() . ')'
+            ];
         }
 
         // TEST 3 – Calculate Total Time (session-based approach)
@@ -289,7 +367,14 @@ class SelfTests {
                     $term = get_term_by( 'name', $name, 'task_status' );
                     if ( $term && ! is_wp_error( $term ) ) { wp_set_object_terms( $task_id, [ $term->term_id ], 'task_status', false ); break; }
                 }
-                $entries = \PTT_Today_Data_Provider::get_daily_entries( $user_id, $local_today_str, [] );
+                // Use PSR-4 class directly, with fallback to procedural class
+                if (class_exists('\KISS\PTT\Presentation\Today\DataProvider')) {
+                    $entries = \KISS\PTT\Presentation\Today\DataProvider::getDailyEntries( $user_id, $local_today_str, [] );
+                } elseif (class_exists('PTT_Today_Data_Provider')) {
+                    $entries = \PTT_Today_Data_Provider::get_daily_entries( $user_id, $local_today_str, [] );
+                } else {
+                    $entries = [];
+                }
                 $found = false;
                 foreach ( $entries as $e ) { if ( $e['post_id'] === $task_id ) { $found = true; break; } }
                 $results[] = [
@@ -432,6 +517,41 @@ class SelfTests {
             }
         }
 
+        // PSR-4 Helpers class exists
+        $helpers_class_exists = class_exists( '\KISS\PTT\Utilities\Helpers' );
+        $results[] = [ 'name' => 'PSR-4: Helpers Class', 'status' => $helpers_class_exists ? 'Pass' : 'Fail', 'message' => $helpers_class_exists ? 'PSR-4 Helpers class exists.' : 'CRITICAL: PSR-4 Helpers class is missing!' ];
+
+        // PSR-4 Helpers methods exist
+        if ( $helpers_class_exists ) {
+            $required_helper_methods = [ 'getTasksForUser', 'getActiveSessionIndexForUser' ];
+            foreach ( $required_helper_methods as $method ) {
+                $method_exists = method_exists( '\KISS\PTT\Utilities\Helpers', $method );
+                $results[] = [ 'name' => "PSR-4 Method: Helpers::{$method}", 'status' => $method_exists ? 'Pass' : 'Fail', 'message' => $method_exists ? "PSR-4 method {$method}() exists." : "CRITICAL: PSR-4 method {$method}() is missing!" ];
+            }
+        }
+
+        // PSR-4 TodayHelpers classes exist
+        $today_entry_renderer_exists = class_exists( '\KISS\PTT\Presentation\Today\EntryRenderer' );
+        $today_data_provider_exists = class_exists( '\KISS\PTT\Presentation\Today\DataProvider' );
+        $today_page_manager_exists = class_exists( '\KISS\PTT\Presentation\Today\PageManager' );
+
+        $results[] = [ 'name' => 'PSR-4: Today EntryRenderer Class', 'status' => $today_entry_renderer_exists ? 'Pass' : 'Fail', 'message' => $today_entry_renderer_exists ? 'PSR-4 Today EntryRenderer class exists.' : 'CRITICAL: PSR-4 Today EntryRenderer class is missing!' ];
+        $results[] = [ 'name' => 'PSR-4: Today DataProvider Class', 'status' => $today_data_provider_exists ? 'Pass' : 'Fail', 'message' => $today_data_provider_exists ? 'PSR-4 Today DataProvider class exists.' : 'CRITICAL: PSR-4 Today DataProvider class is missing!' ];
+        $results[] = [ 'name' => 'PSR-4: Today PageManager Class', 'status' => $today_page_manager_exists ? 'Pass' : 'Fail', 'message' => $today_page_manager_exists ? 'PSR-4 Today PageManager class exists.' : 'CRITICAL: PSR-4 Today PageManager class is missing!' ];
+
+        // PSR-4 TodayController class exists
+        $today_controller_exists = class_exists( '\KISS\PTT\Presentation\Today\TodayController' );
+        $results[] = [ 'name' => 'PSR-4: Today Controller Class', 'status' => $today_controller_exists ? 'Pass' : 'Fail', 'message' => $today_controller_exists ? 'PSR-4 Today Controller class exists.' : 'CRITICAL: PSR-4 Today Controller class is missing!' ];
+
+        // PSR-4 TodayController methods exist
+        if ( $today_controller_exists ) {
+            $required_controller_methods = [ 'register', 'addTodayPage', 'renderTodayPageHtml', 'getDailyEntriesCallback', 'startNewSessionCallback' ];
+            foreach ( $required_controller_methods as $method ) {
+                $method_exists = method_exists( '\KISS\PTT\Presentation\Today\TodayController', $method );
+                $results[] = [ 'name' => "PSR-4 Method: TodayController::{$method}", 'status' => $method_exists ? 'Pass' : 'Fail', 'message' => $method_exists ? "PSR-4 method {$method}() exists." : "CRITICAL: PSR-4 method {$method}() is missing!" ];
+            }
+        }
+
         // Database tables (core)
         global $wpdb;
         $required_tables = [ $wpdb->posts => 'posts', $wpdb->postmeta => 'postmeta', $wpdb->terms => 'terms', $wpdb->term_taxonomy => 'term_taxonomy', $wpdb->term_relationships => 'term_relationships' ];
@@ -454,28 +574,117 @@ class SelfTests {
             $results[] = [ 'name' => 'Sample Data Validation', 'status' => 'Skip', 'message' => 'No existing tasks found - sample data validation skipped.' ];
         }
 
-        // Final verification: Check for any remaining test posts
-        $remaining_test_posts = get_posts([
-            'post_type' => 'project_task',
-            'post_status' => 'any',
-            'numberposts' => -1,
-            's' => 'CALC TEST POST'
-        ]);
+        // Final cleanup: Remove any remaining test posts that may have been missed
+        $test_patterns = [
+            'CALC TEST POST',
+            'SELF TEST POST',
+            'TODAY DATE INCLUSION TEST',
+            'STATUS TEST',
+            'Session Move Source',
+            'Session Move Target',
+            'SELF TEST - AUTO TIMESTAMP',
+            'Test Task A1',
+            'Test Task B1',
+            'Test Task A2/B2',
+            'Convert Legacy Task Timer to New Sessions',
+            'Today'
+        ];
 
-        $remaining_count = 0;
-        foreach ($remaining_test_posts as $post) {
-            if (strpos($post->post_title, 'CALC TEST POST') !== false) {
-                $remaining_count++;
+        $final_cleanup_count = 0;
+        foreach ($test_patterns as $pattern) {
+            $test_posts = get_posts([
+                'post_type' => 'project_task',
+                'post_status' => 'any',
+                'numberposts' => -1,
+                's' => $pattern
+            ]);
+
+            foreach ($test_posts as $post) {
+                $is_test_post = false;
+
+                if ($pattern === 'Today') {
+                    $is_test_post = ($post->post_title === 'Today');
+                } else {
+                    $is_test_post = (strpos($post->post_title, $pattern) !== false);
+                }
+
+                if ($is_test_post) {
+                    wp_delete_post($post->ID, true);
+                    $final_cleanup_count++;
+                }
             }
         }
+
+        // Final verification: Check for any remaining test posts using broader search
+        $remaining_count = 0;
+        foreach ($test_patterns as $pattern) {
+            $remaining_posts = get_posts([
+                'post_type' => 'project_task',
+                'post_status' => 'any',
+                'numberposts' => -1,
+                's' => $pattern
+            ]);
+
+            foreach ($remaining_posts as $post) {
+                if ($pattern === 'Today') {
+                    if ($post->post_title === 'Today') {
+                        $remaining_count++;
+                    }
+                } else {
+                    if (strpos($post->post_title, $pattern) !== false) {
+                        $remaining_count++;
+                    }
+                }
+            }
+        }
+
+        $cleanup_message = $final_cleanup_count > 0
+            ? "Final cleanup removed {$final_cleanup_count} additional test posts. "
+            : '';
+
+        $verification_message = $remaining_count === 0
+            ? $cleanup_message . 'All test posts properly cleaned up.'
+            : $cleanup_message . "WARNING: {$remaining_count} test posts still remain - cleanup may have failed.";
 
         $results[] = [
             'name' => 'Test Post Cleanup Verification',
             'status' => $remaining_count === 0 ? 'Pass' : 'Fail',
-            'message' => $remaining_count === 0 ? 'All test posts properly cleaned up.' : "WARNING: {$remaining_count} test posts still remain - cleanup may have failed."
+            'message' => $verification_message
         ];
 
         return $results;
+    }
+
+    /**
+     * Ensure PSR-4 compatibility layers are loaded
+     *
+     * @return void
+     */
+    private static function ensureCompatibilityLayersLoaded(): void
+    {
+        // Ensure PSR-4 Today classes are available, since they live in a single file (TodayHelpers.php)
+        if (!class_exists('KISS\\PTT\\Presentation\\Today\\DataProvider') && defined('PTT_PLUGIN_DIR')) {
+            $psr4File = PTT_PLUGIN_DIR . 'src/Presentation/Today/TodayHelpers.php';
+            if (file_exists($psr4File)) {
+                require_once $psr4File;
+            }
+        }
+
+        // Load Today helpers compatibility if not already loaded
+        if (!class_exists('PTT_Today_Data_Provider') && defined('PTT_PLUGIN_DIR')) {
+            $compatFile = PTT_PLUGIN_DIR . 'src/Presentation/Today/today-helpers-compat.php';
+            if (file_exists($compatFile)) {
+                require_once $compatFile;
+            }
+        }
+
+        // Load Today controller compatibility if not already loaded
+        if (!function_exists('ptt_render_today_page_html') && defined('PTT_PLUGIN_DIR')) {
+            $compatFile = PTT_PLUGIN_DIR . 'src/Presentation/Today/today-compat.php';
+            if (file_exists($compatFile)) {
+                require_once $compatFile;
+            }
+        }
     }
 
 }

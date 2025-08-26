@@ -1709,18 +1709,32 @@ jQuery(document).ready(function ($) {
                 const results = response.data.results;
                 const total = results.length;
                 const failed = results.filter(r => r.status && r.status.toLowerCase() === 'fail').length;
-                const firstFailedIndex = results.findIndex(r => r.status && r.status.toLowerCase() === 'fail');
-                const jumpLink = failed ? `<a href="#ptt-first-failed" style="margin-left:8px;">Jump to first failed</a>` : '';
-                const passedNote = failed === 0 ? ` <span style="color:#2e7d32;font-weight:bold;">All tests have passed.</span>` : '';
-                const summaryHtml = `<div class="notice ${failed ? 'notice-error' : 'notice-success'}"><strong>Number of Tests:</strong> ${failed} out of ${total} Failed.${passedNote} ${jumpLink}</div>`;
-                let tableHtml = summaryHtml + '<table class="wp-list-table widefat striped"><thead><tr><th>Test Name</th><th>Status</th><th>Message</th></tr></thead><tbody>';
+                const errors = results.filter(r => r.status && r.status.toLowerCase() === 'error').length;
+                const firstFailedIndex = results.findIndex(r => r.status && (r.status.toLowerCase() === 'fail' || r.status.toLowerCase() === 'error'));
+                const jumpLink = (failed + errors) ? `<a href="#ptt-first-failed" style="margin-left:8px;">Jump to first issue</a>` : '';
+                const passedNote = (failed + errors) === 0 ? ` <span style="color:#2e7d32;font-weight:bold;">All tests have passed.</span>` : '';
+                const issueText = errors > 0 ? `${failed} failed, ${errors} errors` : `${failed} failed`;
+                const summaryHtml = `<div class="notice ${(failed + errors) ? 'notice-error' : 'notice-success'}"><strong>Test Results:</strong> ${total} tests, ${issueText}.${passedNote} ${jumpLink}</div>`;
+
+                // Add debug info if available
+                let debugHtml = '';
+                if (response.data.debug) {
+                    debugHtml += '<details style="margin: 10px 0;"><summary>Debug Information</summary>';
+                    debugHtml += '<table class="wp-list-table widefat"><tbody>';
+                    Object.entries(response.data.debug).forEach(([key, value]) => {
+                        debugHtml += `<tr><td><strong>${key}:</strong></td><td>${value}</td></tr>`;
+                    });
+                    debugHtml += '</tbody></table></details>';
+                }
+                let tableHtml = summaryHtml + debugHtml + '<table class="wp-list-table widefat striped"><thead><tr><th>Test Name</th><th>Status</th><th>Message</th></tr></thead><tbody>';
                 results.forEach(function (result, idx) {
-                    const isFailed = result.status && result.status.toLowerCase() === 'failed';
-                    const anchor = (isFailed && idx === firstFailedIndex) ? ' id="ptt-first-failed"' : '';
+                    const status = result.status ? result.status.toLowerCase() : 'unknown';
+                    const isIssue = status === 'fail' || status === 'error';
+                    const anchor = (isIssue && idx === firstFailedIndex) ? ' id="ptt-first-failed"' : '';
                     tableHtml += `<tr${anchor}>
-                        <td>${result.name}</td>
-                        <td class="status-${result.status.toLowerCase()}">${result.status}</td>
-                        <td>${result.message}</td>
+                        <td>${result.name || 'Unknown Test'}</td>
+                        <td class="status-${status}">${result.status || 'Unknown'}</td>
+                        <td>${result.message || 'No message'}</td>
                     </tr>`;
                 });
                 tableHtml += '</tbody></table>';
@@ -1730,11 +1744,64 @@ jQuery(document).ready(function ($) {
                 }
             } else {
                 // Handle cases where the response is not what was expected
-                let errorMessage = '<p class="status-fail">An error occurred while running tests. The server returned an unexpected response, which may indicate a fatal error or that a sub-process was interrupted.</p>';
+                let errorMessage = '<div class="notice notice-error">';
+                errorMessage += '<h3>Self-Test Error</h3>';
+                errorMessage += '<p>An error occurred while running tests. The server returned an unexpected response.</p>';
+
+                if (response && response.data && response.data.message) {
+                    errorMessage += `<p><strong>Error:</strong> ${response.data.message}</p>`;
+                }
+
+                if (response && response.data && response.data.details) {
+                    errorMessage += '<details><summary>Technical Details</summary>';
+                    errorMessage += '<pre style="background: #f5f5f5; padding: 10px; overflow: auto; max-height: 300px;">';
+                    errorMessage += JSON.stringify(response.data.details, null, 2);
+                    errorMessage += '</pre></details>';
+                }
+
+                errorMessage += '<p><strong>Possible causes:</strong></p>';
+                errorMessage += '<ul>';
+                errorMessage += '<li>PHP fatal error during test execution</li>';
+                errorMessage += '<li>Memory limit exceeded</li>';
+                errorMessage += '<li>Maximum execution time exceeded</li>';
+                errorMessage += '<li>Missing required plugin dependencies</li>';
+                errorMessage += '<li>Database connection issues</li>';
+                errorMessage += '</ul>';
+                errorMessage += '<p><strong>Troubleshooting:</strong></p>';
+                errorMessage += '<ul>';
+                errorMessage += '<li>Check your PHP error log for fatal errors</li>';
+                errorMessage += '<li>Increase PHP memory_limit and max_execution_time</li>';
+                errorMessage += '<li>Ensure ACF Pro is active and up to date</li>';
+                errorMessage += '<li>Try deactivating other plugins temporarily</li>';
+                errorMessage += '</ul>';
+                errorMessage += '</div>';
+
                 $resultsContainer.html(errorMessage);
             }
-        }).fail(function () {
-            $resultsContainer.append('<p class="error">A server error occurred.</p>');
+        }).fail(function (xhr, status, error) {
+            let errorMessage = '<div class="notice notice-error">';
+            errorMessage += '<h3>Network Error</h3>';
+            errorMessage += '<p>A server communication error occurred while running tests.</p>';
+            errorMessage += `<p><strong>Status:</strong> ${status}</p>`;
+            errorMessage += `<p><strong>Error:</strong> ${error}</p>`;
+
+            if (xhr.responseText) {
+                errorMessage += '<details><summary>Server Response</summary>';
+                errorMessage += '<pre style="background: #f5f5f5; padding: 10px; overflow: auto; max-height: 300px;">';
+                errorMessage += xhr.responseText;
+                errorMessage += '</pre></details>';
+            }
+
+            errorMessage += '<p><strong>Possible causes:</strong></p>';
+            errorMessage += '<ul>';
+            errorMessage += '<li>Server timeout or overload</li>';
+            errorMessage += '<li>WordPress AJAX nonce verification failure</li>';
+            errorMessage += '<li>Plugin conflict or fatal error</li>';
+            errorMessage += '<li>Insufficient server resources</li>';
+            errorMessage += '</ul>';
+            errorMessage += '</div>';
+
+            $resultsContainer.html(errorMessage);
         }).always(function () {
             $button.prop('disabled', false);
             $spinner.hide();

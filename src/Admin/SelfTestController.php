@@ -119,14 +119,53 @@ class SelfTestController {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => 'Permission denied.' ] );
         }
+
+        $debugInfo = [
+            'php_version' => PHP_VERSION,
+            'wp_version' => get_bloginfo('version'),
+            'memory_limit' => ini_get('memory_limit'),
+            'max_execution_time' => ini_get('max_execution_time'),
+            'plugin_version' => defined('PTT_VERSION') ? PTT_VERSION : 'unknown',
+            'timestamp' => current_time('mysql'),
+        ];
+
         try {
             $results = \KISS\PTT\Diagnostics\SelfTests::run();
             $timestamp = current_time( 'timestamp' );
             update_option( 'ptt_tests_last_run', $timestamp );
-            wp_send_json_success( [ 'results' => $results, 'time' => date_i18n( get_option( 'time_format' ), $timestamp ) ] );
+
+            // Count test results for summary
+            $summary = ['pass' => 0, 'fail' => 0, 'skip' => 0, 'error' => 0];
+            foreach ($results as $result) {
+                $status = strtolower($result['status'] ?? 'unknown');
+                if (isset($summary[$status])) {
+                    $summary[$status]++;
+                }
+            }
+
+            wp_send_json_success( [
+                'results' => $results,
+                'time' => date_i18n( get_option( 'time_format' ), $timestamp ),
+                'summary' => $summary,
+                'debug' => $debugInfo
+            ] );
         } catch (\Throwable $e) {
-            if ( function_exists('error_log') ) { error_log('[PTT] SelfTests error: ' . $e->getMessage()); }
-            wp_send_json_error( [ 'message' => 'Self-tests failed: ' . $e->getMessage() ] );
+            $errorDetails = [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'debug' => $debugInfo
+            ];
+
+            if ( function_exists('error_log') ) {
+                error_log('[PTT] SelfTests fatal error: ' . json_encode($errorDetails));
+            }
+
+            wp_send_json_error( [
+                'message' => 'Self-tests failed with fatal error: ' . $e->getMessage(),
+                'details' => $errorDetails
+            ] );
         }
     }
 
