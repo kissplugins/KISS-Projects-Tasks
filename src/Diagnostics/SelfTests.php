@@ -662,13 +662,8 @@ class SelfTests {
      */
     private static function ensureCompatibilityLayersLoaded(): void
     {
-        // Ensure PSR-4 Today classes are available, since they live in a single file (TodayHelpers.php)
-        if (!class_exists('KISS\\PTT\\Presentation\\Today\\DataProvider') && defined('PTT_PLUGIN_DIR')) {
-            $psr4File = PTT_PLUGIN_DIR . 'src/Presentation/Today/TodayHelpers.php';
-            if (file_exists($psr4File)) {
-                require_once $psr4File;
-            }
-        }
+        // PSR-4 Today classes (EntryRenderer, DataProvider, PageManager) are autoloaded by Composer
+        // No explicit includes are required here.
 
         // Load Today helpers compatibility if not already loaded
         if (!class_exists('PTT_Today_Data_Provider') && defined('PTT_PLUGIN_DIR')) {
