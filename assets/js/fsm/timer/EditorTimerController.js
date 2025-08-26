@@ -33,8 +33,11 @@
     }
 
     fsm.rehydrate();
-    jQuery(document).on('click', '.ptt-session-start', function(e){ e.preventDefault(); var postId = jQuery('#post_ID').val(); fsm.transition('START_TIMER', { taskId: postId }); });
-    jQuery(document).on('click', '.ptt-session-stop', function(e){ e.preventDefault(); fsm.transition('STOP_TIMER'); });
+    // When FSM is enabled, intercept editor start/stop and route through FSM
+    jQuery(document).off('click.pttEditorStart');
+    jQuery(document).off('click.pttEditorStop');
+    jQuery(document).on('click.pttEditorStart', '.ptt-session-start', function(e){ e.preventDefault(); var postId = jQuery('#post_ID').val(); fsm.transition('START_TIMER', { taskId: postId }); });
+    jQuery(document).on('click.pttEditorStop', '.ptt-session-stop', function(e){ e.preventDefault(); fsm.transition('STOP_TIMER'); });
     root.PTT_EditorFSM = fsm;
   }
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }

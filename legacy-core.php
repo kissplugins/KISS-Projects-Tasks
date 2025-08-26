@@ -413,12 +413,40 @@ function ptt_start_session_timer_callback() {
         ptt_stop_session( $post_id, $active );
     }
 
-    $current_time = current_time( 'mysql', 1 ); // Use UTC time
-    update_sub_field( array( 'sessions', $row_index + 1, 'session_start_time' ), $current_time, $post_id );
-    update_sub_field( array( 'sessions', $row_index + 1, 'session_stop_time' ), '', $post_id );
-    update_sub_field( array( 'sessions', $row_index + 1, 'session_calculated_duration' ), '0.00', $post_id );
+    $current_time   = current_time( 'mysql', 1 ); // UTC
+    $session_title  = isset($_POST['session_title']) ? sanitize_text_field( wp_unslash($_POST['session_title']) ) : '';
+    if ( $session_title === '' ) { $session_title = 'Session ' . date_i18n( 'g:i A' ); }
 
-    wp_send_json_success( [ 'message' => 'Session started!', 'start_time' => $current_time ] );
+    // Ensure the requested row exists; if not, append a new one server-side
+    $sessions = get_field( 'sessions', $post_id );
+    $count    = is_array( $sessions ) ? count( $sessions ) : 0;
+
+    if ( $row_index >= $count ) {
+        // Create a new row with start time so the timer cannot be lost
+        $new_row = [
+            'session_title'           => $session_title,
+            'session_notes'           => '',
+            'session_start_time'      => $current_time,
+            'session_stop_time'       => '',
+            'session_manual_override' => 0,
+            'session_manual_duration' => 0,
+        ];
+        $row_one_based = add_row( 'sessions', $new_row, $post_id ); // returns 1-based index
+        if ( ! $row_one_based ) {
+            wp_send_json_error( [ 'message' => 'Failed to create session row.' ] );
+        }
+        $row_index = intval( $row_one_based ) - 1; // normalize to 0-based for response
+    } else {
+        // Row exists; just set start time and reset stop/duration
+        update_sub_field( [ 'sessions', $row_index + 1, 'session_start_time' ], $current_time, $post_id );
+        update_sub_field( [ 'sessions', $row_index + 1, 'session_stop_time' ], '', $post_id );
+        update_sub_field( [ 'sessions', $row_index + 1, 'session_calculated_duration' ], '0.00', $post_id );
+    }
+
+    // Optionally recalc task totals (safe, cheap)
+    if ( function_exists( 'ptt_calculate_and_save_duration' ) ) { ptt_calculate_and_save_duration( $post_id ); }
+
+    wp_send_json_success( [ 'message' => 'Session started!', 'start_time' => $current_time, 'row_index' => $row_index ] );
 }
 add_action( 'wp_ajax_ptt_start_session_timer', 'ptt_start_session_timer_callback' );
 

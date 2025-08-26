@@ -52,6 +52,11 @@ class Plugin {
         // PSR-4 migrated: today.php → Presentation\Today\TodayController class with backward compatibility
         require_once PTT_PLUGIN_DIR . 'src/Presentation/Today/today-compat.php';
         require_once PTT_PLUGIN_DIR . 'legacy-core.php';
+        // Editor FSM compat AJAX
+        require_once PTT_PLUGIN_DIR . 'src/Presentation/Editor/editor-compat.php';
+        if (class_exists('KISS\\PTT\\Presentation\\Editor\\EditorCompat')) {
+            \KISS\PTT\Presentation\Editor\EditorCompat::register();
+        }
     }
 
     protected static function register_hooks() {

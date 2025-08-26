@@ -51,6 +51,21 @@ jQuery(document).ready(function ($) {
     // Initial render (safe no-op if panel absent)
     pttUpdateFsmDebug();
 
+        // Short onbeforeunload guard for first 2–3s after starting a timer
+        window.pttStartUnloadGuard = function(ms){
+            try {
+                var duration = ms || 3000;
+                var handler = function(e){
+                    e.preventDefault();
+                    e.returnValue = 'Saving your timer...';
+                    return e.returnValue;
+                };
+                window.addEventListener('beforeunload', handler, { once:false });
+                setTimeout(function(){ window.removeEventListener('beforeunload', handler); }, duration);
+            } catch(_){}
+        };
+
+
 
     // Session recovery - store active task in localStorage
     const PTT_STORAGE_KEY = 'ptt_active_task';
@@ -442,17 +457,31 @@ jQuery(document).ready(function ($) {
         $btn.prop('disabled', true);
         showSpinner($controls);
 
+        var sessionTitle = $row.find('[data-key="field_ptt_session_title"] input').val() || '';
         $.post(ptt_ajax_object.ajax_url, {
             action: 'ptt_start_session_timer',
             nonce: ptt_ajax_object.nonce,
             post_id: postId,
-            row_index: index
+            row_index: index,
+            session_title: sessionTitle
         }).done(function(response){
             if (response.success) {
                 $row.find('[data-key="field_ptt_session_start_time"] input').val(response.data.start_time).trigger('change');
+                if (typeof response.data.row_index !== 'undefined') {
+                    var newIdx = parseInt(response.data.row_index, 10);
+                    if (!isNaN(newIdx) && newIdx !== index) {
+                        window.location.reload();
+                        return;
+                    }
+                }
+
                 $btn.hide();
                 $controls.find('.ptt-session-active-timer').css('display', 'inline-flex');
                 manageLiveTimer($controls, response.data.start_time);
+                if (window.pttStartUnloadGuard) { window.pttStartUnloadGuard(3000); }
+                // Proactively trigger Update to persist any surrounding ACF state
+                var $saveButton = $('#publish');
+                if ($saveButton.length && $saveButton.is(':enabled')) { setTimeout(function(){ $saveButton.trigger('click'); }, 150); }
             } else {
                 alert(response.data.message || 'An error occurred.');
             }

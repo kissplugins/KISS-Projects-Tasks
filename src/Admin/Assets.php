@@ -57,6 +57,10 @@ class Assets {
             'PTT_FSM_TODAY_ENABLED' => $flags['enabled'] && $flags['today'],
             'PTT_FSM_EDITOR_ENABLED' => $flags['enabled'] && $flags['editor'],
         ] );
+        // Mirror flags onto window for legacy scripts that check `window.PTT_FSM_ENABLED`
+        add_action('admin_print_footer_scripts', function() use ($flags){
+            echo '<script>window.PTT_FSM_ENABLED='.( $flags['enabled']? 'true':'false' ).';window.PTT_FSM_TODAY_ENABLED='.( ($flags['enabled']&&$flags['today'])?'true':'false' ).';window.PTT_FSM_EDITOR_ENABLED='.( ($flags['enabled']&&$flags['editor'])?'true':'false' ).';</script>';
+        });
     }
 }
 
