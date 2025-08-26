@@ -151,6 +151,13 @@
 
 ## Version 2.2.13 - Today page duplicate entries fix
 
+
+## Version 2.2.33 - All Tasks: Assignee sorting/filter restored + self-test
+Released: 2025-08-26
+- Restored Assignee column sorting (ASC/DESC) on All Tasks admin list
+- Added Assignee filter dropdown to narrow rows by user
+- Added automated self-test to verify sortable column registration and dropdown rendering
+
 ## Version 2.2.32 - FSM-centric timer persistence + UI polish
 Released: 2025-08-26
 - Editor: Start Timer is now routed via FSM EditorEffects/Controller when FSM is enabled, ensuring a single authoritative state machine controls timers.

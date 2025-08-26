@@ -12,6 +12,7 @@ use KISS\PTT\Domain\Timer\TimerService;
 use KISS\PTT\Admin\Assets as AdminAssets;
 use KISS\PTT\Admin\SelfTestController;
 use KISS\PTT\Admin\DataMigrationController;
+use KISS\PTT\Admin\ListTable;
 
 class Plugin {
     // Simple, low-risk: register services directly on Plugin
@@ -31,6 +32,8 @@ class Plugin {
         SelfTestController::register();
         DataMigrationController::register();
         \KISS\PTT\Admin\SchemaStatusPage::register();
+        // Register list table enhancements (sortable/filterable Assignee)
+        if (class_exists('KISS\\PTT\\Admin\\ListTable')) { \KISS\PTT\Admin\ListTable::register(); }
 
         self::register_hooks();
         // Load remaining procedural modules (PSR-4 migration in progress)

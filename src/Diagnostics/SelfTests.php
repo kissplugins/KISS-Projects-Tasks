@@ -560,6 +560,11 @@ class SelfTests {
             $results[] = [ 'name' => "Database Table: {$name}", 'status' => $table_exists ? 'Pass' : 'Fail', 'message' => $table_exists ? "Database table {$name} exists." : "CRITICAL: Database table {$name} is missing!" ];
         }
 
+        // Admin List Table self-tests (prevent regressions on Assignee sorting/filter)
+        if ( class_exists('KISS\\PTT\\Diagnostics\\SelfTests\\ListTableSelfTests') ) {
+            $results = array_merge($results, \KISS\PTT\Diagnostics\SelfTests\ListTableSelfTests::run());
+        }
+
         // Sample data validation (session-only approach)
         $sample_tasks = get_posts( [ 'post_type' => 'project_task', 'numberposts' => 1, 'post_status' => 'any' ] );
         if ( ! empty( $sample_tasks ) ) {
