@@ -99,6 +99,15 @@
 .acf-field[data-key="field_ptt_sessions"] .acf-actions .ptt-session-update-btn {
     margin-left: 0;
     vertical-align: middle;
+
+/* Make the Update button highly visible */
+.acf-field[data-key="field_ptt_sessions"] .ptt-session-update-btn.button.button-primary{
+    background-color: #2271b1; /* WP blue */
+    border-color: #2271b1;
+    box-shadow: 0 1px 0 #2271b1;
+}
+.acf-field[data-key="field_ptt_sessions"] .ptt-session-update-btn{
+    font-weight: 600;
 }
 
 .ptt-session-active-timer {
@@ -109,6 +118,23 @@
 
 .ptt-session-elapsed-time {
     font-family: 'DSEG7Classic-Italic', monospace, sans-serif;
+
+/* Total Duration hh:mm inline badge */
+.acf-field[data-key="field_ptt_total_duration_display"] .acf-input {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* space between input and badge */
+}
+.ptt-total-hhmm-badge{
+  color: #d63638; /* WP error red for emphasis */
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* On small screens, let the badge wrap under nicely */
+@media (max-width: 782px){
+  .acf-field[data-key="field_ptt_total_duration_display"] .acf-input{flex-direction: column; align-items: flex-start; gap: 4px;}
+}
+
     font-size: 1.2em;
     font-weight: bold;
     color: #f44336; /* Red for running timer */

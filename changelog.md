@@ -1,5 +1,16 @@
 # Changelog
 
+
+## Version 2.2.31 - Reinforce Update button visibility on Task Editor
+- Added robust insertion of an "Update" button next to the Sessions repeater "Add Session" button.
+- Uses MutationObserver + periodic retries to ensure the button is present even if ACF renders late.
+- Styled as a primary button and placed inline with "Add Session" so it’s easy to find.
+- Clicking it triggers the main Publish/Update action (#publish) with disabled state and feedback.
+
+## Version 2.2.30 - Total Duration: add friendly hh:mm display
+- **Added**: On the Task Editor, next to Total Duration (hrs), show a friendly hh:mm equivalent (read-only badge) that updates live as the value changes.
+- **Note**: All calculations remain decimal hours; hh:mm is display-only for user friendliness.
+
 ## Version 2.2.29 - Preserve historical manual sessions; disable auto-timestamp on save
 - **Changed**: Manual session entries without start/stop timestamps are no longer auto-stamped on save. This prevents older manual entries from being pulled into the current day when a new timer is stopped.
 - **Updated**: Self-tests adjusted to verify that manual sessions without timestamps remain unchanged.
@@ -139,6 +150,25 @@
 **Note**: This migration is one-way. Once completed, you cannot revert to parent-level timer fields without restoring from a database backup.
 
 ## Version 2.2.13 - Today page duplicate entries fix
+
+
+## Version 2.2.33 - All Tasks: Assignee sorting/filter restored + self-test
+Released: 2025-08-26
+- Restored Assignee column sorting (ASC/DESC) on All Tasks admin list
+- Added Assignee filter dropdown to narrow rows by user
+- Added automated self-test to verify sortable column registration and dropdown rendering
+
+## Version 2.2.32 - FSM-centric timer persistence + UI polish
+Released: 2025-08-26
+- Editor: Start Timer is now routed via FSM EditorEffects/Controller when FSM is enabled, ensuring a single authoritative state machine controls timers.
+- Server: ptt_start_session_timer now creates the session row server-side if the requested index doesn't exist and returns the authoritative row_index.
+- Editor: Start handler sends session_title; on mismatch row_index, the UI reloads to sync with the database.
+- Editor: Added ptt_get_active_session_for_user endpoint and FSM rehydrate implementation to recover running session after reload.
+- Editor: Disabled Start Timer when Manual Override is checked for the session.
+- UI: Align hh:mm badge inline with Total Duration input; responsive layout on small screens.
+- Safety: Added onbeforeunload guard for 2–3 seconds after Start to reduce accidental navigation before save completes.
+- Version bump and changelog updated.
+
 - Fixed Today page showing duplicate entries for Quick Start tasks (both "created" and session entries on same day).
 - Added logic to suppress task-level "created" entries when session entries exist for the same date.
 

@@ -1,70 +1,44 @@
+## Priority Plan (PSR‑4 → TypeScript → FSM)
+
+- PSR‑4 (one more pass — best bang for buck)
+  - [ ] Migrate Reports to PSR‑4 (Presentation\Reports: Controller/Service)
+  - [ ] Fix Reports date‑range UTC normalization during the move
+  - [ ] Register TodayController::register() from Plugin::init (avoid double hooks with compat)
+  - [ ] Optional: Add deprecation flag for today‑helpers‑compat wrappers (log _doing_it_wrong when enabled)
+
+- TypeScript (Today page pilot — highest UX/stability ROI)
+  - [ ] Add minimal build (esbuild or Vite) with strict tsconfig
+  - [ ] Define types: Entry, Session, TimerAction; typed fetch/AJAX client
+  - [ ] Implement typed modules: start/stop/resume controls; move‑session flow; inline duration editing
+  - [ ] Scope bundle to Today admin page; graceful fallback; add a few Vitest tests
+
+- FSM (after TS pilot)
+  - [ ] Integrate TimerFSM with typed controls behind a feature flag
+  - [ ] Add lightweight metrics/logging for state transitions
+  - [ ] Plan DataFSM next (read model, cache invalidation)
+
+
 # Roadmap
 
 ## Human QA Testing
-Missing: A comprehensive end-to-end test that simulates real user workflow.
-
-My Thoughts on Your "Special 15 Minute End to End Test" Idea
-This is an excellent idea for several reasons:
-
-Real-world validation - Tests the actual user journey, not just isolated functions
-User confidence - Gives users a way to verify everything works before using it for real work
-Debugging aid - When users report issues, you can ask them to run this test first
-Demo functionality - New users can see how the plugin works without creating real data
-Regression testing - After updates, users can quickly verify nothing broke
-Proposed Implementation
-I suggest creating a "Demo & Test" page that:
-
-Opens in a new tab (as you suggested) to avoid disrupting their current work
-Creates temporary demo data with clear naming (e.g., "DEMO - Client ABC", "DEMO - Project XYZ")
-Walks through the complete workflow:
-Create a client
-Create a project under that client
-Create a task under that project
-Start a timer session
-Stop the timer after a few seconds
-Show the results on the Today page
-Provides step-by-step feedback showing what's happening
-Cleans up after itself (with user confirmation)
-Includes a "Skip to Results" option for quick validation
-Would you like me to implement this "15 Minute End to End Test" page? I can:
-
-Create a new admin page accessible from the Tasks menu
-Build an interactive test that guides users through the complete workflow
-Make it open in a new tab as you suggested
-Include real-time progress indicators and validation
-Add cleanup functionality to remove demo data when done
-This would complement the existing self-tests perfectly - the current tests validate the technical foundation, while this new test would validate the user experience.
+- [ ] 15 Minute E2E Demo/Test page (Deferred ~1 week)
+  - [ ] Opens in a new tab; creates demo data; cleans up after confirmation
+  - [ ] Walkthrough: client → project → task → start/stop → verify Today page
+  - [ ] Step-by-step feedback and a Skip-to-Results option
 
 ## NEXT MAJOR PROJECT: FSM
-
-- Objective: Introduce a Finite State Machine (FSM) architecture for the Today page to improve reliability, debuggability, and code clarity.
-- Plan: See PROJECT-FSM.md for the phased, actionable checklist (TimerFSM + DataFSM, controller, effects, rollout plan).
-- Status: Planning complete; next step is Phase 0 (Preparation) and Phase 1 (TimerFSM pilot behind feature flag).
+- [ ] Introduce Today page FSM to improve reliability and debuggability
+- [ ] See PROJECT-FSM.md for detailed phases (TimerFSM + DataFSM, controller/effects)
+- [ ] Next: Phase 0 prep and Phase 1 pilot behind a feature flag
 
 
 ## Near‑Term Priorities (August 2025)
-
-1) Ship two targeted bug fixes before further PSR‑4 work
-   - Reports → Classic: date‑range filtering can miss expected rows due to UTC/local parsing of session_start_time. Fix by normalizing to UTC during comparisons.
-   - Today → Quick Start: duplicate entries appear because the page shows a task‑level "created" entry and a session entry on the same day. Suppress the task‑level entry when a same‑day session exists.
-
-2) Resume incremental PSR‑4 tasks after the fixes
-   - Keep Plugin as the simple service container for now.
-   - Add UTC/date helpers to ACFAdapter and route reporting/TODAY comparisons through those (no UI refactor).
-
-3) QA/User Validation Enhancements
-   - Deferred ~1 week: Implement the "15 Minute End‑to‑End Test" Demo page that opens in a new tab and cleans up after itself (preferred workflow test).
-   - Add a quick admin command/button to run Self‑Tests and display results inline, with a link to detailed logs.
-
-4) PSR‑4 Hardening for Today Helpers
-   - [x] Split TodayHelpers classes (EntryRenderer, DataProvider, PageManager) into separate files to align with Composer’s PSR‑4 expectations and remove explicit requires.
-   - [x] Retired explicit include in Plugin::init; Composer autoload now loads classes.
-   - [x] Removed the TodayHelpers placeholder class/file.
-   - [ ] Consider deprecating today-helpers-compat.php wrappers (add notices behind a flag) once plugin usage migrates to PSR‑4 everywhere.
-
-5) Compatibility & Hooks
-   - Call TodayController::register() directly from Plugin::init; gradually retire today-compat hook registrations.
-   - Keep legacy wrappers for a deprecation window and add _doing_it_wrong() notices behind a flag.
+- [ ] Reports: Fix date‑range UTC normalization (best bang for buck)
+- [ ] Reports: Migrate to PSR‑4 (Controller/Service), apply the fix during migration
+- [ ] Today: Call TodayController::register() from Plugin::init (avoid double hooks)
+- [ ] Optional: Deprecation flag for today‑helpers‑compat wrappers
+- [ ] QA: Quick admin action to run Self‑Tests and show results inline
+- [ ] QA: 15 Minute E2E Demo/Test page (Deferred ~1 week)
 
 Notes on FSM and PSR‑4
 - The Today‑page FSM (TimerFSM/DataFSM) is an independent UI/controller improvement. It is not required to ship the two bug fixes above.
@@ -79,7 +53,7 @@ Notes on FSM and PSR‑4
 - [x] Move time calculation logic into `KISS\PTT\Time\Calculator`
 - [x] Wrap existing helper functions to call namespaced classes
 - [x] Self-Tests suite stabilized (67/67 passing)
-- [ ] Human QA Testing (End‑to‑End): Provide "15 Minute E2E Test" page that opens in a new tab and cleans up after itself (Deferred ~1 week)
+- [ ] Human QA Testing (15 Minute E2E Demo/Test page) — Deferred ~1 week
 
 
 ## Phase 2 – Core Domain & Storage (High Priority)

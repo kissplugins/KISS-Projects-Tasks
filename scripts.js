@@ -51,6 +51,21 @@ jQuery(document).ready(function ($) {
     // Initial render (safe no-op if panel absent)
     pttUpdateFsmDebug();
 
+        // Short onbeforeunload guard for first 2–3s after starting a timer
+        window.pttStartUnloadGuard = function(ms){
+            try {
+                var duration = ms || 3000;
+                var handler = function(e){
+                    e.preventDefault();
+                    e.returnValue = 'Saving your timer...';
+                    return e.returnValue;
+                };
+                window.addEventListener('beforeunload', handler, { once:false });
+                setTimeout(function(){ window.removeEventListener('beforeunload', handler); }, duration);
+            } catch(_){}
+        };
+
+
 
     // Session recovery - store active task in localStorage
     const PTT_STORAGE_KEY = 'ptt_active_task';
@@ -318,6 +333,7 @@ jQuery(document).ready(function ($) {
             const $startInput = $row.find('[data-key="field_ptt_session_start_time"] input');
             const $stopInput = $row.find('[data-key="field_ptt_session_stop_time"] input');
             const $durationInput = $row.find('[data-key="field_ptt_session_calculated_duration"] input');
+            const $manualOverrideInput = $row.find('[data-key="field_ptt_session_manual_override"] input');
 
             const debugEnabled = !!(window.PTT_DEBUG || (window.localStorage && localStorage.getItem('PTT_DEBUG')==='1') || (window.location.search||'').indexOf('ptt_debug=1')>-1);
             const debugHtml = `<div class="ptt-debug" style="margin-top:6px;color:#666;font-size:12px;">[PTT] Timer UI initialized${debugEnabled? ' (debug on)':''}</div>`;
@@ -364,7 +380,7 @@ jQuery(document).ready(function ($) {
 	        const $actions = $field.find('.acf-actions').first();
 	        if ($actions.length) {
 	            if ($actions.find('.ptt-session-update-btn').length === 0) {
-	                const $btn = $('<button type="button" class="button button-secondary ptt-session-update-btn" style="margin-left:8px;">Update</button>');
+	                const $btn = $('<button type="button" class="button button-primary ptt-session-update-btn" style="margin-left:8px;">Update</button>');
 	                $actions.append($btn);
 	            }
 	            return;
@@ -373,7 +389,7 @@ jQuery(document).ready(function ($) {
 	        // Fallback: place after the Add Row button if actions container is not found
 	        const $addBtn = $field.find('[data-event="add-row"], [data-name="add-row"]').last();
 	        if ($addBtn.length && $addBtn.next('.ptt-session-update-btn').length === 0) {
-	            const $btn = $('<button type="button" class="button button-secondary ptt-session-update-btn" style="margin-left:8px;">Update</button>');
+	            const $btn = $('<button type="button" class="button button-primary ptt-session-update-btn" style="margin-left:8px;">Update</button>');
 	            $addBtn.after($btn);
 	        }
 	    }
@@ -386,7 +402,8 @@ jQuery(document).ready(function ($) {
 	    }
 
 	    // Click handler: replicate the Publish/Update button
-	    $(document).on('click', '.ptt-session-update-btn', function(e){
+	    $(document).off('click', '.ptt-session-update-btn');
+    $(document).on('click', '.ptt-session-update-btn', function(e){
 	        e.preventDefault();
 	        const $btn = $(this);
 	        $btn.prop('disabled', true).text('Updating...');
@@ -401,7 +418,18 @@ jQuery(document).ready(function ($) {
                     $startButton.show();
                     $activeDisplay.hide();
                     $message.hide();
+                    const override = $manualOverrideInput.prop('checked');
+                    if (override) {
+                        $startButton.prop('disabled', true).attr('title', 'Manual time entry is enabled for this session.');
+                    } else {
+                        $startButton.prop('disabled', false).removeAttr('title');
+                    }
                 }
+            }
+
+            // React to manual override changes
+            if ($manualOverrideInput && $manualOverrideInput.length) {
+                $manualOverrideInput.on('change', updateUIState);
             }
 
             updateUIState();
@@ -429,17 +457,31 @@ jQuery(document).ready(function ($) {
         $btn.prop('disabled', true);
         showSpinner($controls);
 
+        var sessionTitle = $row.find('[data-key="field_ptt_session_title"] input').val() || '';
         $.post(ptt_ajax_object.ajax_url, {
             action: 'ptt_start_session_timer',
             nonce: ptt_ajax_object.nonce,
             post_id: postId,
-            row_index: index
+            row_index: index,
+            session_title: sessionTitle
         }).done(function(response){
             if (response.success) {
                 $row.find('[data-key="field_ptt_session_start_time"] input').val(response.data.start_time).trigger('change');
+                if (typeof response.data.row_index !== 'undefined') {
+                    var newIdx = parseInt(response.data.row_index, 10);
+                    if (!isNaN(newIdx) && newIdx !== index) {
+                        window.location.reload();
+                        return;
+                    }
+                }
+
                 $btn.hide();
                 $controls.find('.ptt-session-active-timer').css('display', 'inline-flex');
                 manageLiveTimer($controls, response.data.start_time);
+                if (window.pttStartUnloadGuard) { window.pttStartUnloadGuard(3000); }
+                // Proactively trigger Update to persist any surrounding ACF state
+                var $saveButton = $('#publish');
+                if ($saveButton.length && $saveButton.is(':enabled')) { setTimeout(function(){ $saveButton.trigger('click'); }, 150); }
             } else {
                 alert(response.data.message || 'An error occurred.');
             }
@@ -1853,3 +1895,92 @@ jQuery(document).ready(function ($) {
         });
     });
 });
+
+// --- UI Enhancement: Show hh:mm next to Total Duration (hrs) on Task Editor ---
+(function($){
+  function formatHhMmFromDecimalHours(h){
+    if (isNaN(h) || h < 0) { h = 0; }
+    var totalMin = Math.floor(h * 60 + 0.0001); // floor minutes
+    var hh = Math.floor(totalMin / 60);
+    var mm = totalMin % 60;
+    var hhStr = (hh < 10 ? '0' : '') + hh;
+    var mmStr = (mm < 10 ? '0' : '') + mm;
+    return hhStr + ':' + mmStr;
+  }
+  function enhanceTotalDuration(){
+    var $input = $('.acf-field[data-key="field_ptt_total_duration_display"] input[type="text"]');
+    if(!$input.length) return;
+    var $badge = $('<span class="ptt-total-hhmm-badge"></span>');
+    if(!$input.next('.ptt-total-hhmm-badge').length){ $input.after($badge); }
+    else { $badge = $input.next('.ptt-total-hhmm-badge'); }
+    var last = null;
+    function render(){
+      var raw = ($input.val() || '').toString().replace(',', '.');
+      var num = parseFloat(raw);
+      if (isNaN(num)) { $badge.text(''); return; }
+      var hhmm = formatHhMmFromDecimalHours(num);
+      $badge.text('(~' + hhmm + ' hh:mm)');
+    }
+    function tick(){ var cur = $input.val(); if(cur !== last){ last = cur; render(); } }
+    render();
+    $input.on('input change', render);
+    setInterval(tick, 1000);
+  }
+  $(function(){ enhanceTotalDuration(); });
+})(jQuery);
+
+
+// --- Reinforce Sessions "Update" button insertion (robust init + observer) ---
+(function($){
+  function ensureSessionsUpdateButton(ctx){
+    var $root = (ctx && ctx.jquery) ? ctx : $(document);
+    var $field = $root.find('.acf-field[data-key="field_ptt_sessions"]').first();
+    if(!$field.length) return;
+
+    function addIfMissing(){
+      // Preferred: inside .acf-actions
+      var $actions = $field.find('.acf-actions').first();
+      if ($actions.length) {
+        if ($actions.find('.ptt-session-update-btn').length === 0) {
+          $actions.append($('<button type="button" class="button button-primary ptt-session-update-btn" style="margin-left:8px;">Update</button>'));
+        }
+        return;
+      }
+      // Fallback: after Add Row button
+      var $addBtn = $field.find('[data-event="add-row"], [data-name="add-row"], .acf-repeater-add-row').last();
+      if ($addBtn.length && $addBtn.next('.ptt-session-update-btn').length === 0) {
+        $addBtn.after($('<button type="button" class="button button-primary ptt-session-update-btn" style="margin-left:8px;">Update</button>'));
+      }
+    }
+
+    // Initial attempt
+    addIfMissing();
+
+    // Observe DOM changes within the field to re-assert the button
+    try {
+      if (window.MutationObserver) {
+        var obs = new MutationObserver(function(){ addIfMissing(); });
+        obs.observe($field[0], { childList:true, subtree:true });
+      }
+    } catch(e) {}
+
+    // Lightweight periodic retries (10s)
+    var tries = 0; var iv = setInterval(function(){ addIfMissing(); if(++tries >= 10) clearInterval(iv); }, 1000);
+  }
+
+  $(function(){
+    ensureSessionsUpdateButton();
+    if (window.acf) {
+      window.acf.addAction('ready', ensureSessionsUpdateButton);
+      window.acf.addAction('append', ensureSessionsUpdateButton);
+    }
+  });
+
+  // Single delegated handler
+  $(document).on('click', '.ptt-session-update-btn', function(e){
+    e.preventDefault();
+    var $btn = $(this);
+    $btn.prop('disabled', true).text('Updating...');
+    $('#publish').trigger('click');
+  });
+})(jQuery);

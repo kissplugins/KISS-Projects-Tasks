@@ -13,8 +13,17 @@
     // Find first session row without a start time; fallback to index 0
     var $rows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row');
     var index = 0;
-    $rows.each(function(i){ var v = jQuery(this).find('[data-key="field_ptt_session_start_time"] input').val(); if(!v){ index = i; return false; } });
-    return ajax('ptt_start_session_timer', { post_id: taskId, row_index: index });
+    var title = '';
+    $rows.each(function(i){
+      var $row = jQuery(this);
+      var v = $row.find('[data-key="field_ptt_session_start_time"] input').val();
+      if(!v){ index = i; title = ($row.find('[data-key="field_ptt_session_title"] input').val()||'').trim(); return false; }
+    });
+    return ajax('ptt_start_session_timer', { post_id: taskId, row_index: index, session_title: title })
+      .then(function(data){
+        // Normalize result for FSM: { startUtc, postId, sessionIndex }
+        return { startUtc: data.start_time, postId: taskId, sessionIndex: (typeof data.row_index!=='undefined'? data.row_index : index) };
+      });
   };
   EditorEffects.prototype.stopTimer  = function(postId){
     // Determine index from visible running row
@@ -24,11 +33,21 @@
     return ajax('ptt_stop_session_timer', { post_id: postId, row_index: index });
   };
   EditorEffects.prototype.rehydrate  = function(){
-    // If a row has start and no stop, consider running
-    var $rows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row');
-    var running = false, postId = jQuery('#post_ID').val()||null, sessionIndex = null, startUtc=null;
-    $rows.each(function(i){ var s = jQuery(this).find('[data-key="field_ptt_session_start_time"] input').val(); var e = jQuery(this).find('[data-key="field_ptt_session_stop_time"] input').val(); if(s && !e){ running=true; sessionIndex=i; startUtc=s; return false; } });
-    return Promise.resolve(running ? { running:true, postId:postId, sessionIndex:sessionIndex, startUtc:startUtc } : { running:false });
+    // Ask server for user's active session; only activate if it's this post
+    var postId = jQuery('#post_ID').val()||null;
+    return new Promise(function(resolve){
+      jQuery.post((root.ptt_ajax_object && root.ptt_ajax_object.ajax_url)||'', {
+        action: 'ptt_get_active_session_for_user', nonce: (root.ptt_ajax_object && root.ptt_ajax_object.nonce)||''
+      }).done(function(resp){
+        if(resp && resp.success && resp.data){
+          if(resp.data.running && postId && parseInt(resp.data.post_id,10)===parseInt(postId,10)){
+            resolve({ running:true, postId: resp.data.post_id, sessionIndex: resp.data.session_index, startUtc: resp.data.start_time });
+            return;
+          }
+        }
+        resolve({ running:false });
+      }).fail(function(){ resolve({ running:false }); });
+    });
   };
   EditorEffects.prototype.updateTimerUI = function(state, ctx){
     var $rows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row');

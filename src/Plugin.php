@@ -12,6 +12,7 @@ use KISS\PTT\Domain\Timer\TimerService;
 use KISS\PTT\Admin\Assets as AdminAssets;
 use KISS\PTT\Admin\SelfTestController;
 use KISS\PTT\Admin\DataMigrationController;
+use KISS\PTT\Admin\ListTable;
 
 class Plugin {
     // Simple, low-risk: register services directly on Plugin
@@ -31,6 +32,8 @@ class Plugin {
         SelfTestController::register();
         DataMigrationController::register();
         \KISS\PTT\Admin\SchemaStatusPage::register();
+        // Register list table enhancements (sortable/filterable Assignee)
+        if (class_exists('KISS\\PTT\\Admin\\ListTable')) { \KISS\PTT\Admin\ListTable::register(); }
 
         self::register_hooks();
         // Load remaining procedural modules (PSR-4 migration in progress)
@@ -52,6 +55,11 @@ class Plugin {
         // PSR-4 migrated: today.php → Presentation\Today\TodayController class with backward compatibility
         require_once PTT_PLUGIN_DIR . 'src/Presentation/Today/today-compat.php';
         require_once PTT_PLUGIN_DIR . 'legacy-core.php';
+        // Editor FSM compat AJAX
+        require_once PTT_PLUGIN_DIR . 'src/Presentation/Editor/editor-compat.php';
+        if (class_exists('KISS\\PTT\\Presentation\\Editor\\EditorCompat')) {
+            \KISS\PTT\Presentation\Editor\EditorCompat::register();
+        }
     }
 
     protected static function register_hooks() {
