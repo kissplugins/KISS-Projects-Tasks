@@ -4,7 +4,7 @@ namespace KISS\PTT;
 use KISS\PTT\Time\Calculator;
 use KISS\PTT\Time\TimeFunctions;
 use KISS\PTT\Utilities\Helpers;
-use KISS\PTT\Presentation\Today\TodayHelpers;
+
 use KISS\PTT\Presentation\Today\TodayController;
 use KISS\PTT\Integration\ACF\ACFAdapter;
 use KISS\PTT\Domain\Session\SessionRepository;
