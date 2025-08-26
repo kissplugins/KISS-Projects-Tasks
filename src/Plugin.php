@@ -2,6 +2,7 @@
 namespace KISS\PTT;
 
 use KISS\PTT\Time\Calculator;
+use KISS\PTT\Time\TimeFunctions;
 use KISS\PTT\Integration\ACF\ACFAdapter;
 use KISS\PTT\Domain\Session\SessionRepository;
 use KISS\PTT\Domain\Timer\TimerService;
@@ -29,9 +30,10 @@ class Plugin {
         \KISS\PTT\Admin\SchemaStatusPage::register();
 
         self::register_hooks();
-        // Load remaining procedural modules
+        // Load remaining procedural modules (PSR-4 migration in progress)
         require_once PTT_PLUGIN_DIR . 'helpers.php';
-        require_once PTT_PLUGIN_DIR . 'time-functions.php';
+        // PSR-4 migrated: time-functions.php → TimeFunctions class with backward compatibility
+        require_once PTT_PLUGIN_DIR . 'src/Time/time-functions-compat.php';
         // Register local ACF groups and diagnostics if ACF is active
         require_once PTT_PLUGIN_DIR . 'src/Integration/ACF/FieldGroups.php';
         require_once PTT_PLUGIN_DIR . 'src/Integration/ACF/Diagnostics.php';

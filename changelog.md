@@ -1,5 +1,26 @@
 # Changelog
 
+## Version 2.2.20 - Improved self-test cleanup and post deletion
+- **Added**: Automatic cleanup of orphaned "CALC TEST POST" entries at the start of self-tests.
+- **Added**: Final verification test to ensure all test posts are properly cleaned up.
+- **Improved**: Test post cleanup now uses try-finally blocks to ensure cleanup even if tests fail.
+- **Fixed**: Self-tests no longer leave behind multiple test posts in the task list.
+- The self-tests now properly clean up after themselves, preventing accumulation of test data.
+
+## Version 2.2.19 - Fixed PSR-4 Migration: time-functions.php
+- **Fixed**: Fatal error caused by defining functions inside class methods (not allowed in PHP).
+- **Added**: Separate compatibility file `src/Time/time-functions-compat.php` for procedural function wrappers.
+- **Updated**: Plugin class now requires the compatibility file instead of calling a class method.
+- **Maintained**: Full backward compatibility with all existing function calls.
+
+## Version 2.2.18 - PSR-4 Migration: time-functions.php
+- **Migrated**: `time-functions.php` to PSR-4 class `src/Time/TimeFunctions.php`.
+- **Added**: Backward compatibility layer with procedural function wrappers.
+- **Updated**: Plugin class now uses PSR-4 TimeFunctions instead of requiring procedural file.
+- **Added**: Self-tests validation for PSR-4 TimeFunctions class and methods.
+- **Maintained**: Full backward compatibility - all existing function calls continue to work.
+- This is the first step in the PSR-4 migration strategy for better code organization.
+
 ## Version 2.2.17 - Added total duration display field
 - **Added**: New "Total Duration (hrs)" read-only field in task edit screen that shows the sum of all session durations.
 - **Updated**: Calculator class now populates the total_duration_display field when calculating durations.

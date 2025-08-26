@@ -21,6 +21,28 @@ class SelfTests {
             ];
         }
 
+        // TEST 0.5 – Cleanup orphaned test posts from previous runs
+        $all_test_posts = get_posts([
+            'post_type' => 'project_task',
+            'post_status' => 'any',
+            'numberposts' => -1,
+            's' => 'CALC TEST POST'
+        ]);
+
+        $cleanup_count = 0;
+        foreach ($all_test_posts as $post) {
+            if (strpos($post->post_title, 'CALC TEST POST') !== false) {
+                wp_delete_post($post->ID, true);
+                $cleanup_count++;
+            }
+        }
+
+        $results[] = [
+            'name' => 'Cleanup Orphaned Test Posts',
+            'status' => 'Pass',
+            'message' => $cleanup_count > 0 ? "Cleaned up {$cleanup_count} orphaned test posts." : 'No orphaned test posts found.'
+        ];
+
         // TEST 1 – Task Post Save & Assignee Update
         $test_post_id = wp_insert_post( [
             'post_type'   => 'project_task',
@@ -55,36 +77,40 @@ class SelfTests {
         // TEST 3 – Calculate Total Time (session-based approach)
         $calc_post = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'CALC TEST POST', 'post_status' => 'publish' ] );
         if ( $calc_post && ! is_wp_error( $calc_post ) ) {
-            if ( function_exists('update_field') ) {
-                // Test 1: 1h 30m session (10:00 to 11:30)
-                $session_1h30m = [
-                    'session_title' => 'Test Session 1h30m',
-                    'session_start_time' => '2025-07-19 10:00:00',
-                    'session_stop_time' => '2025-07-19 11:30:00',
-                    'session_manual_override' => false,
-                    'session_manual_duration' => '',
-                ];
-                update_field( 'sessions', [ $session_1h30m ], $calc_post );
-                $duration = \ptt_calculate_and_save_duration( $calc_post );
-                $results[] = [ 'name' => 'Calculate Total Time (1h 30m)', 'status' => ( $duration === '1.50' ) ? 'Pass' : 'Fail', 'message' => ( $duration === '1.50' ) ? 'Correctly calculated 1.50 hours from session.' : "Calculation incorrect. Expected 1.50, got {$duration}." ];
+            try {
+                if ( function_exists('update_field') ) {
+                    // Test 1: 1h 30m session (10:00 to 11:30)
+                    $session_1h30m = [
+                        'session_title' => 'Test Session 1h30m',
+                        'session_start_time' => '2025-07-19 10:00:00',
+                        'session_stop_time' => '2025-07-19 11:30:00',
+                        'session_manual_override' => false,
+                        'session_manual_duration' => '',
+                    ];
+                    update_field( 'sessions', [ $session_1h30m ], $calc_post );
+                    $duration = \ptt_calculate_and_save_duration( $calc_post );
+                    $results[] = [ 'name' => 'Calculate Total Time (1h 30m)', 'status' => ( $duration === '1.50' ) ? 'Pass' : 'Fail', 'message' => ( $duration === '1.50' ) ? 'Correctly calculated 1.50 hours from session.' : "Calculation incorrect. Expected 1.50, got {$duration}." ];
 
-                // Test 2: 1 minute session (12:00 to 12:01) - should round to 0.02 hours
-                $session_1min = [
-                    'session_title' => 'Test Session 1min',
-                    'session_start_time' => '2025-07-19 12:00:00',
-                    'session_stop_time' => '2025-07-19 12:01:00',
-                    'session_manual_override' => false,
-                    'session_manual_duration' => '',
-                ];
-                update_field( 'sessions', [ $session_1h30m, $session_1min ], $calc_post );
-                $total_duration = \ptt_calculate_and_save_duration( $calc_post );
-                // Total should be 1.50 + 0.02 = 1.52 (1h30m + 1min rounded)
-                $expected_total = 1.52; // 1.50 + 0.02
-                $results[] = [ 'name' => 'Calculate Total Time (Rounding)', 'status' => ( abs((float)$total_duration - $expected_total) < 0.01 ) ? 'Pass' : 'Fail', 'message' => ( abs((float)$total_duration - $expected_total) < 0.01 ) ? 'Correctly calculated and rounded session durations.' : "Expected ~{$expected_total} hours, got {$total_duration}." ];
-            } else {
-                $results[] = [ 'name' => 'Calculate Total Time', 'status' => 'Skip', 'message' => 'ACF functions are not available; skipping duration calculation test.' ];
+                    // Test 2: 1 minute session (12:00 to 12:01) - should round to 0.02 hours
+                    $session_1min = [
+                        'session_title' => 'Test Session 1min',
+                        'session_start_time' => '2025-07-19 12:00:00',
+                        'session_stop_time' => '2025-07-19 12:01:00',
+                        'session_manual_override' => false,
+                        'session_manual_duration' => '',
+                    ];
+                    update_field( 'sessions', [ $session_1h30m, $session_1min ], $calc_post );
+                    $total_duration = \ptt_calculate_and_save_duration( $calc_post );
+                    // Total should be 1.50 + 0.02 = 1.52 (1h30m + 1min rounded)
+                    $expected_total = 1.52; // 1.50 + 0.02
+                    $results[] = [ 'name' => 'Calculate Total Time (Rounding)', 'status' => ( abs((float)$total_duration - $expected_total) < 0.01 ) ? 'Pass' : 'Fail', 'message' => ( abs((float)$total_duration - $expected_total) < 0.01 ) ? 'Correctly calculated and rounded session durations.' : "Expected ~{$expected_total} hours, got {$total_duration}." ];
+                } else {
+                    $results[] = [ 'name' => 'Calculate Total Time', 'status' => 'Skip', 'message' => 'ACF functions are not available; skipping duration calculation test.' ];
+                }
+            } finally {
+                // Always cleanup, even if test fails
+                wp_delete_post( $calc_post, true );
             }
-            wp_delete_post( $calc_post, true );
         } else {
             $results[] = [ 'name' => 'Calculate Total Time', 'status' => 'Fail', 'message' => 'Could not create post for calculation test.' ];
         }
@@ -387,10 +413,23 @@ class SelfTests {
             }
         }
 
-        // Core functions exist
+        // Core functions exist (PSR-4 + procedural wrappers)
         foreach ( [ 'ptt_get_tasks_for_user','ptt_calculate_and_save_duration','ptt_get_total_sessions_duration','ptt_calculate_session_duration','ptt_get_active_session_index_for_user' ] as $fn ) {
             $exists = function_exists( $fn );
             $results[] = [ 'name' => "Function: {$fn}", 'status' => $exists ? 'Pass' : 'Fail', 'message' => $exists ? "Core function {$fn}() exists." : "CRITICAL: Core function {$fn}() is missing!" ];
+        }
+
+        // PSR-4 TimeFunctions class exists
+        $time_functions_class_exists = class_exists( '\KISS\PTT\Time\TimeFunctions' );
+        $results[] = [ 'name' => 'PSR-4: TimeFunctions Class', 'status' => $time_functions_class_exists ? 'Pass' : 'Fail', 'message' => $time_functions_class_exists ? 'PSR-4 TimeFunctions class exists.' : 'CRITICAL: PSR-4 TimeFunctions class is missing!' ];
+
+        // PSR-4 TimeFunctions methods exist
+        if ( $time_functions_class_exists ) {
+            $required_methods = [ 'calculateAndSaveDuration', 'getActiveSessionIndex', 'calculateSessionDuration', 'ensureManualSessionTimestamps', 'getTotalSessionsDuration' ];
+            foreach ( $required_methods as $method ) {
+                $method_exists = method_exists( '\KISS\PTT\Time\TimeFunctions', $method );
+                $results[] = [ 'name' => "PSR-4 Method: TimeFunctions::{$method}", 'status' => $method_exists ? 'Pass' : 'Fail', 'message' => $method_exists ? "PSR-4 method {$method}() exists." : "CRITICAL: PSR-4 method {$method}() is missing!" ];
+            }
         }
 
         // Database tables (core)
@@ -414,6 +453,27 @@ class SelfTests {
         } else {
             $results[] = [ 'name' => 'Sample Data Validation', 'status' => 'Skip', 'message' => 'No existing tasks found - sample data validation skipped.' ];
         }
+
+        // Final verification: Check for any remaining test posts
+        $remaining_test_posts = get_posts([
+            'post_type' => 'project_task',
+            'post_status' => 'any',
+            'numberposts' => -1,
+            's' => 'CALC TEST POST'
+        ]);
+
+        $remaining_count = 0;
+        foreach ($remaining_test_posts as $post) {
+            if (strpos($post->post_title, 'CALC TEST POST') !== false) {
+                $remaining_count++;
+            }
+        }
+
+        $results[] = [
+            'name' => 'Test Post Cleanup Verification',
+            'status' => $remaining_count === 0 ? 'Pass' : 'Fail',
+            'message' => $remaining_count === 0 ? 'All test posts properly cleaned up.' : "WARNING: {$remaining_count} test posts still remain - cleanup may have failed."
+        ];
 
         return $results;
     }

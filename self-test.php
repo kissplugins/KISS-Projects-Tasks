@@ -263,7 +263,7 @@ function ptt_test_data_structure_integrity() {
         }
     }
 
-    // Test 7: Core Functions Exist
+    // Test 7: Core Functions Exist (PSR-4 + procedural wrappers)
     $required_functions = [
         'ptt_get_tasks_for_user',
         'ptt_calculate_and_save_duration',
@@ -283,6 +283,16 @@ function ptt_test_data_structure_integrity() {
                 : "CRITICAL: Core function {$function_name}() is missing!",
         ];
     }
+
+    // Test 8: PSR-4 TimeFunctions Class
+    $time_functions_class_exists = class_exists( '\KISS\PTT\Time\TimeFunctions' );
+    $results[] = [
+        'name'    => 'PSR-4: TimeFunctions Class',
+        'status'  => $time_functions_class_exists ? 'Pass' : 'Fail',
+        'message' => $time_functions_class_exists
+            ? 'PSR-4 TimeFunctions class exists.'
+            : 'CRITICAL: PSR-4 TimeFunctions class is missing!',
+    ];
 
     // Test 8: Database Table Integrity (WordPress core tables)
     global $wpdb;
