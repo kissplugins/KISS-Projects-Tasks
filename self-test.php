@@ -263,7 +263,7 @@ function ptt_test_data_structure_integrity() {
         }
     }
 
-    // Test 7: Core Functions Exist
+    // Test 7: Core Functions Exist (PSR-4 + procedural wrappers)
     $required_functions = [
         'ptt_get_tasks_for_user',
         'ptt_calculate_and_save_duration',
@@ -283,6 +283,54 @@ function ptt_test_data_structure_integrity() {
                 : "CRITICAL: Core function {$function_name}() is missing!",
         ];
     }
+
+    // Test 8: PSR-4 TimeFunctions Class
+    $time_functions_class_exists = class_exists( '\KISS\PTT\Time\TimeFunctions' );
+    $results[] = [
+        'name'    => 'PSR-4: TimeFunctions Class',
+        'status'  => $time_functions_class_exists ? 'Pass' : 'Fail',
+        'message' => $time_functions_class_exists
+            ? 'PSR-4 TimeFunctions class exists.'
+            : 'CRITICAL: PSR-4 TimeFunctions class is missing!',
+    ];
+
+    // Test 9: PSR-4 Helpers Class
+    $helpers_class_exists = class_exists( '\KISS\PTT\Utilities\Helpers' );
+    $results[] = [
+        'name'    => 'PSR-4: Helpers Class',
+        'status'  => $helpers_class_exists ? 'Pass' : 'Fail',
+        'message' => $helpers_class_exists
+            ? 'PSR-4 Helpers class exists.'
+            : 'CRITICAL: PSR-4 Helpers class is missing!',
+    ];
+
+    // Test 10: PSR-4 Today Helper Classes
+    $today_classes = [
+        'EntryRenderer' => '\KISS\PTT\Presentation\Today\EntryRenderer',
+        'DataProvider' => '\KISS\PTT\Presentation\Today\DataProvider',
+        'PageManager' => '\KISS\PTT\Presentation\Today\PageManager',
+    ];
+
+    foreach ($today_classes as $name => $class) {
+        $class_exists = class_exists($class);
+        $results[] = [
+            'name'    => "PSR-4: Today {$name} Class",
+            'status'  => $class_exists ? 'Pass' : 'Fail',
+            'message' => $class_exists
+                ? "PSR-4 Today {$name} class exists."
+                : "CRITICAL: PSR-4 Today {$name} class is missing!",
+        ];
+    }
+
+    // Test 11: PSR-4 TodayController Class
+    $today_controller_exists = class_exists( '\KISS\PTT\Presentation\Today\TodayController' );
+    $results[] = [
+        'name'    => 'PSR-4: Today Controller Class',
+        'status'  => $today_controller_exists ? 'Pass' : 'Fail',
+        'message' => $today_controller_exists
+            ? 'PSR-4 Today Controller class exists.'
+            : 'CRITICAL: PSR-4 Today Controller class is missing!',
+    ];
 
     // Test 8: Database Table Integrity (WordPress core tables)
     global $wpdb;

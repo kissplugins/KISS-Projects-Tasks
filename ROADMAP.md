@@ -52,6 +52,18 @@ This would complement the existing self-tests perfectly - the current tests vali
    - Keep Plugin as the simple service container for now.
    - Add UTC/date helpers to ACFAdapter and route reporting/TODAY comparisons through those (no UI refactor).
 
+3) QA/User Validation Enhancements
+   - Implement the "15 Minute End‑to‑End Test" Demo page that opens in a new tab and cleans up after itself (preferred workflow test).
+   - Add a quick admin command/button to run Self‑Tests and display results inline, with a link to detailed logs.
+
+4) PSR‑4 Hardening for Today Helpers
+   - Split TodayHelpers classes (EntryRenderer, DataProvider, PageManager) into separate files to align with Composer’s PSR‑4 expectations and remove explicit requires.
+   - After splitting, retire the explicit include in Plugin::init and keep autoload-only.
+
+5) Compatibility & Hooks
+   - Call TodayController::register() directly from Plugin::init; gradually retire today-compat hook registrations.
+   - Keep legacy wrappers for a deprecation window and add _doing_it_wrong() notices behind a flag.
+
 Notes on FSM and PSR‑4
 - The Today‑page FSM (TimerFSM/DataFSM) is an independent UI/controller improvement. It is not required to ship the two bug fixes above.
 - FSM will live under src/Presentation/Today/ (controller + effects) and can be introduced behind a feature flag after PSR‑4 Phase 2 hardening steps.
@@ -64,7 +76,8 @@ Notes on FSM and PSR‑4
 - [x] Refactor main plugin bootstrap into `KISS\PTT\Plugin`
 - [x] Move time calculation logic into `KISS\PTT\Time\Calculator`
 - [x] Wrap existing helper functions to call namespaced classes
-- [ ] Human QA Testing - Not done yet
+- [x] Self-Tests suite stabilized (67/67 passing)
+- [ ] Human QA Testing (End‑to‑End): Provide "15 Minute E2E Test" page that opens in a new tab and cleans up after itself
 
 
 ## Phase 2 – Core Domain & Storage (High Priority)
@@ -78,6 +91,7 @@ Notes on FSM and PSR‑4
   - [x] Create ACFAdapter (src/Integration/ACF/ACFAdapter.php)
   - [x] Create SessionRepository (src/Domain/Session/SessionRepository.php)
   - [x] Create TimerService skeleton (src/Domain/Timer/TimerService.php)
+  - [x] Diagnostics: ACF schema checks and admin warnings (src/Integration/ACF/Diagnostics.php)
 
   - [x] Register local ACF field groups for clean installs (src/Integration/ACF/FieldGroups.php)
 
@@ -134,8 +148,8 @@ If your site has different field keys or names:
 
 ## Phase 3 – Service Seams under PSR‑4 (In Progress)
 - [ ] src/Support/Services locator
-- [ ] src/Integration/ACF/ACFAdapter (field‑key access, UTC conversions)
-- [ ] Wire repositories/services in Plugin::init/boot
+- [x] src/Integration/ACF/ACFAdapter (field‑key access, UTC conversions) — partial in place
+- [x] Wire repositories/services in Plugin::init (ACFAdapter, SessionRepository, TimerService)
 
 ## Phase 4 – Session Storage Promotion (Decision Point)
 Option B1 – Session CPT (ptt_session)
@@ -158,9 +172,10 @@ Option B2 – Custom table (wp_ptt_sessions)
 - [ ] Instrument timings of get_field/update_field and track improvements
 
 ## Phase 6 – Today UI and Controllers (Lower Priority)
-- [ ] Migrate Today page data/renderer into classes (Presentation\Today)
-- [ ] Centralize AJAX callbacks in Plugin::init via namespaced callables
+- [x] Migrate Today page data/renderer into classes (Presentation\Today) — implemented in TodayHelpers.php with compatibility wrappers
+- [x] Centralize AJAX callbacks in Plugin::init via namespaced callables — TodayController provides PSR‑4 endpoints; compat file registers procedural handlers
 - [ ] Replace procedural handlers with service calls; defer UI polish to later
+- [ ] Split TodayHelpers classes into separate files and remove explicit requires (see Near‑Term Priority 4)
 
 ## Phase 7 – Public API and Extensibility
 - [ ] Enable show_in_rest for CPT/taxonomies (read-only), or

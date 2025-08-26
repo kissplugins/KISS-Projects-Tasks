@@ -1,5 +1,82 @@
 # Changelog
 
+## Version 2.2.27 - Fix PSR-4 Today classes autoloading during Self-Tests
+- **Fixed**: Explicitly include TodayHelpers.php where the PSR-4 Today classes (EntryRenderer, DataProvider, PageManager) are defined.
+- **Reason**: These classes are defined in a single file; Composer PSR-4 expects one class per file, so the autoloader may not load them before Self-Tests run in some contexts.
+- **Also**: Self-tests now ensure the file is required before referencing the classes, preventing fatal "Class ... DataProvider not found" errors.
+
+## Version 2.2.26 - Comprehensive test post cleanup enhancement
+- **Enhanced**: Self-test cleanup now removes ALL test post patterns, not just "CALC TEST POST".
+- **Added**: Cleanup for "TODAY DATE INCLUSION TEST", "Today", "Convert Legacy Task Timer to New Sessions", and other test patterns.
+- **Improved**: Double-layer cleanup - initial cleanup at start + final cleanup at end of tests.
+- **Fixed**: Test posts no longer accumulate after multiple self-test runs.
+- **Enhanced**: Cleanup verification now checks for all test patterns, not just one type.
+
+## Version 2.2.25 - Fixed PSR-4 compatibility layer loading in self-tests
+- **Fixed**: Self-tests now properly load PSR-4 compatibility layers before running tests.
+- **Added**: Automatic compatibility layer loading for Today helpers and controller classes.
+- **Enhanced**: Self-tests now use PSR-4 classes directly with fallback to procedural classes.
+- **Resolved**: "Class DataProvider not found" error in self-tests.
+- The enhanced error reporting from v2.2.24 successfully identified and helped resolve this PSR-4 migration issue.
+
+## Version 2.2.24 - Enhanced self-test error reporting and debugging
+- **Enhanced**: Self-test error handling with detailed debugging information.
+- **Added**: Individual test error wrapping with try-catch blocks to isolate failing tests.
+- **Added**: Debug information panel showing PHP version, memory limits, plugin version, etc.
+- **Improved**: JavaScript error handling with detailed error messages and troubleshooting tips.
+- **Added**: Support for "Error" status in addition to "Pass", "Fail", and "Skip".
+- **Enhanced**: Network error handling with server response details and common causes.
+- **Improved**: Error messages now include file names, line numbers, and stack traces.
+- Self-tests now provide much better debugging information when issues occur.
+
+## Version 2.2.23 - PSR-4 Migration: today.php
+- **Migrated**: `today.php` to PSR-4 class `src/Presentation/Today/TodayController.php`.
+- **Added**: Complete Today page controller with all 15 functions migrated to static methods.
+- **Added**: Backward compatibility layer with procedural function wrappers in `src/Presentation/Today/today-compat.php`.
+- **Updated**: Plugin class now uses PSR-4 TodayController instead of requiring procedural file.
+- **Added**: Self-tests validation for PSR-4 TodayController class and key methods.
+- **Maintained**: Full backward compatibility - all existing function calls and AJAX handlers continue to work.
+- **Migrated Functions**: Menu registration, page rendering, and 11 AJAX handlers (tasks, sessions, timers, quick start).
+- Fourth successful PSR-4 migration, completing the Today page presentation layer.
+
+## Version 2.2.22 - PSR-4 Migration: today-helpers.php
+- **Migrated**: `today-helpers.php` to PSR-4 classes in `src/Presentation/Today/TodayHelpers.php`.
+- **Added**: Three new PSR-4 classes: `EntryRenderer`, `DataProvider`, and `PageManager`.
+- **Added**: Backward compatibility layer with procedural class wrappers in `src/Presentation/Today/today-helpers-compat.php`.
+- **Updated**: `today.php` now uses PSR-4 classes instead of requiring procedural file.
+- **Added**: Self-tests validation for PSR-4 Today helper classes.
+- **Maintained**: Full backward compatibility - all existing class calls continue to work.
+- Third successful PSR-4 migration, establishing the pattern for presentation layer classes.
+
+## Version 2.2.21 - PSR-4 Migration: helpers.php
+- **Migrated**: `helpers.php` to PSR-4 class `src/Utilities/Helpers.php`.
+- **Added**: Backward compatibility layer with procedural function wrappers in `src/Utilities/helpers-compat.php`.
+- **Updated**: Plugin class now uses PSR-4 Helpers instead of requiring procedural file.
+- **Added**: Self-tests validation for PSR-4 Helpers class and methods.
+- **Maintained**: Full backward compatibility - all existing function calls continue to work.
+- Second successful PSR-4 migration following the established pattern.
+
+## Version 2.2.20 - Improved self-test cleanup and post deletion
+- **Added**: Automatic cleanup of orphaned "CALC TEST POST" entries at the start of self-tests.
+- **Added**: Final verification test to ensure all test posts are properly cleaned up.
+- **Improved**: Test post cleanup now uses try-finally blocks to ensure cleanup even if tests fail.
+- **Fixed**: Self-tests no longer leave behind multiple test posts in the task list.
+- The self-tests now properly clean up after themselves, preventing accumulation of test data.
+
+## Version 2.2.19 - Fixed PSR-4 Migration: time-functions.php
+- **Fixed**: Fatal error caused by defining functions inside class methods (not allowed in PHP).
+- **Added**: Separate compatibility file `src/Time/time-functions-compat.php` for procedural function wrappers.
+- **Updated**: Plugin class now requires the compatibility file instead of calling a class method.
+- **Maintained**: Full backward compatibility with all existing function calls.
+
+## Version 2.2.18 - PSR-4 Migration: time-functions.php
+- **Migrated**: `time-functions.php` to PSR-4 class `src/Time/TimeFunctions.php`.
+- **Added**: Backward compatibility layer with procedural function wrappers.
+- **Updated**: Plugin class now uses PSR-4 TimeFunctions instead of requiring procedural file.
+- **Added**: Self-tests validation for PSR-4 TimeFunctions class and methods.
+- **Maintained**: Full backward compatibility - all existing function calls continue to work.
+- This is the first step in the PSR-4 migration strategy for better code organization.
+
 ## Version 2.2.17 - Added total duration display field
 - **Added**: New "Total Duration (hrs)" read-only field in task edit screen that shows the sum of all session durations.
 - **Updated**: Calculator class now populates the total_duration_display field when calculating durations.
