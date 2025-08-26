@@ -48,14 +48,7 @@ class TimerService
             }
         }
 
-        // Invariant 1: Task must not have a parent-level running timer
-        $start = $this->acf->getField('start_time', $postId);
-        $stop  = $this->acf->getField('stop_time', $postId);
-        if ($start && !$stop) {
-            return false;
-        }
-
-        // Invariant 2: Task should not already have a running session
+        // Invariant: Task should not already have a running session (session-only approach)
         $sessions = $this->sessions->getAll($postId);
         foreach ($sessions as $s) {
             if (!empty($s['session_start_time']) && empty($s['session_stop_time'])) {

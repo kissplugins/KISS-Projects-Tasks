@@ -10,37 +10,17 @@ class Calculator {
         $sessions = get_field( 'sessions', $post_id );
         $duration = 0.00;
 
+        // Session-only approach: calculate duration from sessions repeater only
         if ( ! empty( $sessions ) ) {
             $duration = self::get_total_sessions_duration( $post_id );
         } else {
-            $manual_override = get_field( 'manual_override', $post_id );
-
-            if ( $manual_override ) {
-                $manual_duration = get_field( 'manual_duration', $post_id );
-                $duration        = $manual_duration ? (float) $manual_duration : 0.00;
-            } else {
-                $start_time_str = get_field( 'start_time', $post_id );
-                $stop_time_str  = get_field( 'stop_time', $post_id );
-
-                if ( $start_time_str && $stop_time_str ) {
-                    try {
-                        $start_time = new DateTime( $start_time_str, new DateTimeZone( 'UTC' ) );
-                        $stop_time  = new DateTime( $stop_time_str, new DateTimeZone( 'UTC' ) );
-
-                        if ( $stop_time > $start_time ) {
-                            $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
-                            $duration_hours = $diff_seconds / 3600;
-                            $duration       = ceil( $duration_hours * 100 ) / 100;
-                        }
-                    } catch ( Exception $e ) {
-                        $duration = 0.00;
-                    }
-                }
-            }
+            // No sessions = no duration (parent-level fields removed)
+            $duration = 0.00;
         }
 
         $formatted_duration = number_format( (float) $duration, 2, '.', '' );
-        update_field( 'calculated_duration', $formatted_duration, $post_id );
+        // Update the read-only total duration display field
+        update_field( 'total_duration_display', $formatted_duration, $post_id );
 
         return $formatted_duration;
     }

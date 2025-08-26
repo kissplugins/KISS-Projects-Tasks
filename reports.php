@@ -16,54 +16,22 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 /*===================================================================
- * Helper: Format Task Notes (URLs → links, truncate > 200 chars)
+ * Helper: Format Task Notes (URLs → links, truncate > 200 chars)
  *==================================================================*/
-function ptt_format_task_notes( $content, $max_length = 200 ) {
-	$content = wp_strip_all_tags( $content );
-	$content = trim( $content );
-
-	if ( empty( $content ) ) {
-		return '';
-	}
-
-	$truncated = false;
-	if ( strlen( $content ) > $max_length ) {
-		$content   = substr( $content, 0, $max_length - 3 );
-		$truncated = true;
-	}
-
-	$content = esc_html( $content );
-
-	$url_pattern = '/(https?:\/\/[^\s<>"{}|\\^`\[\]]+)/i';
-	$content     = preg_replace_callback(
-		$url_pattern,
-		function ( $m ) {
-			$url         = $m[1];
-			$display_url = strlen( $url ) > 50 ? substr( $url, 0, 47 ) . '…' : $url;
-			return '<a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . $display_url . '</a>';
-		},
-		$content
-	);
-
-	if ( $truncated ) {
-		$content .= '…';
-	}
-
-	return $content;
+if ( ! function_exists( 'ptt_format_task_notes' ) ) {
+    function ptt_format_task_notes( $content, $max_length = 200 ) {
+        return \KISS\PTT\Reports\Helpers::formatTaskNotes( $content, (int) $max_length );
+    }
 }
 
 /**
  * Retrieves the Assignee display name for a task.
- *
- * @param int $post_id Task ID.
- * @return string Assignee name or "No Assignee".
+ * Back-compat wrapper for PSR-4 helper.
  */
-function ptt_get_assignee_name( $post_id ) {
-       $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );
-       if ( $assignee_id ) {
-               return get_the_author_meta( 'display_name', $assignee_id );
-       }
-       return __( 'No Assignee', 'ptt' );
+if ( ! function_exists( 'ptt_get_assignee_name' ) ) {
+    function ptt_get_assignee_name( $post_id ) {
+        return \KISS\PTT\Reports\Helpers::getAssigneeName( (int) $post_id );
+    }
 }
 
 /*===================================================================
@@ -82,25 +50,12 @@ function ptt_add_reports_page() {
 add_action( 'admin_menu', 'ptt_add_reports_page' );
 
 /*===================================================================
- * Handle sort-by-status cookie early
+ * Handle sort-by-status cookie early (delegates to PSR-4)
  *==================================================================*/
-function ptt_handle_sort_status_cookie() {
-       if ( ! isset( $_GET['page'] ) || 'ptt-reports' !== $_GET['page'] ) {
-               return;
-       }
-
-       if ( ! current_user_can( 'edit_posts' ) ) {
-               return;
-       }
-
-       if ( isset( $_GET['run_report'] ) ) {
-               $sort_pref = isset( $_GET['sort_status'] ) ? sanitize_text_field( $_GET['sort_status'] ) : 'default';
-               if ( isset( $_GET['remember_sort'] ) && '1' === $_GET['remember_sort'] ) {
-                       setcookie( 'ptt_sort_status', $sort_pref, time() + YEAR_IN_SECONDS, COOKIEPATH, COOKIE_DOMAIN );
-               } else {
-                       setcookie( 'ptt_sort_status', '', time() - 3600, COOKIEPATH, COOKIE_DOMAIN );
-               }
-       }
+if ( ! function_exists( 'ptt_handle_sort_status_cookie' ) ) {
+    function ptt_handle_sort_status_cookie() {
+        \KISS\PTT\Reports\Preferences::handleSortStatusCookie();
+    }
 }
 add_action( 'admin_init', 'ptt_handle_sort_status_cookie' );
 
@@ -109,22 +64,14 @@ add_action( 'admin_init', 'ptt_handle_sort_status_cookie' );
  *==================================================================*/
 function ptt_reports_page_html() {
 
-		$saved_sort = isset( $_REQUEST['sort_status'] )
-			? sanitize_text_field( $_REQUEST['sort_status'] )
-			: ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
+		$saved_sort = \KISS\PTT\Reports\Preferences::getSavedSort();
 
 		$view_mode = isset( $_REQUEST['view_mode'] ) ? sanitize_text_field( $_REQUEST['view_mode'] ) : 'classic';
 		?>
 		<div class="wrap">
 				<h1>Project &amp; Task Time Reports</h1>
 
-		<div class="notice notice-info inline">
-			<p><strong>How the Date Filter Works:</strong></p>
-			<ul style="list-style: disc; padding-left: 20px;">
-				<li><strong>Classic &amp; Task Focused Views:</strong> The date range shows tasks that were either created or had work sessions logged within that period.</li>
-				<li><strong>Single Day View:</strong> The single date picker shows all tasks that were created or had work sessions logged on that specific day.</li>
-			</ul>
-		</div>
+		<?php echo \KISS\PTT\Reports\UI::dateFilterHelpHtml(); ?>
 
 		<form method="get" action="">
 			<?php wp_nonce_field( 'ptt_run_report_nonce' ); ?>
@@ -289,7 +236,7 @@ function ptt_display_report_results() {
        $status_id   = isset( $_REQUEST['status_id'] )   ? intval( $_REQUEST['status_id'] )   : 0;
        $start_date  = ! empty( $_REQUEST['start_date'] ) ? sanitize_text_field( $_REQUEST['start_date'] ) : null;
        $end_date    = ! empty( $_REQUEST['end_date'] )   ? sanitize_text_field( $_REQUEST['end_date'] )   : null;
-       $sort_status = isset( $_REQUEST['sort_status'] ) ? sanitize_text_field( $_REQUEST['sort_status'] ) : ( isset( $_COOKIE['ptt_sort_status'] ) ? sanitize_text_field( $_COOKIE['ptt_sort_status'] ) : 'default' );
+       $sort_status = \KISS\PTT\Reports\Preferences::getSavedSort();
        $view_mode   = isset( $_REQUEST['view_mode'] )   ? sanitize_text_field( $_REQUEST['view_mode'] )   : 'classic';
 
 	/*--------------------------------------------------------------
@@ -387,18 +334,18 @@ function ptt_display_report_results() {
 		 * Render Debug Output (if enabled)
 		 *-------------------------------------------------------------*/
 		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
-			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
-			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
-			echo '<h4>Initial WP_Query Arguments:</h4>';
-			echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
-			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
-			echo '<h4>Task Sorting Logic:</h4>';
-			echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
-			echo '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>';
-			echo '<h4>Final Status Order Map (<code>$status_order</code>):</h4>';
-			echo '<p><em>Tasks are sorted based on the ascending value of their status ID in this map.</em></p>';
-			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
-			echo '</div>';
+			$title = '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
+			$content = ''
+				. '<h4>Initial WP_Query Arguments:</h4>'
+				. '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>'
+				. '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>'
+				. '<h4>Task Sorting Logic:</h4>'
+				. '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>'
+				. '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>'
+				. '<h4>Final Status Order Map (<code>$status_order</code>):</h4>'
+				. '<p><em>Tasks are sorted based on the ascending value of their status ID in this map.</em></p>'
+				. '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
+			echo \KISS\PTT\Reports\UI::debugNotice( $title, $content );
 		}
 
 		/*----------------------------------------------------------
@@ -407,8 +354,10 @@ function ptt_display_report_results() {
                 $task_list = [];
                 if ( $q->have_posts() ) {
                         // Attn: LLM Maintainers do not refactor this date search code unless specifically directed.
-                        $start_timestamp = $start_date ? strtotime( $start_date . ' 00:00:00' ) : 0;
-                        $end_timestamp   = $end_date ? strtotime( $end_date . ' 23:59:59' ) : PHP_INT_MAX;
+                        // Converted to centralized UTC helpers (no behavior change intended)
+                        $bounds = \KISS\PTT\Plugin::$acf->localDateRangeToUtcBounds( $start_date, $end_date );
+                        $start_timestamp = $bounds['start_ts_utc'];
+                        $end_timestamp   = $bounds['end_ts_utc'];
 
 			while ( $q->have_posts() ) {
 				$q->the_post();
@@ -427,8 +376,8 @@ function ptt_display_report_results() {
 					if ( ! empty( $sessions ) && is_array( $sessions ) ) {
 						foreach ( $sessions as $session ) {
 							if ( ! empty( $session['session_start_time'] ) ) {
-								$session_timestamp = strtotime( $session['session_start_time'] );
-								if ( $session_timestamp >= $start_timestamp && $session_timestamp <= $end_timestamp ) {
+								// Use centralized adapter to compare UTC datetime against local date range
+								if ( \KISS\PTT\Plugin::$acf->isUtcWithinLocalRange( $session['session_start_time'], $start_date, $end_date ) ) {
 									$is_relevant = true;
 									break;
 								}
@@ -456,7 +405,12 @@ function ptt_display_report_results() {
 				}
 				$last_entry_date = ( $latest_session_timestamp > 0 ) ? date( 'Y-m-d', $latest_session_timestamp ) : '–';
 
-				$duration    = (float) get_field( 'calculated_duration', $post_id );
+				// Use new total duration display field or calculate on-demand
+				$duration = (float) get_field( 'total_duration_display', $post_id );
+				if ( !$duration && function_exists( 'ptt_calculate_and_save_duration' ) ) {
+					// Fallback: calculate on-demand if display field is empty
+					$duration = (float) ptt_calculate_and_save_duration( $post_id );
+				}
 				$grand_total += $duration;
 
 				$client_terms = get_the_terms( $post_id, 'client' );
@@ -465,7 +419,7 @@ function ptt_display_report_results() {
 				$task_base = [
 					'id'              => $post_id,
 					'title'           => get_the_title(),
-                                       'assignee_name'   => ptt_get_assignee_name( $post_id ),
+                                       'assignee_name'   => \KISS\PTT\Reports\Helpers::getAssigneeName( (int) $post_id ),
 					'client_name'     => ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '–',
 					'project_name'    => ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–',
 					'creation_date'   => get_the_date( 'Y-m-d', $post_id ),
@@ -560,13 +514,13 @@ function ptt_display_report_results() {
 		 * Render Debug Output (if enabled)
 		 *-------------------------------------------------------------*/
 		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
-			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
-			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information (Single Day View)</h3>';
-			echo '<h4>Query & Filtering Logic:</h4>';
-			echo '<p><strong>Target Date (<code>$target_date_str</code>):</strong> ' . esc_html( $target_date_str ) . '</p>';
-			echo '<p><em>The query below fetches all candidate tasks based on non-date filters (User, Client, etc.). PHP logic then loops through these results to find tasks that were either created on the target date or had a time session on that date.</em></p>';
-			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
-			echo '</div>';
+			$title = '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information (Single Day View)</h3>';
+			$content = ''
+				. '<h4>Query & Filtering Logic:</h4>'
+				. '<p><strong>Target Date (<code>$target_date_str</code>):</strong> ' . esc_html( $target_date_str ) . '</p>'
+				. '<p><em>The query below fetches all candidate tasks based on non-date filters (User, Client, etc.). PHP logic then loops through these results to find tasks that were either created on the target date or had a time session on that date.</em></p>'
+				. '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
+			echo \KISS\PTT\Reports\UI::debugNotice( $title, $content );
 		}
 
 		/*----------------------------------------------------------
@@ -636,7 +590,11 @@ function ptt_display_report_results() {
 					if ( $post_creation_date === $target_date_str ) {
 						$is_relevant_for_day = true;
 						$sort_timestamp      = get_the_date( 'U', $post_id );
-						$daily_duration      = (float) get_field( 'calculated_duration', $post_id );
+						// Use new total duration display field or calculate on-demand
+						$daily_duration = (float) get_field( 'total_duration_display', $post_id );
+						if ( !$daily_duration && function_exists( 'ptt_calculate_and_save_duration' ) ) {
+							$daily_duration = (float) ptt_calculate_and_save_duration( $post_id );
+						}
 					}
 				}
 
@@ -762,18 +720,18 @@ function ptt_display_report_results() {
 		 * Render Debug Output (if enabled)
 		 *-------------------------------------------------------------*/
 		if ( isset( $_REQUEST['debug_mode'] ) && '1' === $_REQUEST['debug_mode'] ) {
-			echo '<div class="notice notice-info" style="padding: 15px; margin: 20px 0; border-left-color: #0073aa;">';
-			echo '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
-			echo '<h4>Initial WP_Query Arguments:</h4>';
-			echo '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>';
-			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>';
-			echo '<h4>Task Sorting Logic:</h4>';
-			echo '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>';
-			echo '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>';
-			echo '<h4>Final Status Order Map (<code>$status_order</code>):</h4>';
-			echo '<p><em>Tasks are sorted based on the ascending value of their status ID in this map.</em></p>';
-			echo '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
-			echo '</div>';
+			$title = '<h3><span class="dashicons dashicons-hammer" style="vertical-align: middle; margin-right: 5px;"></span> Debugging Information</h3>';
+			$content = ''
+				. '<h4>Initial WP_Query Arguments:</h4>'
+				. '<p><em>This is the main query sent to the database to fetch all matching tasks before they are grouped and sorted.</em></p>'
+				. '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px; white-space: pre-wrap;">' . esc_html( print_r( $args, true ) ) . '</pre>'
+				. '<h4>Task Sorting Logic:</h4>'
+				. '<p><strong>Selected View Mode (<code>$view_mode</code>):</strong> ' . esc_html( $view_mode ) . '</p>'
+				. '<p><strong>Selected Sort Preference (<code>$sort_status</code>):</strong> ' . esc_html( $sort_status ) . '</p>'
+				. '<h4>Final Status Order Map (<code>$status_order</code>):</h4>'
+				. '<p><em>Tasks are sorted based on the ascending value of their status ID in this map.</em></p>'
+				. '<pre style="background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">' . esc_html( print_r( $status_order, true ) ) . '</pre>';
+			echo \KISS\PTT\Reports\UI::debugNotice( $title, $content );
 		}
 
 		/*----------------------------------------------------------
@@ -782,8 +740,10 @@ function ptt_display_report_results() {
                 $report = [];
                 if ( $q->have_posts() ) {
                         // Attn: LLM Maintainers do not refactor this date search code unless specifically directed.
-                        $start_timestamp = $start_date ? strtotime( $start_date . ' 00:00:00' ) : 0;
-                        $end_timestamp   = $end_date ? strtotime( $end_date . ' 23:59:59' ) : PHP_INT_MAX;
+                        // Converted to centralized UTC helpers (no behavior change intended)
+                        $bounds = \KISS\PTT\Plugin::$acf->localDateRangeToUtcBounds( $start_date, $end_date );
+                        $start_timestamp = $bounds['start_ts_utc'];
+                        $end_timestamp   = $bounds['end_ts_utc'];
 
 			while ( $q->have_posts() ) {
 				$q->the_post();
@@ -802,8 +762,8 @@ function ptt_display_report_results() {
 					if ( ! empty( $sessions ) && is_array( $sessions ) ) {
 						foreach ( $sessions as $session ) {
 							if ( ! empty( $session['session_start_time'] ) ) {
-								$session_timestamp = strtotime( $session['session_start_time'] );
-								if ( $session_timestamp >= $start_timestamp && $session_timestamp <= $end_timestamp ) {
+								// Use centralized adapter to compare UTC datetime against local date range
+								if ( \KISS\PTT\Plugin::$acf->isUtcWithinLocalRange( $session['session_start_time'], $start_date, $end_date ) ) {
 									$is_relevant = true;
 									break;
 								}
@@ -831,7 +791,11 @@ function ptt_display_report_results() {
 				}
 				$last_entry_date = ( $latest_session_timestamp > 0 ) ? date( 'Y-m-d', $latest_session_timestamp ) : '–';
 
-				$duration = (float) get_field( 'calculated_duration', $post_id );
+				// Use new total duration display field or calculate on-demand
+				$duration = (float) get_field( 'total_duration_display', $post_id );
+				if ( !$duration && function_exists( 'ptt_calculate_and_save_duration' ) ) {
+					$duration = (float) ptt_calculate_and_save_duration( $post_id );
+				}
 				$grand_total += $duration;
 
                                $assignee_id = (int) get_post_meta( $post_id, 'ptt_assignee', true );

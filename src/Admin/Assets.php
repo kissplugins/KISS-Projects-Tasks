@@ -20,6 +20,12 @@ class Assets {
             return;
         }
 
+        // Reports page
+        if ( $hook === 'project_task_page_ptt-reports' ) {
+            self::enqueueCore($hook);
+            return;
+        }
+
         // Project Task post editor (post.php / post-new.php)
         if ( $hook === 'post.php' || $hook === 'post-new.php' ) {
             $screen = function_exists('get_current_screen') ? get_current_screen() : null;
@@ -36,6 +42,20 @@ class Assets {
         wp_localize_script( 'ptt-scripts', 'ptt_ajax_object', [
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce'    => wp_create_nonce('ptt_ajax_nonce'),
+        ] );
+
+        // FSM bundles (Today + Editor share core; flags disabled by default)
+        wp_enqueue_script( 'ptt-fsm-timer-core', PTT_PLUGIN_URL . 'assets/js/fsm/timer/TimerFSM.js', [], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-timer-today', PTT_PLUGIN_URL . 'assets/js/fsm/timer/TodayEffects.js', [ 'ptt-fsm-timer-core', 'jquery' ], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-timer-today-controller', PTT_PLUGIN_URL . 'assets/js/fsm/timer/TodayTimerController.js', [ 'ptt-fsm-timer-today' ], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-timer-editor', PTT_PLUGIN_URL . 'assets/js/fsm/timer/EditorEffects.js', [ 'ptt-fsm-timer-core', 'jquery' ], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-timer-editor-controller', PTT_PLUGIN_URL . 'assets/js/fsm/timer/EditorTimerController.js', [ 'ptt-fsm-timer-editor' ], PTT_VERSION, true );
+        // FSM flags from settings helper (defaults ON). Applies to all users (internal testers).
+        $flags = Settings::getFlags();
+        wp_localize_script( 'ptt-fsm-timer-today-controller', 'PTT_FSM_FLAGS', [
+            'PTT_FSM_ENABLED' => $flags['enabled'],
+            'PTT_FSM_TODAY_ENABLED' => $flags['enabled'] && $flags['today'],
+            'PTT_FSM_EDITOR_ENABLED' => $flags['enabled'] && $flags['editor'],
         ] );
     }
 }

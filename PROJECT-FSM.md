@@ -36,6 +36,29 @@ Effects to inject:
 
 ---
 
+
+## Dependencies and Sequencing with PSR‑4
+
+- Pre‑requisites for FSM rollout (lightweight, do not block bug fixes):
+  - [ ] PSR‑4 Phase 2: Add UTC/date helpers in ACFAdapter and route Today/Reports timestamp parsing through them
+  - [ ] Ensure Plugin acts as stable service container (KISS\PTT\Plugin::$timer,::$sessions,::$acf)
+  - [ ] Keep Today procedural handlers intact while FSM is behind feature flag
+
+- Nice‑to‑have (post‑FSM acceptable):
+  - [ ] PSR‑4 Phase 3: Introduce thin Services locator (optional)
+  - [ ] Migrate Today data builder to src/Presentation/Today/ service after FSM Phase 2
+
+
+- Progress note (v2.1.7): Introduced PSR‑4 Today\DateHelper::isUtcOnLocalDate and routed Today session-date checks through it. This reduces duplication and supports later DataFSM work without UI refactor.
+- Progress note (v2.1.8): Introduced Today\EntryBuilder and delegated task-level entry construction to it; more helpers to follow.
+
+- Progress note (v2.1.9): Delegated session-level entry building to Today\EntryBuilder::buildSessionEntriesForDate; sets up for a lean TodayService.
+
+
+- Not required for initial FSM pilot:
+  - [x] Full PSR‑4 completion across all admin pages
+  - [x] Session CPT or custom table (Roadmap Phase 4)
+
 ## Actionable checklist by phase
 
 ### Phase 0 – Preparation (non‑breaking)
@@ -81,11 +104,42 @@ Acceptance:
 - [ ] No duplicate event handlers remain
 - [ ] FSMs are pure and testable; effects mocked in tests
 
+
+### Dual‑Context Application (Today + Post Editor)
+
+- Core principle: A single pure TimerFSM reused across contexts; context differences live in Effects.
+- Effects interfaces are identical; each context provides its own DOM/AJAX wiring.
+
+Controllers and Effects:
+- TodayTimerController + TodayEffects
+- EditorTimerController + EditorEffects
+
+Feature flags:
+- window.PTT_FSM_ENABLED (global)
+- window.PTT_FSM_TODAY_ENABLED (scoped)
+- window.PTT_FSM_EDITOR_ENABLED (scoped)
+
+
+Note: As of v2.2.4, these flags are controlled via Settings (options: ptt_fsm_enabled, ptt_fsm_today_enabled, ptt_fsm_editor_enabled) and default to ON for internal users; no URL param required.
+
+Benefits for the Post Editor:
+- Prevents “lost” sessions by making START/STOP idempotent and state‑aware
+- Guards against double‑starts when a session is already RUNNING elsewhere
+- Rehydration on load detects an existing running session and sets UI accordingly
+- Centralizes error handling (e.g., conflict_active_elsewhere) with consistent UI feedback
+
 ### Phase 4 – Optional enhancements
 - [ ] Local state persistence: store minimal FSM context in localStorage on transitions; restore when rehydration fails
 - [ ] Error taxonomy: network_error, permission_error, validation_error, conflict_active_elsewhere
 - [ ] Visualization: add simple diagram JSON and render in debug when ptt_debug=1 (or use XState Diagram later)
 - [ ] Replace hand‑rolled FSMs with XState if/when hierarchical states are needed
+- Progress note (v2.2.4): FSM flags moved to Settings (default ON). Panels added for semi‑permanent debug on Today & Editor in v2.2.5. ACF Schema test included in main self‑tests in v2.2.6; legacy card hidden in v2.2.7.
+
+
+- Progress note (v2.2.0‑alpha scaffolding): Added TimerFSM core, TodayEffects, TodayTimerController with flags off by default. No behavior changes yet; legacy handlers remain active.
+- Progress note (v2.2.1): Added Editor scaffolding (EditorEffects, EditorTimerController) with flags off; sharing TimerFSM core across contexts.
+
+
 
 ---
 
@@ -135,10 +189,10 @@ class TodayPageFSM {
             isLoading: false,
             error: null
         };
-        
+
         this.listeners = new Set();
         this.timerInterval = null;
-        
+
         // Bind methods
         this.transition = this.transition.bind(this);
         this.send = this.send.bind(this);
@@ -156,7 +210,7 @@ class TodayPageFSM {
                 },
                 entry: () => this.stopTimerDisplay()
             },
-            
+
             LOADING: {
                 on: {
                     ENTRIES_LOADED: 'IDLE',
@@ -165,21 +219,21 @@ class TodayPageFSM {
                 entry: () => this.showLoading(),
                 exit: () => this.hideLoading()
             },
-            
+
             STARTING_TIMER: {
                 on: {
                     TIMER_STARTED: 'TIMER_RUNNING',
                     START_FAILED: 'IDLE'
                 }
             },
-            
+
             STARTING_QUICK_START: {
                 on: {
                     QUICK_START_CREATED: 'TIMER_RUNNING',
                     QUICK_START_FAILED: 'IDLE'
                 }
             },
-            
+
             TIMER_RUNNING: {
                 on: {
                     STOP_TIMER: 'STOPPING_TIMER',
@@ -189,7 +243,7 @@ class TodayPageFSM {
                 entry: () => this.startTimerDisplay(),
                 exit: () => this.stopTimerDisplay()
             },
-            
+
             LOADING_WITH_TIMER: {
                 on: {
                     ENTRIES_LOADED: 'TIMER_RUNNING',
@@ -197,14 +251,14 @@ class TodayPageFSM {
                 },
                 entry: () => this.showLoading()
             },
-            
+
             STOPPING_TIMER: {
                 on: {
                     TIMER_STOPPED: 'IDLE',
                     STOP_FAILED: 'TIMER_RUNNING'
                 }
             },
-            
+
             ERROR: {
                 on: {
                     RETRY: 'IDLE',
@@ -225,25 +279,25 @@ class TodayPageFSM {
 
         const nextState = currentStateConfig.on[event];
         const prevState = this.currentState;
-        
+
         // Exit current state
         if (currentStateConfig.exit) {
             currentStateConfig.exit(payload);
         }
-        
+
         // Update state
         this.currentState = nextState;
         this.context = { ...this.context, ...payload };
-        
+
         // Enter new state
         const nextStateConfig = this.machine[nextState];
         if (nextStateConfig && nextStateConfig.entry) {
             nextStateConfig.entry(payload);
         }
-        
+
         // Notify listeners
         this.notifyListeners(prevState, nextState, event, payload);
-        
+
         console.log(`FSM: ${prevState} → ${nextState} (${event})`);
         return true;
     }
@@ -293,7 +347,7 @@ class TodayPageFSM {
 
         const timerDisplay = document.querySelector('.ptt-today-timer-display');
         const startBtn = document.querySelector('#ptt-today-start-stop-btn');
-        
+
         if (startBtn) {
             startBtn.textContent = 'Stop';
             startBtn.classList.remove('button-primary');
@@ -306,12 +360,12 @@ class TodayPageFSM {
                 const now = new Date();
                 const start = new Date(timerStartTime + 'Z'); // Treat as UTC
                 const diff = now - start;
-                
+
                 const hours = Math.floor(diff / 3600000);
                 const minutes = Math.floor((diff % 3600000) / 60000);
                 const seconds = Math.floor((diff % 60000) / 1000);
-                
-                timerDisplay.textContent = 
+
+                timerDisplay.textContent =
                     `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             }
         }, 1000);
@@ -325,11 +379,11 @@ class TodayPageFSM {
 
         const timerDisplay = document.querySelector('.ptt-today-timer-display');
         const startBtn = document.querySelector('#ptt-today-start-stop-btn');
-        
+
         if (timerDisplay) {
             timerDisplay.textContent = '00:00:00';
         }
-        
+
         if (startBtn) {
             startBtn.textContent = 'Start';
             startBtn.classList.add('button-primary');
@@ -394,7 +448,7 @@ function loadDailyEntries() {
     }
 
     const selectedDate = document.querySelector('#ptt-today-date-select')?.value || new Date().toISOString().split('T')[0];
-    
+
     $.post(ptt_ajax_object.ajax_url, {
         action: 'ptt_get_daily_entries',
         nonce: ptt_ajax_object.nonce,
@@ -405,7 +459,7 @@ function loadDailyEntries() {
                 entries: response.data.entries || [],
                 selectedDate: selectedDate
             });
-            
+
             // Update UI
             document.querySelector('#ptt-today-entries-list').innerHTML = response.data.html;
             document.querySelector('#ptt-today-total strong').textContent = response.data.total;
@@ -441,13 +495,13 @@ function startTimer() {
 // Subscribe to state changes for UI updates
 todayPageFSM.subscribe(({ nextState, context, event }) => {
     console.log('State changed:', { nextState, context, event });
-    
+
     // Enable/disable controls based on state
     const controls = document.querySelectorAll('#ptt-today-start-stop-btn, #ptt-today-task-select, #ptt-today-project-filter');
     controls.forEach(control => {
         control.disabled = todayPageFSM.isLoading;
     });
-    
+
     // Update debug panel if exists
     const debugPanel = document.querySelector('#ptt-debug-content');
     if (debugPanel) {

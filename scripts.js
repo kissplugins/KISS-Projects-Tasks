@@ -1,6 +1,57 @@
 jQuery(document).ready(function ($) {
     'use strict';
 
+    // Phase 0: FSM scaffolding (non-breaking)
+    // - Feature flag (default: false)
+    // - Effects stubs
+    // - Debug hook to render placeholder FSM info
+    window.PTT_FSM_ENABLED = (window.PTT_FSM_ENABLED === true);
+    window.pttEffects = window.pttEffects || {
+        startTimer: function(){ return Promise.reject('FSM not enabled'); },
+        stopTimer: function(){ return Promise.reject('FSM not enabled'); },
+        loadEntries: function(){ return Promise.reject('FSM not enabled'); },
+        updateTimerUI: function(){},
+        toggleLoading: function(){},
+        renderEntries: function(){},
+        showError: function(msg){ if (window.console) console.warn('[PTT]', msg); },
+        rehydrate: function(){ return Promise.resolve({ running: false }); }
+    };
+    window.PTT_FSM = window.PTT_FSM || {
+        timerState: 'DISABLED',
+        dataState: 'DISABLED',
+        nextTimerEvents: [],
+        nextDataEvents: [],
+        getDebugInfo: function(){
+            return {
+                enabled: !!window.PTT_FSM_ENABLED,
+                timerState: this.timerState,
+                dataState: this.dataState,
+                nextTimerEvents: this.nextTimerEvents,
+                nextDataEvents: this.nextDataEvents
+            };
+        }
+    };
+    function pttUpdateFsmDebug(){
+        try{
+            var debugOn = (window.location.search||'').indexOf('ptt_debug=1')>-1 || (window.localStorage && localStorage.getItem('PTT_DEBUG')==='1');
+            if(!debugOn) return;
+            var el = document.querySelector('#ptt-debug-content');
+            if(!el) return;
+            var info = (window.PTT_FSM && window.PTT_FSM.getDebugInfo) ? window.PTT_FSM.getDebugInfo() : {};
+            var container = document.querySelector('#ptt-fsm-debug');
+            if(!container){
+                container = document.createElement('div');
+                container.id = 'ptt-fsm-debug';
+                container.style.marginTop = '8px';
+                el.appendChild(container);
+            }
+            container.innerHTML = '<strong>FSM</strong><pre style="white-space:pre-wrap">'+JSON.stringify({ fsm: info }, null, 2)+'</pre>';
+        }catch(e){}
+    }
+    // Initial render (safe no-op if panel absent)
+    pttUpdateFsmDebug();
+
+
     // Session recovery - store active task in localStorage
     const PTT_STORAGE_KEY = 'ptt_active_task';
 
@@ -998,6 +1049,18 @@ jQuery(document).ready(function ($) {
         const $dateLabel = $dateRow.find('th label');
         const $weekButtons = $('#set-this-week, #set-last-week');
 
+        if (window.console) {
+            console.debug('[PTT Reports] handleReportViewModeChange()', {
+                viewMode,
+                present: {
+                    start: $('#start_date').length,
+                    end: $('#end_date').length,
+                    thisWeekBtn: $('#set-this-week').length,
+                    lastWeekBtn: $('#set-last-week').length
+                }
+            });
+        }
+
         if (viewMode === 'single_day') {
             $endDate.hide();
             $separator.hide();
@@ -1012,11 +1075,12 @@ jQuery(document).ready(function ($) {
     }
 
     // Handle view mode change
-    $('input[name="view_mode"]').on('change', handleReportViewModeChange);
+    $(document).on('change', 'input[name="view_mode"]', handleReportViewModeChange);
 
     // Run on page load to set initial state
     if ($('input[name="view_mode"]').length) {
         handleReportViewModeChange();
+        if (window.console) console.debug('[PTT Reports] Initialized view mode controls');
     }
 
 
@@ -1027,7 +1091,7 @@ jQuery(document).ready(function ($) {
         return `${y}-${m}-${d}`;
     };
 
-    $('#set-this-week').on('click', function(e) {
+    $(document).on('click', '#set-this-week', function(e) {
         e.preventDefault();
         const today = new Date();
         const day = today.getDay(); // Sunday - 0, Monday - 1, ..., Saturday - 6
@@ -1038,11 +1102,14 @@ jQuery(document).ready(function ($) {
         const saturday = new Date(today);
         saturday.setDate(today.getDate() - day + 6);
 
-        $('#start_date').val(formatDate(sunday));
-        $('#end_date').val(formatDate(saturday));
+        const start = formatDate(sunday);
+        const end = formatDate(saturday);
+        $('#start_date').val(start).trigger('change');
+        $('#end_date').val(end).trigger('change');
+        if (window.console) console.debug('[PTT Reports] Set This Week', { start, end });
     });
 
-    $('#set-last-week').on('click', function(e) {
+    $(document).on('click', '#set-last-week', function(e) {
         e.preventDefault();
         const today = new Date();
         const day = today.getDay();
@@ -1053,8 +1120,11 @@ jQuery(document).ready(function ($) {
         const lastSaturday = new Date(today);
         lastSaturday.setDate(today.getDate() - day - 1);
 
-        $('#start_date').val(formatDate(lastSunday));
-        $('#end_date').val(formatDate(lastSaturday));
+        const start = formatDate(lastSunday);
+        const end = formatDate(lastSaturday);
+        $('#start_date').val(start).trigger('change');
+        $('#end_date').val(end).trigger('change');
+        if (window.console) console.debug('[PTT Reports] Set Last Week', { start, end });
     });
 
     // Handle status change on reports page
@@ -1100,6 +1170,102 @@ jQuery(document).ready(function ($) {
         const $entriesList = $('#ptt-today-entries-list');
         const $totalDisplay = $('#ptt-today-total strong');
 
+        // Phase 1: TimerFSM (behind feature flag)
+        var timerFSM = null;
+        function createTimerFSM(){
+            function TimerFSM(){
+                this.state = 'IDLE';
+                this.ctx = { postId:null, sessionIndex:null, startUtc:null };
+            }
+            TimerFSM.prototype.transition = function(next, payload){
+                var prev = this.state; this.state = next; if(payload){ this.ctx = Object.assign(this.ctx, payload); }
+                if ((window.location.search||'').indexOf('ptt_debug=1')>-1) { console.log('[PTT][FSM]', prev+' -> '+next, this.ctx); }
+                try { if(window.PTT_FSM){ window.PTT_FSM.timerState = this.state; } } catch(e){}
+            };
+            TimerFSM.prototype.start = function(data){
+                var self=this; self.transition('STARTING');
+                return window.pttEffects.startTimer(data).then(function(res){
+                    self.transition('RUNNING', { postId:res.postId, sessionIndex:res.sessionIndex, startUtc:res.startUtc });
+                    window.pttEffects.updateTimerUI('RUNNING', { postId:res.postId, sessionIndex:res.sessionIndex, startUtc:res.startUtc, sessionTitle:res.sessionTitle });
+                }).catch(function(err){ self.transition('ERROR', { error:err }); window.pttEffects.showError(err&&err.message?err.message:String(err)); self.transition('IDLE'); });
+            };
+            TimerFSM.prototype.stop = function(){
+                var self=this; if(self.state!=='RUNNING'){ return Promise.resolve(); }
+                self.transition('STOPPING');
+                return window.pttEffects.stopTimer({ postId:self.ctx.postId, sessionIndex:self.ctx.sessionIndex }).then(function(){
+                    self.transition('IDLE', { postId:null, sessionIndex:null, startUtc:null });
+                    window.pttEffects.updateTimerUI('IDLE', {});
+                }).catch(function(err){ self.transition('ERROR', { error:err }); window.pttEffects.showError(err&&err.message?err.message:String(err)); self.transition('RUNNING'); });
+            };
+            return new TimerFSM();
+        }
+
+        if (window.PTT_FSM_ENABLED) {
+            // Override effects with Today-page aware implementations
+            window.pttEffects = Object.assign({}, window.pttEffects, {
+                startTimer: function(data){
+                    var taskId = data.taskId, title = (data.title||'').trim(), clientId = data.clientId||'';
+                    // Quick Start path
+                    if (clientId && (!taskId || !title)) {
+                        return $.post(ptt_ajax_object.ajax_url, { action:'ptt_today_quick_start', nonce: ptt_ajax_object.nonce, client_id: clientId })
+                            .then(function(response){ if(!response || !response.success){ throw new Error(response&&response.data&&response.data.message||'Could not start timer'); }
+                                return { postId: response.data.post_id, sessionIndex: response.data.session_index, startUtc: response.data.start_time, sessionTitle: (response.data.session_data&&response.data.session_data.title)||title };
+                            });
+                    }
+                    // Normal start new session
+                    if (!taskId || !title) { return Promise.reject(new Error('title_or_task_required')); }
+                    return $.post(ptt_ajax_object.ajax_url, { action:'ptt_today_start_new_session', nonce: ptt_ajax_object.nonce, post_id: taskId, session_title: title })
+                        .then(function(response){ if(!response || !response.success){ throw new Error(response&&response.data&&response.data.message||'Could not start timer'); }
+                            return { postId: response.data.post_id, sessionIndex: response.data.row_index, startUtc: response.data.start_time, sessionTitle: title };
+                        });
+                },
+                stopTimer: function(data){
+                    return $.post(ptt_ajax_object.ajax_url, { action:'ptt_stop_session_timer', nonce: ptt_ajax_object.nonce, post_id: data.postId, row_index: data.sessionIndex })
+                        .then(function(response){ if(!response || !response.success){ throw new Error(response&&response.data&&response.data.message||'Failed to stop timer'); } return response; });
+                },
+                updateTimerUI: function(state, ctx){
+                    if(state==='RUNNING'){
+                        $startStopBtn.addClass('running').text('Stop').removeClass('button-primary').addClass('button-secondary');
+                        $startStopBtn.data('postid', ctx.postId); $startStopBtn.data('rowindex', ctx.sessionIndex);
+                        if (ctx.sessionTitle) { $sessionTitle.val(ctx.sessionTitle); }
+                        $sessionTitle.prop('disabled', true); $taskSelect.prop('disabled', true); $projectFilter.prop('disabled', true); $clientFilter.prop('disabled', true);
+                        startTodayPageTimer(ctx.startUtc);
+                        loadDailyEntries();
+                    } else if(state==='IDLE'){
+                        $startStopBtn.removeClass('running').text('Start').removeClass('button-secondary').addClass('button-primary');
+                        $startStopBtn.data('postid',''); $startStopBtn.data('rowindex','');
+                        $sessionTitle.val('').prop('disabled', false); $taskSelect.prop('disabled', false); $projectFilter.prop('disabled', false); $clientFilter.prop('disabled', false);
+                        stopTodayPageTimer();
+                        loadDailyEntries();
+                    }
+                    // Update FSM debug panel
+                    try { pttUpdateFsmDebug(); } catch(e){}
+                },
+                rehydrate: function(){
+                    // Ask server if there's an active session for current user
+                    return $.post(ptt_ajax_object.ajax_url, { action:'ptt_get_active_task_info', nonce: ptt_ajax_object.nonce })
+                        .then(function(response){
+                            if (response && response.success) {
+                                return { running:true, postId: response.data.post_id, startUtc: response.data.start_time, sessionIndex: response.data.session_index, sessionTitle: response.data.task_name || response.data.session_title };
+                            }
+                            return { running:false };
+                        }).catch(function(){ return { running:false }; });
+                }
+            });
+            timerFSM = createTimerFSM();
+            // Rehydrate on load
+            window.pttEffects.rehydrate().then(function(info){
+                if (info && info.running) {
+                    timerFSM.state = 'RUNNING';
+                    timerFSM.ctx = { postId: info.postId, sessionIndex: info.sessionIndex, startUtc: info.startUtc };
+                    window.pttEffects.updateTimerUI('RUNNING', { postId: info.postId, sessionIndex: info.sessionIndex, startUtc: info.startUtc, sessionTitle: info.sessionTitle });
+                } else {
+                    window.pttEffects.updateTimerUI('IDLE', {});
+                }
+            });
+        }
+
+
         let activeTimerInterval = null;
 
         // Fetch tasks based on filters
@@ -1136,6 +1302,26 @@ jQuery(document).ready(function ($) {
             const $btn = $(this);
             const isRunning = $btn.hasClass('running');
 
+            if (window.PTT_FSM_ENABLED) {
+                // FSM-powered Start/Stop
+                if (isRunning) {
+                    $btn.prop('disabled', true).text('Stopping...');
+                    timerFSM.stop().finally(function(){ $btn.prop('disabled', false); });
+                } else {
+                    const taskId = $taskSelect.val();
+                    const title = $sessionTitle.val();
+                    const clientId = $clientFilter.val();
+                    if (!clientId && (!taskId || !title.trim())) {
+                        alert('Please enter a session title and select a task (or choose a Client for Quick Start).');
+                        return;
+                    }
+                    $btn.prop('disabled', true).text('Starting...');
+                    timerFSM.start({ taskId: taskId, title: title, clientId: clientId }).finally(function(){ $btn.prop('disabled', false); });
+                }
+                return;
+            }
+
+            // Legacy behavior (flag off)
             if (isRunning) {
                 // --- STOP TIMER ---
                 const postId = $btn.data('postid');
@@ -1522,8 +1708,8 @@ jQuery(document).ready(function ($) {
             if (response.success && response.data && Array.isArray(response.data.results)) {
                 const results = response.data.results;
                 const total = results.length;
-                const failed = results.filter(r => r.status && r.status.toLowerCase() === 'failed').length;
-                const firstFailedIndex = results.findIndex(r => r.status && r.status.toLowerCase() === 'failed');
+                const failed = results.filter(r => r.status && r.status.toLowerCase() === 'fail').length;
+                const firstFailedIndex = results.findIndex(r => r.status && r.status.toLowerCase() === 'fail');
                 const jumpLink = failed ? `<a href="#ptt-first-failed" style="margin-left:8px;">Jump to first failed</a>` : '';
                 const passedNote = failed === 0 ? ` <span style="color:#2e7d32;font-weight:bold;">All tests have passed.</span>` : '';
                 const summaryHtml = `<div class="notice ${failed ? 'notice-error' : 'notice-success'}"><strong>Number of Tests:</strong> ${failed} out of ${total} Failed.${passedNote} ${jumpLink}</div>`;

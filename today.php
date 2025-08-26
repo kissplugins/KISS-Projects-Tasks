@@ -655,35 +655,40 @@ add_action( 'wp_ajax_ptt_move_session', 'ptt_move_session_callback' );
 /**
  * Helper to find any active session across all tasks for a specific user.
  *
+ * Note: This function may also be defined in helpers.php. Guard to avoid
+ * redeclaration fatals in local/dev environments.
+ *
  * @param int $user_id The user ID to check.
  * @return array|false An array with post_id and index of the active session, or false.
  */
-function ptt_get_active_session_index_for_user( $user_id ) {
-	$user_task_ids = ptt_get_tasks_for_user( $user_id );
-	if ( empty( $user_task_ids ) ) {
-		return false;
-	}
+if ( ! function_exists( 'ptt_get_active_session_index_for_user' ) ) {
+	function ptt_get_active_session_index_for_user( $user_id ) {
+		$user_task_ids = ptt_get_tasks_for_user( $user_id );
+		if ( empty( $user_task_ids ) ) {
+			return false;
+		}
 
-	$args = [
-		'post_type'      => 'project_task',
-		'posts_per_page' => -1,
-		'post__in'       => $user_task_ids,
-		'fields'         => 'ids', // We only need the IDs
-	];
+		$args = [
+			'post_type'      => 'project_task',
+			'posts_per_page' => -1,
+			'post__in'       => $user_task_ids,
+			'fields'         => 'ids', // We only need the IDs
+		];
 
-	$query = new WP_Query( $args );
+		$query = new WP_Query( $args );
 
-	if ( $query->have_posts() ) {
-		foreach ( $query->posts as $post_id ) {
-			$index = ptt_get_active_session_index( $post_id );
-			if ( $index !== false ) {
-				// No need to reset postdata as we are only using IDs
-				return [ 'post_id' => $post_id, 'index' => $index ];
+		if ( $query->have_posts() ) {
+			foreach ( $query->posts as $post_id ) {
+				$index = ptt_get_active_session_index( $post_id );
+				if ( $index !== false ) {
+					// No need to reset postdata as we are only using IDs
+					return [ 'post_id' => $post_id, 'index' => $index ];
+				}
 			}
 		}
-	}
 
-	return false;
+		return false;
+	}
 }
 
 /**

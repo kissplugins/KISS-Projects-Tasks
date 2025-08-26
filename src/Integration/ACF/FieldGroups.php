@@ -27,11 +27,8 @@ function ptt_register_local_acf_groups() {
         'fields' => [
             [ 'key' => 'field_ptt_task_max_budget', 'label' => 'Max Budget (hrs)', 'name' => 'task_max_budget', 'type' => 'number', 'default_value' => '', 'min' => 0, 'step' => '0.01' ],
             [ 'key' => 'field_ptt_task_deadline', 'label' => 'Task Deadline', 'name' => 'task_deadline', 'type' => 'date_time_picker', 'display_format' => 'Y-m-d H:i:s', 'return_format' => 'Y-m-d H:i:s' ],
-            [ 'key' => 'field_ptt_start_time', 'label' => 'Start Time', 'name' => 'start_time', 'type' => 'date_time_picker', 'display_format' => 'Y-m-d H:i:s', 'return_format' => 'Y-m-d H:i:s' ],
-            [ 'key' => 'field_ptt_stop_time', 'label' => 'Stop Time', 'name' => 'stop_time', 'type' => 'date_time_picker', 'display_format' => 'Y-m-d H:i:s', 'return_format' => 'Y-m-d H:i:s' ],
-            [ 'key' => 'field_ptt_calculated_duration', 'label' => 'Calculated Duration (hrs)', 'name' => 'calculated_duration', 'type' => 'text', 'readonly' => 1 ],
-            [ 'key' => 'field_ptt_manual_override', 'label' => 'Manual Override', 'name' => 'manual_override', 'type' => 'true_false', 'ui' => 1 ],
-            [ 'key' => 'field_ptt_manual_duration', 'label' => 'Manual Duration (hrs)', 'name' => 'manual_duration', 'type' => 'number', 'min' => 0, 'step' => '0.01' ],
+            [ 'key' => 'field_ptt_total_duration_display', 'label' => 'Total Duration (hrs)', 'name' => 'total_duration_display', 'type' => 'text', 'readonly' => 1, 'disabled' => 1, 'default_value' => '0.00', 'instructions' => 'Calculated automatically from all sessions below. This field is read-only.' ],
+            // Parent-level timer fields removed - using session repeater for single source of truth
             [
                 'key' => 'field_ptt_sessions',
                 'label' => 'Sessions',

@@ -36,6 +36,7 @@ function ptt_get_tasks_for_user( $user_id ) {
  * Find the currently running session for a user, if any.
  * Returns array like ['post_id' => int, 'index' => int] or false if none.
  */
+if ( ! function_exists( 'ptt_get_active_session_index_for_user' ) ) {
 function ptt_get_active_session_index_for_user( $user_id ) {
     if ( ! $user_id ) { return false; }
     if ( ! function_exists('get_field') ) { return false; }
@@ -55,4 +56,5 @@ function ptt_get_active_session_index_for_user( $user_id ) {
         }
     }
     return false;
+}
 }

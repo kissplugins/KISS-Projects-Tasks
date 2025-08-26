@@ -1,8 +1,166 @@
 # Changelog
 
+## Version 2.2.17 - Added total duration display field
+- **Added**: New "Total Duration (hrs)" read-only field in task edit screen that shows the sum of all session durations.
+- **Updated**: Calculator class now populates the total_duration_display field when calculating durations.
+- **Updated**: Reports and Kanban views now use the new total_duration_display field with fallback to on-demand calculation.
+- **Updated**: ACF diagnostics and self-tests include validation for the new total duration display field.
+- The total duration is now visible in the admin interface again, calculated from sessions only.
+
+## Version 2.2.16 - Fixed fatal errors from removed calculated_duration field
+- **Fixed**: Removed all references to calculated_duration field that was causing fatal errors in self-tests and other functions.
+- **Fixed**: Calculator class no longer tries to update the removed calculated_duration field.
+- **Updated**: Self-tests now use session-only approach for duration calculations and validation.
+- **Updated**: Sample data validation tests now check session fields instead of removed parent-level fields.
+
+## Version 2.2.15 - Fixed self-tests for session-only approach
+- **Fixed**: "Calculate Total Time" self-tests now use session repeater data instead of removed parent-level timer fields.
+- **Updated**: Self-tests create proper session entries with start/stop times for duration calculation testing.
+- Self-tests should now pass correctly with the new session-only architecture.
+
+## Version 2.2.14 - Single Source of Truth Migration
+- **BREAKING**: Removed parent-level timer fields from ACF schema (start_time, stop_time, calculated_duration, manual_override, manual_duration).
+- **Added**: Data migration tool accessible via Tasks → Data Migration to convert existing parent-level data to session format.
+- **Disabled**: Legacy AJAX handlers for parent-level timer operations to prevent dual storage conflicts.
+- **Updated**: All validation and detection functions to use session-only approach.
+- **Updated**: Calculator class to use sessions-only for duration calculations (no parent-level fallback).
+- Sessions repeater is now the single source of truth for all timer data.
+
+### Migration Instructions (IMPORTANT)
+**If you have existing timer data, you MUST run the migration tool:**
+
+1. **Access Migration Tool**: Go to WordPress Admin → Tasks → Data Migration
+2. **Review Preview**: The tool will show all tasks with parent-level timer data that need migration
+3. **Run Dry Run** (Optional): Click "Dry Run" to preview what will happen without making changes
+4. **Start Migration**: Click "Start Migration" to convert all parent-level data to session format
+5. **Monitor Progress**: Watch the real-time progress bar and log for any issues
+6. **Verify Results**: Check that your existing timer data appears correctly in the Sessions repeater
+
+**What the migration does:**
+- Converts parent-level timer data (start_time, stop_time, duration) to session repeater entries
+- Preserves all timing data and manual overrides
+- Creates backup of original data before migration
+- Clears parent-level fields after successful migration
+- Skips tasks that already have sessions to avoid duplicates
+
+**After migration:**
+- All timer functionality will use the Sessions repeater exclusively
+- Parent-level timer fields no longer exist in the admin interface
+- Existing workflows remain the same, but data is stored in session format
+- Reports and calculations will use session data only
+
+**Note**: This migration is one-way. Once completed, you cannot revert to parent-level timer fields without restoring from a database backup.
+
+## Version 2.2.13 - Today page duplicate entries fix
+- Fixed Today page showing duplicate entries for Quick Start tasks (both "created" and session entries on same day).
+- Added logic to suppress task-level "created" entries when session entries exist for the same date.
+
+## Version 2.2.12 - Function redeclaration fix + timezone documentation
+- Fixed fatal error: Cannot redeclare ptt_get_active_session_index_for_user() by adding function_exists() check in helpers.php.
+- Added PROJECT-TIMEZONE.md documenting timezone handling architecture, potential issues, and recommendations.
+
+## Version 2.2.11 - PSR-4: Reports Helpers
+- Added KISS\\PTT\\Reports\\Helpers with formatTaskNotes() and getAssigneeName() read-only helpers.
+- Wired reports.php to use the new helpers with back-compat wrappers; no behavior changes.
+
+## Version 2.2.10 - Preserve legacy detailed self-test count
+- SelfTests::run() now merges results from legacy ptt_test_data_structure_integrity() when available to keep the larger test count intact.
+
+
+## Version 2.2.8 - PSR-4: Diagnostics SelfTests
+- Extracted the self-test suite to KISS\\PTT\\Diagnostics\\SelfTests::run(); controller delegates to it. No behavior changes.
+
+## Version 2.2.9 - PSR-4: Settings helper
+- Added KISS\\PTT\\Admin\\Settings for FSM flags read/save; Assets and SelfTestController now use it. No behavior changes.
+
+
+## Version 2.2.7 - Hide legacy ACF Schema card
+- Hidden the large ACF Schema Status card on Settings page now that it’s part of the main self-tests summary.
+
+
+## Version 2.2.6 - ACF Schema Status rolled into main self-tests
+- The "ACF Schema Status" is now part of the main Self-Test group so the summary includes it.
+
+
+## Version 2.2.5 - FSM debug panels (semi‑permanent)
+- Added small on‑screen FSM debug panels for Today (bottom‑right) and Editor (bottom‑left) with Show toggle.
+- Note: Do not remove these panels unless explicitly requested; comments added in code for future maintainers/LLMs.
+
+
+## Version 2.2.4 - FSM flags in Settings (defaults ON)
+- Added Settings toggles for FSM (Global, Today, Editor) defaulting to ON; flags now read from options.
+
+
+## Version 2.2.3 - Enable Editor FSM for admins with ptt_debug=1
+- Editor FSM now enabled alongside Today when `?ptt_debug=1` is present for admin users.
+
+
+## Version 2.2.2 - Enable Today FSM for admins with ptt_debug=1
+- Localized flags now turn on TimerFSM on Today page for admin users when `?ptt_debug=1` is present.
+- Editor FSM remains disabled.
+
+
+## Version 2.2.1 - FSM scaffolding (Editor)
+- Added EditorEffects and EditorTimerController scaffolding (flags disabled by default; no behavior changes).
+- Enqueued bundles for Editor; using the same TimerFSM core.
+
+
+## Version 2.2.0 - FSM Phase 1a scaffolding (Today)
+- Added TimerFSM core, TodayEffects, and TodayTimerController (feature flags disabled by default; no behavior change yet).
+- Enqueued FSM bundles on Today and Editor screens via admin assets; localized flags for future rollout.
+- Updated PROJECT-FSM.md with dual-context plan and scaffolding progress note.
+
+
+## Version 2.1.9 - PSR-4 Sessions builder
+- Delegated Today session entry construction to src/Presentation/Today/EntryBuilder::buildSessionEntriesForDate.
+- Legacy provider now delegates; no UI changes.
+
+
+## Version 2.1.8 - PSR-4 EntryBuilder (Today)
+- Moved task-level Today entry construction to src/Presentation/Today/EntryBuilder and routed legacy code to use it.
+- Maint: Continued incremental PSR‑4 migration for Today data-building.
+
+
+## Version 2.1.7 - PSR-4 Today DateHelper
+- Added src/Presentation/Today/DateHelper (isUtcOnLocalDate) and updated Today entry filtering to use it for centralized date logic.
+- Maint: Continued PSR‑4 adoption around time/date utilities.
+
+
+## Version 2.1.6 - UTC helpers adoption + Today self-test
+- Reports: Replaced remaining session timestamp comparisons with centralized ACFAdapter::isUtcWithinLocalRange() for consistent timezone handling.
+- Tests: Added self-test coverage to validate Today page session inclusion uses local date (mirrors JS) and won’t regress.
+
+
+## Version 2.1.5 - Reports week buttons fix + debugging
+- Reports: Core assets now load on the Reports page so week buttons are active.
+- Reports: "This Week" and "Last Week" buttons now reliably set start/end date inputs and trigger change events.
+- Dev: Added console.debug logs for view mode initialization and week button clicks to aid troubleshooting.
+
+
+## Version 2.1.4 - Bugfix: Today + Reports
+- Today: Suppress duplicate "created" task-level entry when a same-day session exists (affects Quick Start tasks that create a task and start a session immediately).
+- Reports (Classic/Task Focused): Normalize session_start_time parsing to UTC when filtering by date range to fix missing items in ranges like "Last Week".
+
 ## Version 2.0.0 - PSR-4 bootstrap
 
 ## Version 2.1.0 - ACF Schema Status + FSM Planning
+
+## Version 2.1.1 - FSM Phase 0 Scaffolding
+
+## Version 2.1.3 - Phase 1 Finishing Touches
+- Scripts: Rehydrate TimerFSM on Today page load (queries server for active session)
+- Scripts: Live FSM debug panel updates under ptt_debug=1
+- Scripts: Start validation via FSM effects (guards title/task for non-Quick Start)
+
+
+## Version 2.1.2 - Hotfix: Duplicate function guard
+- Fixed fatal error by guarding ptt_get_active_session_index_for_user() in today.php with function_exists to avoid redeclaration with helpers.php
+
+- Scripts: Added non-breaking FSM scaffolding (feature flag, effects stubs, debug hook)
+- Docs: Proceeding toward Phase 1 implementation behind feature flag
+- Phase 1 (start): TimerFSM scaffold added behind feature flag; start/stop hooks routed through FSM when enabled (legacy preserved when disabled)
+
+
 - Admin: New “ACF Schema Status” page under Tasks showing persistent schema diagnostics
 - Admin: Copy diagnostics buttons (Text/JSON) and compact status widget on Settings/Self‑Test page
 - Diagnostics: Extended ACF schema checks (keys, names, types, date formats) and allowed empty name for message fields

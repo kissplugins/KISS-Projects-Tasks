@@ -342,104 +342,7 @@ class PTT_Today_Data_Provider {
 	 * @return array Array of entry data.
 	 */
 	private static function process_task_for_date( $post_id, $target_date ) {
-		$entries = [];
-
-		// Get task metadata (used by all entry types)
-		$task_title = get_the_title( $post_id );
-		$project_terms = get_the_terms( $post_id, 'project' );
-		$project_id = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->term_id : 0;
-		$project_name = ! is_wp_error( $project_terms ) && $project_terms ? $project_terms[0]->name : '–';
-		$client_terms = get_the_terms( $post_id, 'client' );
-		$client_id = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->term_id : 0;
-		$client_name = ! is_wp_error( $client_terms ) && $client_terms ? $client_terms[0]->name : '';
-		$edit_link = get_edit_post_link( $post_id );
-
-		// 1. Check if task was created/published on target date
-		$post_date = get_the_date( 'Y-m-d', $post_id );
-		$task_created_on_date = ( $post_date === $target_date );
-
-		// 2. Check parent-level time tracking
-		$parent_start_time = get_field( 'start_time', $post_id );
-		$parent_matches_date = false;
-		if ( $parent_start_time ) {
-			$parent_start_ts = strtotime( $parent_start_time );
-			$parent_matches_date = ( $parent_start_ts && date( 'Y-m-d', $parent_start_ts ) === $target_date );
-		}
-
-		// 3. Process session-level time tracking
-		$sessions = get_field( 'sessions', $post_id );
-		$session_entries = [];
-		if ( ! empty( $sessions ) && is_array( $sessions ) ) {
-			$session_entries = self::process_task_sessions( $post_id, $target_date, $task_title, $project_name, $client_name, $project_id, $client_id, $edit_link );
-		}
-
-		// If task was created on date OR has parent-level time tracking, create a task-level entry
-		if ( $task_created_on_date || $parent_matches_date ) {
-			$entry_type = [];
-			if ( $task_created_on_date ) {
-				$entry_type[] = 'created';
-			}
-			if ( $parent_matches_date ) {
-				$entry_type[] = 'parent_time';
-			}
-
-			// Calculate parent-level duration
-			$duration_seconds = 0;
-			$start_ts = 0;
-			$stop_ts = 0;
-			$is_running = false;
-
-			if ( $parent_matches_date ) {
-				$start_ts = strtotime( $parent_start_time );
-				$parent_stop_time = get_field( 'stop_time', $post_id );
-				$manual_override = get_field( 'manual_override', $post_id );
-
-				if ( $manual_override ) {
-					$manual_duration = get_field( 'manual_duration', $post_id );
-					$duration_seconds = $manual_duration ? (int) round( floatval( $manual_duration ) * 3600 ) : 0;
-					$stop_ts = $start_ts; // For manual entries, use same timestamp
-				} elseif ( $parent_stop_time ) {
-					$stop_ts = strtotime( $parent_stop_time );
-					if ( $start_ts && $stop_ts ) {
-						$duration_seconds = $stop_ts - $start_ts;
-					}
-				} else {
-					// Running timer
-					$duration_seconds = time() - $start_ts;
-					$is_running = true;
-				}
-			} else {
-				// Task created on date but no time tracking - use post date
-				$start_ts = strtotime( $post_date . ' 00:00:00' );
-			}
-
-			$entries[] = [
-				'entry_id'         => $post_id . '_task',
-				'post_id'          => $post_id,
-				'session_index'    => -1, // Indicates this is a task-level entry
-				'session_title'    => implode( ', ', $entry_type ) . ': ' . $task_title,
-				'session_notes'    => $task_created_on_date ? 'Task created on this date' : 'Parent-level time tracking',
-				'task_title'       => $task_title,
-				'project_name'     => $project_name,
-				'client_name'      => $client_name,
-				'project_id'       => $project_id,
-				'client_id'        => $client_id,
-				'is_quick_start'   => ( $project_name === 'Quick Start' ),
-				'start_time'       => $start_ts,
-				'stop_time'        => $stop_ts,
-				'duration_seconds' => $duration_seconds,
-				'is_manual'        => $parent_matches_date && get_field( 'manual_override', $post_id ),
-				'duration'         => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : ( $is_running ? 'Running' : '00:00:00' ),
-				'is_running'       => $is_running,
-				'edit_link'        => $edit_link,
-				'entry_type'       => $entry_type,
-			];
-		}
-
-		// Add session entries
-		$entries = array_merge( $entries, $session_entries );
-
-		return $entries;
+		return \KISS\PTT\Presentation\Today\TodayService::buildEntriesForTaskOnDate( (int) $post_id, (string) $target_date );
 	}
 
 	/**
@@ -456,69 +359,14 @@ class PTT_Today_Data_Provider {
 	 * @return array Array of session entry data.
 	 */
 	private static function process_task_sessions( $post_id, $target_date, $task_title, $project_name, $client_name, $project_id, $client_id, $edit_link ) {
-		$entries = [];
-		$sessions = get_field( 'sessions', $post_id );
-
-		if ( empty( $sessions ) || ! is_array( $sessions ) ) {
-			return $entries;
-		}
-
-		foreach ( $sessions as $index => $session ) {
-			$start_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
-			if ( empty( $start_str ) ) {
-				continue;
-			}
-
-			$start_ts = strtotime( $start_str );
-			if ( ! $start_ts ) {
-				continue;
-			}
-
-			if ( date( 'Y-m-d', $start_ts ) === $target_date ) {
-				$stop_str = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
-				$duration_seconds = 0;
-				$stop_ts = strtotime( $stop_str );
-
-				if ( $start_ts && $stop_ts ) {
-					$duration_seconds = $stop_ts - $start_ts;
-				} elseif ( $start_ts && ! $stop_str ) {
-					// For running timers
-					$duration_seconds = time() - $start_ts;
-				}
-
-				// Manual override always takes precedence
-				if ( ! empty( $session['session_manual_override'] ) ) {
-					$manual_hours = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
-					if ( $manual_hours > 0 ) {
-						$duration_seconds = (int) round( $manual_hours * 3600 );
-					}
-				}
-
-				$entries[] = [
-					'entry_id'         => $post_id . '_' . $index,
-					'post_id'          => $post_id,
-					'session_index'    => $index,
-					'session_title'    => $session['session_title'] ?? '',
-					'session_notes'    => $session['session_notes'] ?? '',
-					'task_title'       => $task_title,
-					'project_name'     => $project_name,
-					'client_name'      => $client_name,
-					'project_id'       => $project_id,
-					'client_id'        => $client_id,
-					'is_quick_start'   => ( $project_name === 'Quick Start' ),
-					'start_time'       => $start_ts,
-					'stop_time'        => $stop_ts,
-					'duration_seconds' => $duration_seconds,
-					'is_manual'        => ! empty( $session['session_manual_override'] ),
-					'duration'         => $duration_seconds > 0 ? gmdate( 'H:i:s', $duration_seconds ) : 'Running',
-					'is_running'       => empty( $stop_str ),
-					'edit_link'        => $edit_link,
-					'entry_type'       => ['session'],
-				];
-			}
-		}
-
-		return $entries;
+		return \KISS\PTT\Presentation\Today\EntryBuilder::buildSessionEntriesForDate( (int) $post_id, (string) $target_date, [
+			'task_title'   => $task_title,
+			'project_name' => $project_name,
+			'client_name'  => $client_name,
+			'project_id'   => $project_id,
+			'client_id'    => $client_id,
+			'edit_link'    => $edit_link,
+		] );
 	}
 
 	/**
@@ -528,22 +376,7 @@ class PTT_Today_Data_Provider {
 	 * @return array Total time in seconds and formatted string.
 	 */
 	public static function calculate_total_duration( $entries ) {
-		$total_seconds = 0;
-
-		foreach ( $entries as $entry ) {
-			if ( isset( $entry['duration_seconds'] ) ) {
-				$total_seconds += $entry['duration_seconds'];
-			}
-		}
-
-		$total_hours = floor( $total_seconds / 3600 );
-		$total_minutes = floor( ( $total_seconds / 60 ) % 60 );
-		$formatted = sprintf( '%02d:%02d', $total_hours, $total_minutes );
-
-		return [
-			'seconds'   => $total_seconds,
-			'formatted' => $formatted,
-		];
+		return \KISS\PTT\Presentation\Today\TodayService::calculateTotalDuration( is_array( $entries ) ? $entries : [] );
 	}
 }
 
