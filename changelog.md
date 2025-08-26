@@ -1,5 +1,16 @@
 # Changelog
 
+
+## Version 2.2.31 - Reinforce Update button visibility on Task Editor
+- Added robust insertion of an "Update" button next to the Sessions repeater "Add Session" button.
+- Uses MutationObserver + periodic retries to ensure the button is present even if ACF renders late.
+- Styled as a primary button and placed inline with "Add Session" so it’s easy to find.
+- Clicking it triggers the main Publish/Update action (#publish) with disabled state and feedback.
+
+## Version 2.2.30 - Total Duration: add friendly hh:mm display
+- **Added**: On the Task Editor, next to Total Duration (hrs), show a friendly hh:mm equivalent (read-only badge) that updates live as the value changes.
+- **Note**: All calculations remain decimal hours; hh:mm is display-only for user friendliness.
+
 ## Version 2.2.29 - Preserve historical manual sessions; disable auto-timestamp on save
 - **Changed**: Manual session entries without start/stop timestamps are no longer auto-stamped on save. This prevents older manual entries from being pulled into the current day when a new timer is stopped.
 - **Updated**: Self-tests adjusted to verify that manual sessions without timestamps remain unchanged.
