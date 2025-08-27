@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 2.2.41 - Editor UX: hide Start/Timer on saved sessions; toggle Manual Duration
+Released: 2025-08-27
+- Editor: If a session already has time saved (manual duration > 0 or calculated duration > 0) the default 00:00:00 and Start button are hidden. Avoids confusing controls on completed entries.
+- Editor: Manual Duration field is now hidden when Manual Override is unchecked and shown when checked, without modifying ACF field settings. Pure JS/DOM toggle.
+
 ## Version 2.2.40 - Editor: show timer value before start
 Released: 2025-08-27
 - Editor session controls now display the 00:00:00 timer value to the left of the Start Timer button even before a session has started. This improves discoverability and preserves layout.

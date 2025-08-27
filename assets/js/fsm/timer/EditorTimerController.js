@@ -33,11 +33,27 @@
     }
 
     fsm.rehydrate();
+
+    // Initialize all session rows UI state
+    if (typeof effects.initializeAllRows === 'function') {
+      effects.initializeAllRows();
+    }
+
     // When FSM is enabled, intercept editor start/stop and route through FSM
     jQuery(document).off('click.pttEditorStart');
     jQuery(document).off('click.pttEditorStop');
     jQuery(document).on('click.pttEditorStart', '.ptt-session-start', function(e){ e.preventDefault(); var postId = jQuery('#post_ID').val(); fsm.transition('START_TIMER', { taskId: postId }); });
     jQuery(document).on('click.pttEditorStop', '.ptt-session-stop', function(e){ e.preventDefault(); fsm.transition('STOP_TIMER'); });
+
+    // Re-initialize when new rows are added
+    if (root.acf) {
+      root.acf.addAction('append', function($el){
+        if ($el.find('.acf-field[data-key="field_ptt_sessions"]').length && typeof effects.initializeAllRows === 'function') {
+          setTimeout(function(){ effects.initializeAllRows(); }, 100);
+        }
+      });
+    }
+
     root.PTT_EditorFSM = fsm;
   }
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }
