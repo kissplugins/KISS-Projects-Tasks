@@ -30,6 +30,7 @@ class Plugin {
         // Register admin assets and controllers
         AdminAssets::register();
         SelfTestController::register();
+        \KISS\PTT\Admin\AdminBar::register();
         DataMigrationController::register();
         \KISS\PTT\Admin\SchemaStatusPage::register();
         // Register list table enhancements (sortable/filterable Assignee)

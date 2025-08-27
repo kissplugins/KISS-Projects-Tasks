@@ -1,5 +1,50 @@
 # Changelog
 
+## Version 2.2.41 - Editor UX: hide Start/Timer on saved sessions; toggle Manual Duration
+Released: 2025-08-27
+- Editor: If a session already has time saved (manual duration > 0 or calculated duration > 0) the default 00:00:00 and Start button are hidden. Avoids confusing controls on completed entries.
+- Editor: Manual Duration field is now hidden when Manual Override is unchecked and shown when checked, without modifying ACF field settings. Pure JS/DOM toggle.
+
+## Version 2.2.40 - Editor: show timer value before start
+Released: 2025-08-27
+- Editor session controls now display the 00:00:00 timer value to the left of the Start Timer button even before a session has started. This improves discoverability and preserves layout.
+
+## Version 2.2.39 - Editor timer badge CSS fix
+Released: 2025-08-27
+- Fixed malformed CSS block around .ptt-session-elapsed-time which prevented the red badge background from applying on the Task Editor. The rule now closes correctly and styles take effect.
+- Bumped asset version to cache-bust (PTT_VERSION=2.2.39).
+
+## Version 2.2.38 - Admin bar fix + guard comments
+Released: 2025-08-27
+- Fixed PHP error in Admin Bar indicator (string concatenation in inline style now uses proper concatenation and escaping).
+- Added clear DO NOT EDIT guard comments around Active Timer display styles to avoid unintended refactors.
+
+Released: 2025-08-27
+- Restored Editor timer styling to match legacy look: seven-seg red badge and red Stop button; Start button styled green.
+- If session title is blank at Start, auto-fills as "Session mm-dd-yy HH:mm" (client-side) and server enforces same default.
+- Added Admin Bar item: "KISS Tasks – vX.Y.Z" with a green (pass) or red (fail) dot showing last self-test summary; clicking opens Self Test and auto-runs.
+
+## Version 2.2.37 - UI polish + defaults + admin bar indicator
+
+## Version 2.2.36 - Editor stop persists end/duration under FSM
+Released: 2025-08-26
+- On Stop, EditorEffects now writes stop_time and calculated_duration into the active session row and stops the live ticker.
+- Triggers a WP Update click to persist totals so end/duration are saved immediately.
+
+Released: 2025-08-26
+- Fixed timer stuck at 00:00:00 on Editor when FSM is enabled.
+- Reused existing manageLiveTimer/stopLiveTimer via window.PTT helpers and invoked from EditorEffects.updateTimerUI.
+- Start input is set immediately from server UTC in FSM RUNNING state for consistent display.
+- Note: If you still see an admin-ajax 400, please share the failing action name from Network tab; rehydrate/start should be ptt_get_active_session_for_user and ptt_start_session_timer respectively.
+
+## Version 2.2.35 - Editor FSM live ticking wired to shared timer
+
+## Version 2.2.34 - Editor timer: prevent legacy handler during FSM
+Released: 2025-08-26
+- Fixed an issue where clicking Start Timer in the Task Editor caused a full page reload and timer loss when FSM was enabled.
+- Root cause: legacy jQuery handler also ran alongside FSM and triggered reload + Update click.
+- Change: legacy .ptt-session-start/.ptt-session-stop handlers now no-op when PTT_FSM_ENABLED && PTT_FSM_EDITOR_ENABLED are true.
+- No UI changes; behavior now aligns with FSM and persists immediately via AJAX without reloading.
 
 ## Version 2.2.33 - All Tasks: Assignee sorting/filter restored + self-test
 Released: 2025-08-26
@@ -17,6 +62,7 @@ Released: 2025-08-26
 - UI: Align hh:mm badge inline with Total Duration input; responsive layout on small screens.
 - Safety: Added onbeforeunload guard for 2–3 seconds after Start to reduce accidental navigation before save completes.
 - Version bump and changelog updated.
+- Floating palette to help confirm the FSM is the single source of truth for the timer and to make troubleshooting quick without opening DevTools every time (e.g., seeing START/STOP/ERROR at a glance)
 
 
 ## Version 2.2.31 - Reinforce Update button visibility on Task Editor

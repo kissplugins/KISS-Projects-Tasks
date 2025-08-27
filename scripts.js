@@ -317,6 +317,12 @@ jQuery(document).ready(function ($) {
         }
     }
 
+        // Expose live timer helpers for FSM Editor effects (DRY reuse)
+        window.PTT = window.PTT || {};
+        window.PTT.manageLiveTimer = manageLiveTimer;
+        window.PTT.stopLiveTimer = stopLiveTimer;
+
+
     /**
      * Initializes the timer controls for each session row.
      */
@@ -339,15 +345,14 @@ jQuery(document).ready(function ($) {
             const debugHtml = `<div class="ptt-debug" style="margin-top:6px;color:#666;font-size:12px;">[PTT] Timer UI initialized${debugEnabled? ' (debug on)':''}</div>`;
 
             const controlsHtml = `
-                <div class="ptt-session-controls">
-                    <button type="button" class="button ptt-session-start">Start Timer</button>
-                    <div class="ptt-session-active-timer" style="display: none;">
-                        <span class="duration-label">Duration: </span>
-                        <span class="ptt-session-elapsed-time">00:00:00</span>
-                        <button type="button" class="button ptt-session-stop ptt-stop-button">Stop Timer</button>
+                <div class=\"ptt-session-controls\">
+                    <span class=\"ptt-session-elapsed-time\">00:00:00</span>
+                    <button type=\"button\" class=\"button ptt-session-start ptt-start-button\">Start Timer</button>
+                    <div class=\"ptt-session-active-timer\" style=\"display: none;\">
+                        <button type=\"button\" class=\"button ptt-session-stop ptt-stop-button\">Stop Timer</button>
                     </div>
-                    <div class="ptt-session-message" style="display: none;"></div>
-                    <div class="ptt-ajax-spinner" style="display: none; margin-left: 8px;"></div>
+                    <div class=\"ptt-session-message\" style=\"display: none;\"></div>
+                    <div class=\"ptt-ajax-spinner\" style=\"display: none; margin-left: 8px;\"></div>
                 </div>` + debugHtml;
             $container.find('.acf-input').html(controlsHtml);
 
@@ -358,76 +363,72 @@ jQuery(document).ready(function ($) {
             const $message = $controls.find('.ptt-session-message');
 
             function updateUIState() {
+                // When FSM is enabled for editor, delegate all timer UI control to FSM
+                if (window.PTT_FSM_ENABLED && window.PTT_FSM_EDITOR_ENABLED) {
+                    // Only handle manual duration field visibility - FSM handles timer controls
+                    const $manualDurationField = $row.find('[data-key="field_ptt_session_manual_duration"]');
+                    const override = $manualOverrideInput.prop('checked');
+                    if ($manualDurationField.length) {
+                        if (override) { $manualDurationField.show(); } else { $manualDurationField.hide(); }
+                    }
+                    return;
+                }
+
+                // Legacy behavior when FSM is disabled
                 const startVal = $startInput.val();
                 const stopVal = $stopInput.val();
 
                 stopLiveTimer($controls);
 
+                const $defaultTimer = $controls.children('.ptt-session-elapsed-time');
+                const $manualDurationField = $row.find('[data-key="field_ptt_session_manual_duration"]');
+                const override = $manualOverrideInput.prop('checked');
+
+                // Show/hide Manual Duration field according to Manual Override
+                if ($manualDurationField.length) {
+                    if (override) { $manualDurationField.show(); } else { $manualDurationField.hide(); }
+                }
+
                 if (startVal && !stopVal) { // Running
                     $startButton.hide();
                     $activeDisplay.css('display', 'inline-flex');
                     $message.hide();
+                    if ($defaultTimer && $defaultTimer.length) { $defaultTimer.hide(); }
                     manageLiveTimer($controls, startVal);
                 } else if (startVal && stopVal) { // Stopped
-
-	    // Add an "Update" button next to the Add Session button that triggers the WP Update/Save
-	    function addUpdateButtonToSessionsRepeater($context) {
-	        $context = $context || $(document);
-	        const $field = $context.find('.acf-field[data-key="field_ptt_sessions"]').first();
-	        if (!$field.length) return;
-
-	        // Prefer to append into the ACF actions area
-	        const $actions = $field.find('.acf-actions').first();
-	        if ($actions.length) {
-	            if ($actions.find('.ptt-session-update-btn').length === 0) {
-	                const $btn = $('<button type="button" class="button button-primary ptt-session-update-btn" style="margin-left:8px;">Update</button>');
-	                $actions.append($btn);
-	            }
-	            return;
-	        }
-
-	        // Fallback: place after the Add Row button if actions container is not found
-	        const $addBtn = $field.find('[data-event="add-row"], [data-name="add-row"]').last();
-	        if ($addBtn.length && $addBtn.next('.ptt-session-update-btn').length === 0) {
-	            const $btn = $('<button type="button" class="button button-primary ptt-session-update-btn" style="margin-left:8px;">Update</button>');
-	            $addBtn.after($btn);
-	        }
-	    }
-
-	    // Initialize on load and when ACF appends new content
-	    addUpdateButtonToSessionsRepeater();
-	    if (window.acf) {
-	        window.acf.addAction('append', function($el){ addUpdateButtonToSessionsRepeater($el); });
-	        window.acf.addAction('ready', function($el){ addUpdateButtonToSessionsRepeater($el); });
-	    }
-
-	    // Click handler: replicate the Publish/Update button
-	    $(document).off('click', '.ptt-session-update-btn');
-    $(document).on('click', '.ptt-session-update-btn', function(e){
-	        e.preventDefault();
-	        const $btn = $(this);
-	        $btn.prop('disabled', true).text('Updating...');
-	        $('#publish').trigger('click');
-	    });
-
                     $startButton.hide();
                     $activeDisplay.hide();
+                    if ($defaultTimer && $defaultTimer.length) { $defaultTimer.hide(); }
                     const duration = parseFloat($durationInput.val() || 0).toFixed(2);
                     $message.text(`Session completed. Duration: ${duration} hrs.`).show();
                 } else { // Not started
-                    $startButton.show();
-                    $activeDisplay.hide();
-                    $message.hide();
-                    const override = $manualOverrideInput.prop('checked');
-                    if (override) {
-                        $startButton.prop('disabled', true).attr('title', 'Manual time entry is enabled for this session.');
+                    const manualValStr = ($manualDurationField.find('input').val() || '').trim();
+                    const manualVal = parseFloat(manualValStr);
+                    const calcDur = parseFloat($durationInput.val() || '0');
+                    const hasManualTime = override && !isNaN(manualVal) && manualVal > 0;
+                    const hasCalcTime = !isNaN(calcDur) && calcDur > 0;
+                    const hasSavedTime = hasManualTime || hasCalcTime;
+
+                    if (hasSavedTime) {
+                        $startButton.hide();
+                        $activeDisplay.hide();
+                        if ($defaultTimer && $defaultTimer.length) { $defaultTimer.hide(); }
+                        $message.hide();
                     } else {
-                        $startButton.prop('disabled', false).removeAttr('title');
+                        $startButton.show();
+                        $activeDisplay.hide();
+                        $message.hide();
+                        if ($defaultTimer && $defaultTimer.length) { $defaultTimer.show(); }
+                        if (override) {
+                            $startButton.prop('disabled', true).attr('title', 'Manual time entry is enabled for this session.');
+                        } else {
+                            $startButton.prop('disabled', false).removeAttr('title');
+                        }
                     }
                 }
             }
 
-            // React to manual override changes
+            // React to manual override changes and manual duration edits
             if ($manualOverrideInput && $manualOverrideInput.length) {
                 $manualOverrideInput.on('change', updateUIState);
             }
@@ -448,6 +449,8 @@ jQuery(document).ready(function ($) {
     // New unified click handlers using event delegation
     $(document).on('click', '.ptt-session-start', function(e) {
         e.preventDefault();
+        // When the Editor FSM is enabled, do not run the legacy handler.
+        if (window.PTT_FSM_ENABLED && window.PTT_FSM_EDITOR_ENABLED) { return; }
         const $btn = $(this);
         const $controls = $btn.closest('.ptt-session-controls');
         const $row = $btn.closest('.acf-row');
@@ -495,6 +498,8 @@ jQuery(document).ready(function ($) {
 
     $(document).on('click', '.ptt-session-stop', function(e) {
         e.preventDefault();
+        // When the Editor FSM is enabled, do not run the legacy handler.
+        if (window.PTT_FSM_ENABLED && window.PTT_FSM_EDITOR_ENABLED) { return; }
         const $btn = $(this);
         const $controls = $btn.closest('.ptt-session-controls');
         const $row = $btn.closest('.acf-row');

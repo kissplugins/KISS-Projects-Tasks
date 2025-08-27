@@ -415,7 +415,11 @@ function ptt_start_session_timer_callback() {
 
     $current_time   = current_time( 'mysql', 1 ); // UTC
     $session_title  = isset($_POST['session_title']) ? sanitize_text_field( wp_unslash($_POST['session_title']) ) : '';
-    if ( $session_title === '' ) { $session_title = 'Session ' . date_i18n( 'g:i A' ); }
+    if ( $session_title === '' ) {
+        // Default: Session mm-dd-yy HH:MM using site-local time for readability
+        $local_ts = current_time( 'timestamp' );
+        $session_title = 'Session ' . date_i18n( 'm-d-y H:i', $local_ts );
+    }
 
     // Ensure the requested row exists; if not, append a new one server-side
     $sessions = get_field( 'sessions', $post_id );
