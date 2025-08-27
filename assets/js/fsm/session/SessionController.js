@@ -156,6 +156,25 @@
       return false;
     });
 
+    // Intercept session duplication
+    jQuery(document).off('click.pttSessionDuplicate');
+    jQuery(document).on('click.pttSessionDuplicate', '.acf-field[data-key="field_ptt_sessions"] .ptt-session-duplicate', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+
+      var $row = jQuery(this).closest('.acf-row');
+      var sessionIndex = $row.index();
+      var postId = jQuery('#post_ID').val();
+
+      if(!sessionFSM.canDuplicateSession()){
+        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot duplicate session in current state' });
+        return false;
+      }
+
+      sessionFSM.transition('DUPLICATE_SESSION', { sourceIndex: sessionIndex, postId: postId });
+      return false;
+    });
+
     // Intercept WordPress save to validate sessions
     jQuery(document).off('click.pttSessionSave');
     jQuery(document).on('click.pttSessionSave', '#publish', function(e){
@@ -191,6 +210,13 @@
           sessionFSM.transition('SESSION_DELETED');
         }
       }
+
+      if(sessionStorage.getItem('ptt_session_duplicate_pending') === '1'){
+        sessionStorage.removeItem('ptt_session_duplicate_pending');
+        if(sessionFSM.state === 'DUPLICATING'){
+          sessionFSM.transition('SESSION_DUPLICATED');
+        }
+      }
     });
 
     // Re-initialize when new rows are added by ACF
@@ -207,9 +233,14 @@
       });
     }
 
+    // Initialize duplicate buttons for existing rows
+    if (typeof effects.initializeAllRowButtons === 'function') {
+      effects.initializeAllRowButtons();
+    }
+
     // Expose SessionFSM globally for debugging
     root.PTT_SessionFSM = sessionFSM;
-    
+
     sessionFSM.log('SessionController initialized');
   }
 

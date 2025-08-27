@@ -209,6 +209,88 @@
     });
   };
 
+  // Duplicate session row
+  SessionEffects.prototype.duplicateSession = function(payload){
+    var self = this;
+    return new Promise(function(resolve, reject){
+      try {
+        var sourceIndex = payload.sourceIndex;
+        var $sourceRow = self.getSessionRow(sourceIndex);
+
+        if(!$sourceRow || !$sourceRow.length){
+          reject(new Error('Source session row not found'));
+          return;
+        }
+
+        // Get source session data
+        var sourceData = self.getSessionData(sourceIndex);
+        if(!sourceData){
+          reject(new Error('Could not read source session data'));
+          return;
+        }
+
+        // Create new session first
+        var $addButton = jQuery('.acf-field[data-key="field_ptt_sessions"] [data-event="add-row"], .acf-field[data-key="field_ptt_sessions"] [data-name="add-row"]');
+        if(!$addButton.length){
+          reject(new Error('Could not find add session button'));
+          return;
+        }
+
+        $addButton.trigger('click');
+
+        // Wait for ACF to create the row, then populate with source data
+        setTimeout(function(){
+          var $newRows = self.getSessionRows();
+          var newIndex = $newRows.length - 1;
+          var $newRow = $newRows.eq(newIndex);
+
+          if(!$newRow.length){
+            reject(new Error('Failed to create new session row'));
+            return;
+          }
+
+          // Generate new title with "Copy of" prefix and timestamp
+          var now = new Date();
+          var mm = ('0'+(now.getMonth()+1)).slice(-2);
+          var dd = ('0'+now.getDate()).slice(-2);
+          var yy = String(now.getFullYear()).slice(-2);
+          var HH = ('0'+now.getHours()).slice(-2);
+          var MM = ('0'+now.getMinutes()).slice(-2);
+          var newTitle = 'Copy of ' + (sourceData.title || 'Session') + ' (' + mm + '-' + dd + '-' + yy + ' ' + HH + ':' + MM + ')';
+
+          // Populate new row with source data (excluding timer-specific fields)
+          $newRow.find('[data-key="field_ptt_session_title"] input').val(newTitle).trigger('change');
+          $newRow.find('[data-key="field_ptt_session_notes"] textarea').val(sourceData.notes).trigger('change');
+
+          // Copy manual override and duration if set
+          if(sourceData.manualOverride){
+            $newRow.find('[data-key="field_ptt_session_manual_override"] input').prop('checked', true).trigger('change');
+            $newRow.find('[data-key="field_ptt_session_manual_duration"] input').val(sourceData.manualDuration).trigger('change');
+          }
+
+          // Do NOT copy start/stop times or calculated duration - these should be fresh for new session
+
+          // Trigger save to persist the duplication
+          var $saveButton = jQuery('#publish');
+          if($saveButton.length && $saveButton.is(':enabled')){
+            sessionStorage.setItem('ptt_session_duplicate_pending', '1');
+            $saveButton.trigger('click');
+          }
+
+          resolve({
+            duplicated: true,
+            sourceIndex: sourceIndex,
+            newIndex: newIndex,
+            newTitle: newTitle
+          });
+        }, 100);
+
+      } catch(err) {
+        reject(err);
+      }
+    });
+  };
+
   // Update session UI based on FSM state
   SessionEffects.prototype.updateSessionUI = function(state, ctx){
     var $rows = this.getSessionRows();
@@ -230,39 +312,73 @@
     // Add state classes for styling
     $row.removeClass('ptt-session-idle ptt-session-editing ptt-session-validating ptt-session-saving ptt-session-error');
     $row.addClass('ptt-session-' + state.toLowerCase());
-    
+
     // Show/hide validation errors
     var $errorContainer = $row.find('.ptt-session-errors');
     if(!$errorContainer.length){
       $errorContainer = jQuery('<div class="ptt-session-errors" style="color: #d63638; font-size: 12px; margin-top: 5px;"></div>');
       $row.find('.acf-input').first().append($errorContainer);
     }
-    
+
     if(ctx.validationErrors && ctx.validationErrors.length > 0){
       $errorContainer.html(ctx.validationErrors.join('<br>')).show();
     } else {
       $errorContainer.hide();
     }
-    
+
+    // Add duplicate button if not already present
+    this.ensureDuplicateButton($row);
+
     // Update field states based on FSM state
     var $inputs = $row.find('input, textarea, select');
-    if(state === 'SAVING'){
+    if(state === 'SAVING' || state === 'DELETING' || state === 'DUPLICATING'){
       $inputs.prop('disabled', true);
     } else {
       $inputs.prop('disabled', false);
     }
   };
 
+  // Ensure duplicate button exists in session row
+  SessionEffects.prototype.ensureDuplicateButton = function($row){
+    if($row.find('.ptt-session-duplicate').length) return; // Already exists
+
+    // Find the row controls area (usually near the delete button)
+    var $controls = $row.find('.acf-row-handle');
+    if(!$controls.length) return;
+
+    // Create duplicate button
+    var $duplicateBtn = jQuery('<a href="#" class="ptt-session-duplicate acf-icon -duplicate" title="Duplicate Session" style="margin-left: 5px; color: #0073aa; text-decoration: none;">⧉</a>');
+
+    // Insert after the delete button or at the end of controls
+    var $deleteBtn = $controls.find('.acf-icon.-minus');
+    if($deleteBtn.length){
+      $deleteBtn.after($duplicateBtn);
+    } else {
+      $controls.append($duplicateBtn);
+    }
+  };
+
   // Update global session UI
   SessionEffects.prototype.updateGlobalSessionUI = function(state, ctx){
     var $addButton = jQuery('.acf-field[data-key="field_ptt_sessions"] [data-event="add-row"], .acf-field[data-key="field_ptt_sessions"] [data-name="add-row"]');
-    
+
     // Disable add button if we can't create sessions
-    if(state === 'CREATING' || state === 'SAVING'){
+    if(state === 'CREATING' || state === 'SAVING' || state === 'DUPLICATING'){
       $addButton.prop('disabled', true);
     } else {
       $addButton.prop('disabled', false);
     }
+
+    // Ensure all rows have duplicate buttons
+    this.initializeAllRowButtons();
+  };
+
+  // Initialize duplicate buttons for all existing rows
+  SessionEffects.prototype.initializeAllRowButtons = function(){
+    var self = this;
+    this.getSessionRows().each(function(){
+      self.ensureDuplicateButton(jQuery(this));
+    });
   };
 
   // Show error message

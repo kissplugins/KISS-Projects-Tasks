@@ -32,8 +32,11 @@
     if(s==='IDLE' && e==='CREATE_SESSION') return this._createSession(payload);
     if(s==='IDLE' && e==='EDIT_SESSION') return this._editSession(payload);
     if(s==='IDLE' && e==='DELETE_SESSION') return this._deleteSession(payload);
+    if(s==='IDLE' && e==='DUPLICATE_SESSION') return this._duplicateSession(payload);
     if(s==='CREATING' && e==='SESSION_CREATED') return this._afterCreate(payload);
     if(s==='CREATING' && e==='CREATE_FAILED') return this._createFailed(payload);
+    if(s==='DUPLICATING' && e==='SESSION_DUPLICATED') return this._sessionDuplicated(payload);
+    if(s==='DUPLICATING' && e==='DUPLICATE_FAILED') return this._duplicateFailed(payload);
     if(s==='EDITING' && e==='FIELD_CHANGED') return this._fieldChanged(payload);
     if(s==='EDITING' && e==='VALIDATE_SESSION') return this._validateSession(payload);
     if(s==='EDITING' && e==='SAVE_SESSION') return this._saveSession(payload);
@@ -142,6 +145,60 @@
     this.ctx.validationErrors = [payload.message || 'Delete failed'];
     this.effects.showError && this.effects.showError(payload.message || 'Failed to delete session');
     this.log('DELETE_FAILED', payload);
+  };
+
+  SessionFSM.prototype._duplicateSession = function(payload){
+    this.state = 'DUPLICATING';
+    this.ctx.sessionIndex = payload.sourceIndex;
+    this.ctx.postId = payload.postId;
+    var self = this;
+
+    // Check if timer is running - prevent duplicating while timer active
+    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+      this.state = 'ERROR';
+      this.ctx.validationErrors = ['Cannot duplicate session while timer is running'];
+      this.effects.showError && this.effects.showError('Stop the current timer before duplicating sessions');
+      this.log('DUPLICATE_FAILED', 'Timer running');
+      return;
+    }
+
+    return this.effects.duplicateSession(payload).then(function(res){
+      self.state = 'IDLE';
+      self.ctx = {
+        sessionIndex: null,
+        postId: null,
+        isDirty: false,
+        validationErrors: [],
+        pendingChanges: {}
+      };
+      self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
+      self.log('SESSION_DUPLICATED', res);
+    }).catch(function(err){
+      self.state = 'ERROR';
+      self.ctx.validationErrors = [err.message || err];
+      self.effects.showError && self.effects.showError(err);
+      self.log('DUPLICATE_FAILED', err);
+    });
+  };
+
+  SessionFSM.prototype._sessionDuplicated = function(payload){
+    this.state = 'IDLE';
+    this.ctx = {
+      sessionIndex: null,
+      postId: null,
+      isDirty: false,
+      validationErrors: [],
+      pendingChanges: {}
+    };
+    this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
+    this.log('SESSION_DUPLICATED', payload);
+  };
+
+  SessionFSM.prototype._duplicateFailed = function(payload){
+    this.state = 'ERROR';
+    this.ctx.validationErrors = [payload.message || 'Duplication failed'];
+    this.effects.showError && this.effects.showError(payload.message || 'Failed to duplicate session');
+    this.log('DUPLICATE_FAILED', payload);
   };
 
   SessionFSM.prototype._fieldChanged = function(payload){
@@ -255,6 +312,18 @@
     // Can't delete if timer is running on this session
     if(this.timerFSM && this.timerFSM.state === 'RUNNING' &&
        this.timerFSM.ctx.sessionIndex === sessionIndex){
+      return false;
+    }
+
+    return true;
+  };
+
+  SessionFSM.prototype.canDuplicateSession = function(){
+    // Can't duplicate if FSM is busy
+    if(this.state !== 'IDLE') return false;
+
+    // Can't duplicate if timer is running (to avoid confusion)
+    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
       return false;
     }
 

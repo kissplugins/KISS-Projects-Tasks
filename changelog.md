@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 2.2.48 - Phase 2: Session Duplication with FSM Validation
+Released: 2025-08-27
+- Implemented session duplication FSM coordination with DUPLICATING state
+- Added duplicate buttons (⧉ icon) to all session rows for easy access
+- Smart data copying: preserves title, notes, manual settings while excluding timer fields
+- Auto-generated unique titles with "Copy of" prefix and timestamp
+- Protection against duplication while timer is running to prevent confusion
+- Complete FSM lifecycle: IDLE → DUPLICATING → IDLE with proper validation
+- Automatic post save after duplication to persist changes immediately
+- Enhanced UI with duplicate buttons automatically added to existing and new rows
+
 ## Version 2.2.47 - Phase 2: Session Deletion FSM Coordination
 Released: 2025-08-27
 - Implemented session deletion FSM coordination with DELETING state
