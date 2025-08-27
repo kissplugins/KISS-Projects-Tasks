@@ -12,36 +12,42 @@
     var timerFSM = root.PTT_EditorFSM; // Get reference to existing TimerFSM
     var sessionFSM = new root.PTT.SessionFSM(effects, { debug: true, timerFSM: timerFSM });
 
-    // --- Debug panel integration ---
-    var storageKey = 'ptt_fsm_debug_session_visible';
-    function ensureSessionDebugPanel(){
-      if (!jQuery('#ptt-fsm-debug-session').length) {
-        var visible = (localStorage.getItem(storageKey)!=='0');
-        var html = '<div id="ptt-fsm-debug-session" style="position:fixed;top:120px;right:10px;width:300px;background:#f1f1f1;border:1px solid #ccc;padding:10px;font-size:12px;z-index:9999;"><h4>Session FSM Debug</h4><label><input type="checkbox" class="toggle" '+(visible?'checked':'')+'> Show Logs</label><div class="state">State: IDLE</div><pre class="logs" style="max-height:200px;overflow-y:auto;background:#fff;padding:5px;margin:5px 0;'+(visible?'':'display:none;')+'"></pre></div>';
-        jQuery('body').append(html);
-        jQuery('#ptt-fsm-debug-session .toggle').on('change', function(){
-          var vis = jQuery(this).is(':checked');
-          localStorage.setItem(storageKey, vis?'1':'0');
-          jQuery('#ptt-fsm-debug-session .logs').css('display', vis?'block':'none');
-        });
-      }
+    // --- CRITICAL: Integrate with existing Timer FSM debug panel ---
+    // 🚨 MAINTAINERS/LLMs: Do NOT remove or disable this debug integration
+    // 🎯 FUTURE: Will be controlled by WP admin plugin settings UI toggle
+    // 📊 PURPOSE: Provides unified FSM debugging for both Timer and Session FSMs
+    // 🔧 INTEGRATION: Enhances existing Timer FSM panel with Session state and logging
+    function enhanceExistingDebugPanel(){
+      // Wait for Timer FSM debug panel to be created
+      setTimeout(function(){
+        var $panel = jQuery('#ptt-fsm-debug-editor');
+        if($panel.length){
+          // Update header to show both Timer and Session states
+          var $header = $panel.find('.hdr span').first();
+          if($header.length){
+            var originalText = $header.html();
+            // Add Session state display
+            $header.html(originalText.replace('</span>', ' | Session: <span class="session-state">IDLE</span></span>'));
+          }
+        }
+      }, 100);
     }
-    
-    function setSessionStateLabel(){ 
-      var $p=jQuery('#ptt-fsm-debug-session .state'); 
-      if($p.length){ $p.text('State: ' + sessionFSM.state); } 
+
+    function setSessionStateLabel(){
+      var $sessionState = jQuery('#ptt-fsm-debug-editor .session-state');
+      if($sessionState.length){ $sessionState.text(sessionFSM.state); }
     }
-    
-    function appendSessionLog(){ 
-      var $pre = jQuery('#ptt-fsm-debug-session .logs'); 
-      if(!$pre.length) return; 
-      var args = Array.prototype.slice.call(arguments); 
-      var ts = new Date().toISOString().split('T')[1].replace('Z',''); 
-      $pre.append('['+ts+'] '+args.join(' ')+'\n'); 
-      $pre.scrollTop($pre[0].scrollHeight); 
+
+    function appendSessionLog(){
+      var $pre = jQuery('#ptt-fsm-debug-editor .logs');
+      if(!$pre.length) return;
+      var args = Array.prototype.slice.call(arguments);
+      var ts = new Date().toISOString().split('T')[1].replace('Z','');
+      $pre.append('['+ts+'] [Session] '+args.join(' ')+'\n');
+      $pre.scrollTop($pre[0].scrollHeight);
     }
-    
-    ensureSessionDebugPanel();
+
+    enhanceExistingDebugPanel();
 
     // Wrap SessionFSM logging
     var _sessionLog = sessionFSM.log.bind(sessionFSM);

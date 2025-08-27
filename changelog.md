@@ -1,5 +1,20 @@
 # Changelog
 
+## Version 2.2.46 - Protected Debug Panels & Documentation
+Released: 2025-08-27
+- Added critical protection comments to prevent accidental removal of debug panels
+- Enhanced code comments with emoji warnings and explicit product owner approval requirements
+- Updated PROJECT-FSM.md with comprehensive debug panel system documentation
+- Documented future plan to convert debug panels to WP admin settings UI toggles
+- Added debug panel positioning, theming, and API enhancement roadmap
+
+## Version 2.2.45 - Unified FSM Debug Panel
+Released: 2025-08-27
+- Consolidated SessionFSM debug output into existing Timer FSM debug panel
+- Debug panel header now shows both Timer and Session states: "IDLE | Session: IDLE"
+- Session events are prefixed with "[Session]" in the unified log for easy identification
+- Improved developer experience with single debug panel for all FSM activity
+
 ## Version 2.2.44 - Implement SessionFSM for CPT Task Editor
 Released: 2025-08-27
 - Added SessionFSM to manage session lifecycle with states: IDLE, CREATING, EDITING, VALIDATING, SAVING, ERROR

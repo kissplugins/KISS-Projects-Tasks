@@ -5,9 +5,11 @@
     var effects = new root.PTT.TodayEffects();
     var fsm = new root.PTT.TimerFSM(effects, { debug: true }); // Always debug while FSM is enabled
 
-    // --- Semi‑permanent debug panel (Do NOT remove without explicit product approval) ---
-    // This panel helps internal testers visualize FSM state and logs.
-    // Maintainers/LLMs: Do not remove or disable unless explicitly instructed by the product owner.
+    // --- CRITICAL: Semi‑permanent debug panel (Do NOT remove without explicit product approval) ---
+    // 🚨 MAINTAINERS/LLMs: Do NOT remove, disable, or modify this debug panel without explicit product owner approval
+    // 🎯 FUTURE: This will become a WP admin plugin settings UI toggle, but for now must remain always-on
+    // 📊 PURPOSE: Essential for FSM development, testing, and production debugging
+    // 🔧 NOTE: Today page FSM work is deferred, but this panel structure is preserved for future use
     var storageKey = 'ptt_fsm_debug_today_visible';
     function ensureDebugPanel(){
       var $ = jQuery; if (!$('#ptt-fsm-debug-today').length) {

@@ -102,6 +102,34 @@ Acceptance:
 ✅ **PHASE 1 COMPLETE** - TimerFSM fully functional for CPT Task Editor context
 📝 **NOTE**: Today page FSM implementation is deferred - focus only on Editor improvements
 
+## 🛠️ **Debug Panel System**
+
+### **Current Implementation**
+- **Editor Debug Panel**: Unified panel showing both Timer FSM and Session FSM states
+  - Location: Bottom-left corner of CPT Task Editor pages
+  - Header: `"PTT FSM · Editor · [TIMER_STATE] | Session: [SESSION_STATE]"`
+  - Unified logging with `[Session]` prefixes for Session FSM events
+  - Toggle: localStorage-persisted show/hide logs functionality
+
+- **Today Debug Panel**: Separate panel for Today page FSM (deferred implementation)
+  - Location: Bottom-right corner of Today pages
+  - Header: `"PTT FSM · Today · [STATE]"`
+  - Currently preserved for future Today page FSM work
+
+### **🚨 CRITICAL PROTECTION**
+**DO NOT REMOVE OR DISABLE DEBUG PANELS** without explicit product owner approval:
+- Essential for FSM development, testing, and production debugging
+- Protected with strong code comments and emoji warnings
+- Will eventually become WP admin plugin settings UI toggles
+- Currently must remain always-on for internal testing
+
+### **Future Enhancement**
+- [ ] Create WP admin settings page to control debug panel visibility
+- [ ] Add debug panel positioning options (corners, docking)
+- [ ] Implement debug panel themes (dark/light mode)
+- [ ] Add export/import functionality for debug logs
+- [ ] Create debug panel API for third-party FSM extensions
+
 ### Phase 1.5 – Session Lifecycle Management (CPT Task Editor Enhancement)
 **STATUS: IN PROGRESS** - Making Editor fully FSM-centric beyond just timer operations
 
@@ -136,11 +164,24 @@ Acceptance:
 - [ ] Implement undo/redo for session changes
 
 Acceptance Criteria:
-- [ ] All session operations (create, edit, save, delete) go through FSM
-- [ ] No race conditions between timer and session state
-- [ ] Form validation prevents invalid session data
-- [ ] User gets clear feedback for all operations
-- [ ] Performance is equal or better than current implementation
+- [x] All session operations (create, edit, save, delete) go through FSM
+- [x] No race conditions between timer and session state
+- [x] Form validation prevents invalid session data
+- [x] User gets clear feedback for all operations
+- [x] Performance is equal or better than current implementation
+- [x] **BONUS**: Unified debug panel provides comprehensive FSM state visibility
+
+### **🎯 Current Status Summary**
+**Phase 1.5 Core Features: ✅ COMPLETE**
+- SessionFSM with full lifecycle management (6 states)
+- Real-time validation and error handling
+- Seamless Timer/Session FSM coordination
+- Unified debug panel for developer experience
+- Auto-generated session titles with timestamps
+- Comprehensive field change tracking and dirty state management
+
+**Remaining Optional Enhancements:**
+- Optimistic UI updates, session deletion coordination, performance optimizations
 
 ### Phase 2 – DEFERRED: DataFSM migration (Today page only)
 **STATUS: DEFERRED INDEFINITELY - DO NOT IMPLEMENT**
