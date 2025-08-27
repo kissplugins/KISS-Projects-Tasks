@@ -4,6 +4,12 @@
 
 
 ## Version 2.2.35 - Editor FSM live ticking wired to shared timer
+
+## Version 2.2.36 - Editor stop persists end/duration under FSM
+Released: 2025-08-26
+- On Stop, EditorEffects now writes stop_time and calculated_duration into the active session row and stops the live ticker.
+- Triggers a WP Update click to persist totals so end/duration are saved immediately.
+
 Released: 2025-08-26
 - Fixed timer stuck at 00:00:00 on Editor when FSM is enabled.
 - Reused existing manageLiveTimer/stopLiveTimer via window.PTT helpers and invoked from EditorEffects.updateTimerUI.
@@ -33,6 +39,7 @@ Released: 2025-08-26
 - UI: Align hh:mm badge inline with Total Duration input; responsive layout on small screens.
 - Safety: Added onbeforeunload guard for 2–3 seconds after Start to reduce accidental navigation before save completes.
 - Version bump and changelog updated.
+- Floating palette to help confirm the FSM is the single source of truth for the timer and to make troubleshooting quick without opening DevTools every time (e.g., seeing START/STOP/ERROR at a glance)
 
 
 ## Version 2.2.31 - Reinforce Update button visibility on Task Editor

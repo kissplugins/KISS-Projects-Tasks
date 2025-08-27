@@ -30,7 +30,22 @@
     var $rows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row');
     var index = 0;
     $rows.each(function(i){ var start = jQuery(this).find('[data-key="field_ptt_session_start_time"] input').val(); var stop = jQuery(this).find('[data-key="field_ptt_session_stop_time"] input').val(); if(start && !stop){ index = i; return false; } });
-    return ajax('ptt_stop_session_timer', { post_id: postId, row_index: index });
+    return ajax('ptt_stop_session_timer', { post_id: postId, row_index: index }).then(function(data){
+      // Persist stop/duration to ACF inputs for this row
+      var $row = $rows.eq(index);
+      $row.find('[data-key="field_ptt_session_stop_time"] input').val(data.stop_time).trigger('change');
+      $row.find('[data-key="field_ptt_session_calculated_duration"] input').val(data.duration).trigger('change');
+      // Stop the live timer display if available
+      if (window.PTT && typeof window.PTT.stopLiveTimer === 'function') {
+        window.PTT.stopLiveTimer($row.find('.ptt-session-controls'));
+      }
+      // Trigger Update/Save to persist totals and fields
+      var $saveButton = jQuery('#publish');
+      if ($saveButton.length && $saveButton.is(':enabled')) {
+        setTimeout(function(){ $saveButton.trigger('click'); }, 150);
+      }
+      return data; // allow FSM to proceed
+    });
   };
   EditorEffects.prototype.rehydrate  = function(){
     // Ask server for user's active session; only activate if it's this post
