@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 2.2.44 - Implement SessionFSM for CPT Task Editor
+Released: 2025-08-27
+- Added SessionFSM to manage session lifecycle with states: IDLE, CREATING, EDITING, VALIDATING, SAVING, ERROR
+- Implemented SessionEffects for ACF session row operations and validation
+- Added SessionController to coordinate between SessionFSM and TimerFSM
+- Session creation now prevents conflicts when timer is running
+- Real-time field validation and dirty state tracking for session forms
+- Auto-generated session titles with timestamp for new sessions
+- Added debug panel for SessionFSM state visualization
+- All session operations now go through FSM for consistent state management
+
 ## Version 2.2.43 - Fix Editor Timer Rehydration
 Released: 2025-08-27
 - Fixed critical FSM rehydration issue in Editor where running timers were not properly restored on page refresh

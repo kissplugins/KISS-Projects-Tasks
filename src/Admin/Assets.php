@@ -50,6 +50,11 @@ class Assets {
         wp_enqueue_script( 'ptt-fsm-timer-today-controller', PTT_PLUGIN_URL . 'assets/js/fsm/timer/TodayTimerController.js', [ 'ptt-fsm-timer-today' ], PTT_VERSION, true );
         wp_enqueue_script( 'ptt-fsm-timer-editor', PTT_PLUGIN_URL . 'assets/js/fsm/timer/EditorEffects.js', [ 'ptt-fsm-timer-core', 'jquery' ], PTT_VERSION, true );
         wp_enqueue_script( 'ptt-fsm-timer-editor-controller', PTT_PLUGIN_URL . 'assets/js/fsm/timer/EditorTimerController.js', [ 'ptt-fsm-timer-editor' ], PTT_VERSION, true );
+
+        // Session FSM bundles (Editor only)
+        wp_enqueue_script( 'ptt-fsm-session-core', PTT_PLUGIN_URL . 'assets/js/fsm/session/SessionFSM.js', [], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-session-effects', PTT_PLUGIN_URL . 'assets/js/fsm/session/SessionEffects.js', [ 'ptt-fsm-session-core', 'jquery' ], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-session-controller', PTT_PLUGIN_URL . 'assets/js/fsm/session/SessionController.js', [ 'ptt-fsm-session-effects', 'ptt-fsm-timer-editor-controller' ], PTT_VERSION, true );
         // FSM flags from settings helper (defaults ON). Applies to all users (internal testers).
         $flags = Settings::getFlags();
         wp_localize_script( 'ptt-fsm-timer-today-controller', 'PTT_FSM_FLAGS', [

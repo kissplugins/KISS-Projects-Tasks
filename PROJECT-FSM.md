@@ -2,9 +2,9 @@
 
 This document defines a pragmatic, low‑risk path to introduce a Finite State Machine (FSM) to the plugin. The goal is clearer state management, fewer race conditions, and better debugging without breaking existing behavior.
 
-## 🎯 **Current Priority: CPT Task Editor First**
+## 🎯 **Current Priority: CPT Task Editor ONLY**
 
-**DEFERRED**: Today page FSM work is postponed until CPT Task Editor FSM is complete and stable.
+**IMPORTANT**: All Today page FSM work is DEFERRED indefinitely. Focus exclusively on CPT Task Editor FSM implementation and refinement. Do not implement DataFSM, Today page loading, or any Today page FSM features until explicitly instructed otherwise.
 
 ## 🎯 **Current Status (Updated)**
 - ✅ **Phase 0**: Complete - Feature flags, effects stubs, debug hooks
@@ -99,18 +99,58 @@ Acceptance:
 - [x] **ADDED**: FSM properly handles all session states (completed, manual time, available)
 - [x] **ADDED**: Legacy system delegates to FSM when enabled, preventing dual-system conflicts
 
-✅ **PHASE 1 COMPLETE** - TimerFSM fully functional for both Today and Editor contexts
+✅ **PHASE 1 COMPLETE** - TimerFSM fully functional for CPT Task Editor context
+📝 **NOTE**: Today page FSM implementation is deferred - focus only on Editor improvements
 
-### Phase 2 – DataFSM migration (loading/refresh)
-- [ ] Implement DataFSM with IDLE, LOADING, LOADED, ERROR
-- [ ] Replace Today page loading with effects.loadEntries(date)
-- [ ] Handle stale responses: if selectedDate changed during load, discard old result
-- [ ] While TimerFSM is RUNNING, DataFSM loads do not disrupt the timer UI
-- [ ] Update UI via effects.toggleLoading and effects.renderEntries
+### Phase 1.5 – Session Lifecycle Management (CPT Task Editor Enhancement)
+**STATUS: IN PROGRESS** - Making Editor fully FSM-centric beyond just timer operations
 
-Acceptance:
-- [ ] Spinner shows/hides correctly during loads
-- [ ] Race conditions avoided (no flicker or stale data after rapid date changes)
+#### Session Creation & Management
+- [x] Implement SessionFSM with states: IDLE, CREATING, EDITING, VALIDATING, SAVING, ERROR
+- [x] Intercept ACF session row creation and route through SessionFSM
+- [x] Add session validation before save (required fields, time conflicts, etc.)
+- [x] Coordinate between TimerFSM and SessionFSM states
+
+#### Form State Management
+- [x] Track dirty state for session fields (title, manual duration, override checkbox)
+- [x] Implement auto-save integration with WordPress post editor
+- [ ] Add optimistic UI updates with server sync
+- [x] Handle form validation errors through FSM
+
+#### Multi-Session Coordination
+- [x] Prevent timer conflicts between multiple session rows
+- [x] Ensure only one session can be running at a time
+- [x] Add session row state management (available, running, completed, manual)
+- [ ] Coordinate session deletion with active timer state
+
+#### Enhanced Error Handling
+- [ ] Add retry logic for failed session save operations
+- [ ] Implement conflict resolution for concurrent edits
+- [ ] Provide detailed user feedback for validation errors
+- [ ] Add recovery suggestions for common error scenarios
+
+#### Performance & UX Improvements
+- [ ] Debounce rapid field changes to reduce server calls
+- [ ] Cache session state in localStorage for faster page loads
+- [ ] Add loading indicators for session operations
+- [ ] Implement undo/redo for session changes
+
+Acceptance Criteria:
+- [ ] All session operations (create, edit, save, delete) go through FSM
+- [ ] No race conditions between timer and session state
+- [ ] Form validation prevents invalid session data
+- [ ] User gets clear feedback for all operations
+- [ ] Performance is equal or better than current implementation
+
+### Phase 2 – DEFERRED: DataFSM migration (Today page only)
+**STATUS: DEFERRED INDEFINITELY - DO NOT IMPLEMENT**
+- [ ] ~~Implement DataFSM with IDLE, LOADING, LOADED, ERROR~~
+- [ ] ~~Replace Today page loading with effects.loadEntries(date)~~
+- [ ] ~~Handle stale responses: if selectedDate changed during load, discard old result~~
+- [ ] ~~While TimerFSM is RUNNING, DataFSM loads do not disrupt the timer UI~~
+- [ ] ~~Update UI via effects.toggleLoading and effects.renderEntries~~
+
+**FOCUS INSTEAD**: Continue refining CPT Task Editor FSM implementation
 
 ### Phase 3 – Consolidation and cleanup
 - [ ] Remove legacy jQuery handlers replaced by FSM when flag ships to 100%
