@@ -9,10 +9,11 @@ This document defines a pragmatic, low‑risk path to introduce a Finite State M
 ## 🎯 **Current Status (Updated)**
 - ✅ **Phase 0**: Complete - Feature flags, effects stubs, debug hooks
 - ✅ **Phase 1**: Complete - TimerFSM implemented for Editor context
-- 🔄 **Current Focus**: CPT Task Editor timer rehydration and state management
-- ⏸️ **Deferred**: Today page FSM implementation
-- ❌ **Phase 2**: Not started - DataFSM for loading/refresh
-- ❌ **Phase 3**: Partial - Legacy delegation implemented, full cleanup pending
+- ✅ **Phase 1.5**: Complete - SessionFSM with unified debug panel
+- 🔄 **Current Focus**: Starting Phase 2 - Advanced Editor FSM Features
+- ⏸️ **Deferred**: Today page FSM implementation (DataFSM)
+- 🚀 **Phase 2**: Starting - Advanced session management and WordPress integration
+- ❌ **Phase 3**: Not started - Legacy cleanup and consolidation
 
 **Key Achievement**: FSM now has complete control over timer UI when enabled, preventing conflicts with legacy system.
 
@@ -180,18 +181,83 @@ Acceptance Criteria:
 - Auto-generated session titles with timestamps
 - Comprehensive field change tracking and dirty state management
 
-**Remaining Optional Enhancements:**
+**Remaining Optional Enhancements (DEFERRED):**
 - Optimistic UI updates, session deletion coordination, performance optimizations
 
-### Phase 2 – DEFERRED: DataFSM migration (Today page only)
-**STATUS: DEFERRED INDEFINITELY - DO NOT IMPLEMENT**
-- [ ] ~~Implement DataFSM with IDLE, LOADING, LOADED, ERROR~~
-- [ ] ~~Replace Today page loading with effects.loadEntries(date)~~
-- [ ] ~~Handle stale responses: if selectedDate changed during load, discard old result~~
-- [ ] ~~While TimerFSM is RUNNING, DataFSM loads do not disrupt the timer UI~~
-- [ ] ~~Update UI via effects.toggleLoading and effects.renderEntries~~
+### **🚀 Optional Performance Optimizations (Phase 1.6 - DEFERRED)**
+**STATUS: DOCUMENTED BUT DEFERRED** - Core functionality is complete and performant
 
-**FOCUS INSTEAD**: Continue refining CPT Task Editor FSM implementation
+#### **Debouncing & Throttling**
+- [ ] Debounce rapid field changes to reduce validation calls (300ms delay)
+- [ ] Throttle session save operations to prevent duplicate requests
+- [ ] Batch multiple field changes into single validation cycle
+- [ ] Implement request cancellation for abandoned operations
+
+#### **Caching & State Persistence**
+- [ ] Cache session validation results to avoid re-validation of unchanged data
+- [ ] Persist FSM state in localStorage for faster page reloads
+- [ ] Implement session data snapshots for instant rollback on errors
+- [ ] Cache ACF field selectors to reduce DOM queries
+
+#### **Optimistic UI Updates**
+- [ ] Update UI immediately on user actions, sync with server asynchronously
+- [ ] Show loading states only for operations taking >200ms
+- [ ] Implement conflict resolution for optimistic updates that fail
+- [ ] Add undo/redo functionality with optimistic state management
+
+#### **Memory & Resource Management**
+- [ ] Implement FSM context cleanup on session deletion
+- [ ] Add event listener cleanup on page unload
+- [ ] Optimize debug logging to prevent memory leaks in long sessions
+- [ ] Lazy-load session validation rules only when needed
+
+#### **Network Optimization**
+- [ ] Implement request queuing for sequential operations
+- [ ] Add retry logic with exponential backoff for failed requests
+- [ ] Compress debug log data for export functionality
+- [ ] Implement WebSocket connections for real-time multi-user coordination
+
+**Acceptance Criteria (When Implemented):**
+- [ ] Field changes respond within 50ms (optimistic updates)
+- [ ] Validation completes within 100ms for cached results
+- [ ] Memory usage remains stable during extended editing sessions
+- [ ] Network requests reduced by 40% through batching and caching
+- [ ] Page load time improved by 25% through state persistence
+
+### Phase 2 – Advanced Editor FSM Features (CPT Task Editor Focus)
+**STATUS: READY TO START** - Building on solid Phase 1.5 foundation
+
+#### **Enhanced Session Management**
+- [x] Implement session deletion FSM coordination (prevent deleting active timer sessions)
+- [ ] Add session duplication functionality with FSM validation
+- [ ] Implement session reordering with conflict detection
+- [ ] Add bulk session operations (delete multiple, export selected)
+
+#### **Advanced Validation & Error Recovery**
+- [ ] Implement comprehensive time overlap detection across all sessions
+- [ ] Add smart conflict resolution suggestions (auto-adjust times, split sessions)
+- [ ] Implement session data recovery from browser crashes
+- [ ] Add validation rule customization per project/client
+
+#### **WordPress Integration Enhancements**
+- [ ] Deep integration with WordPress auto-save system
+- [ ] Coordinate FSM with WordPress revision system
+- [ ] Add FSM state preservation during post status changes (draft/publish)
+- [ ] Implement FSM-aware custom field validation hooks
+
+#### **User Experience Improvements**
+- [ ] Add keyboard shortcuts for common FSM operations (Ctrl+S for save, Esc for cancel)
+- [ ] Implement session templates and quick-start presets
+- [ ] Add session time estimation and budget tracking integration
+- [ ] Create guided session creation wizard for new users
+
+#### **Multi-User Coordination**
+- [ ] Implement real-time session conflict detection for multiple editors
+- [ ] Add session locking when another user is editing
+- [ ] Create collaborative session editing with live updates
+- [ ] Add user activity indicators in session rows
+
+**FOCUS**: Advanced Editor features that leverage the solid FSM foundation
 
 ### Phase 3 – Consolidation and cleanup
 - [ ] Remove legacy jQuery handlers replaced by FSM when flag ships to 100%

@@ -137,6 +137,25 @@
       }
     });
 
+    // Intercept session deletion
+    jQuery(document).off('click.pttSessionDelete');
+    jQuery(document).on('click.pttSessionDelete', '.acf-field[data-key="field_ptt_sessions"] [data-event="remove-row"], .acf-field[data-key="field_ptt_sessions"] .acf-icon.-minus', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+
+      var $row = jQuery(this).closest('.acf-row');
+      var sessionIndex = $row.index();
+      var postId = jQuery('#post_ID').val();
+
+      if(!sessionFSM.canDeleteSession(sessionIndex)){
+        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot delete session in current state' });
+        return false;
+      }
+
+      sessionFSM.transition('DELETE_SESSION', { sessionIndex: sessionIndex, postId: postId });
+      return false;
+    });
+
     // Intercept WordPress save to validate sessions
     jQuery(document).off('click.pttSessionSave');
     jQuery(document).on('click.pttSessionSave', '#publish', function(e){
@@ -144,7 +163,7 @@
       if(sessionFSM.hasUnsavedChanges()){
         e.preventDefault();
         e.stopPropagation();
-        
+
         // Validate before save
         sessionFSM.transition('VALIDATE_SESSION').then(function(){
           // If validation passes, proceed with save
@@ -152,7 +171,7 @@
             sessionFSM.transition('SAVE_SESSION');
           }
         });
-        
+
         return false;
       }
     });
@@ -163,6 +182,13 @@
         sessionStorage.removeItem('ptt_session_save_pending');
         if(sessionFSM.state === 'SAVING'){
           sessionFSM.transition('SESSION_SAVED');
+        }
+      }
+
+      if(sessionStorage.getItem('ptt_session_delete_pending') === '1'){
+        sessionStorage.removeItem('ptt_session_delete_pending');
+        if(sessionFSM.state === 'DELETING'){
+          sessionFSM.transition('SESSION_DELETED');
         }
       }
     });

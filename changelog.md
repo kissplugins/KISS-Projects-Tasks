@@ -1,5 +1,15 @@
 # Changelog
 
+## Version 2.2.47 - Phase 2: Session Deletion FSM Coordination
+Released: 2025-08-27
+- Implemented session deletion FSM coordination with DELETING state
+- Added protection to prevent deleting sessions with active timers
+- SessionFSM now intercepts ACF delete button clicks and validates before deletion
+- Added confirmation dialog and automatic post save after session deletion
+- Enhanced SessionFSM with canDeleteSession() helper method
+- Session deletion now goes through complete FSM lifecycle for consistency
+- Added comprehensive error handling and user feedback for deletion conflicts
+
 ## Version 2.2.46 - Protected Debug Panels & Documentation
 Released: 2025-08-27
 - Added critical protection comments to prevent accidental removal of debug panels

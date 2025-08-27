@@ -160,6 +160,55 @@
     });
   };
 
+  // Delete session row
+  SessionEffects.prototype.deleteSession = function(payload){
+    var self = this;
+    return new Promise(function(resolve, reject){
+      try {
+        var sessionIndex = payload.sessionIndex;
+        var $row = self.getSessionRow(sessionIndex);
+
+        if(!$row || !$row.length){
+          reject(new Error('Session row not found'));
+          return;
+        }
+
+        // Check if session has active timer
+        var sessionData = self.getSessionData(sessionIndex);
+        if(sessionData && sessionData.startTime && !sessionData.stopTime){
+          reject(new Error('Cannot delete session with active timer'));
+          return;
+        }
+
+        // Find and trigger ACF delete button for this row
+        var $deleteButton = $row.find('[data-event="remove-row"], .acf-icon.-minus');
+        if($deleteButton.length){
+          // Confirm deletion
+          if(confirm('Are you sure you want to delete this session? This action cannot be undone.')){
+            $deleteButton.trigger('click');
+
+            // Wait for ACF to remove the row, then resolve
+            setTimeout(function(){
+              // Trigger save to persist the deletion
+              var $saveButton = jQuery('#publish');
+              if($saveButton.length && $saveButton.is(':enabled')){
+                sessionStorage.setItem('ptt_session_delete_pending', '1');
+                $saveButton.trigger('click');
+              }
+              resolve({ deleted: true, sessionIndex: sessionIndex });
+            }, 100);
+          } else {
+            reject(new Error('Deletion cancelled by user'));
+          }
+        } else {
+          reject(new Error('Could not find delete button for session'));
+        }
+      } catch(err) {
+        reject(err);
+      }
+    });
+  };
+
   // Update session UI based on FSM state
   SessionEffects.prototype.updateSessionUI = function(state, ctx){
     var $rows = this.getSessionRows();

@@ -31,11 +31,14 @@
     // State transition table
     if(s==='IDLE' && e==='CREATE_SESSION') return this._createSession(payload);
     if(s==='IDLE' && e==='EDIT_SESSION') return this._editSession(payload);
+    if(s==='IDLE' && e==='DELETE_SESSION') return this._deleteSession(payload);
     if(s==='CREATING' && e==='SESSION_CREATED') return this._afterCreate(payload);
     if(s==='CREATING' && e==='CREATE_FAILED') return this._createFailed(payload);
     if(s==='EDITING' && e==='FIELD_CHANGED') return this._fieldChanged(payload);
     if(s==='EDITING' && e==='VALIDATE_SESSION') return this._validateSession(payload);
     if(s==='EDITING' && e==='SAVE_SESSION') return this._saveSession(payload);
+    if(s==='DELETING' && e==='SESSION_DELETED') return this._sessionDeleted(payload);
+    if(s==='DELETING' && e==='DELETE_FAILED') return this._deleteFailed(payload);
     if(s==='VALIDATING' && e==='VALIDATION_PASSED') return this._validationPassed(payload);
     if(s==='VALIDATING' && e==='VALIDATION_FAILED') return this._validationFailed(payload);
     if(s==='SAVING' && e==='SESSION_SAVED') return this._sessionSaved(payload);
@@ -81,9 +84,64 @@
     this.ctx.isDirty = false;
     this.ctx.pendingChanges = {};
     this.ctx.validationErrors = [];
-    
+
     this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
     this.log('EDITING_SESSION', this.ctx);
+  };
+
+  SessionFSM.prototype._deleteSession = function(payload){
+    this.state = 'DELETING';
+    this.ctx.sessionIndex = payload.sessionIndex;
+    this.ctx.postId = payload.postId;
+    var self = this;
+
+    // Check if trying to delete active timer session
+    if(this.timerFSM && this.timerFSM.state === 'RUNNING' &&
+       this.timerFSM.ctx.sessionIndex === payload.sessionIndex){
+      this.state = 'ERROR';
+      this.ctx.validationErrors = ['Cannot delete session with active timer'];
+      this.effects.showError && this.effects.showError('Stop the timer before deleting this session');
+      this.log('DELETE_FAILED', 'Active timer session');
+      return;
+    }
+
+    return this.effects.deleteSession(payload).then(function(res){
+      self.state = 'IDLE';
+      self.ctx = {
+        sessionIndex: null,
+        postId: null,
+        isDirty: false,
+        validationErrors: [],
+        pendingChanges: {}
+      };
+      self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
+      self.log('SESSION_DELETED', res);
+    }).catch(function(err){
+      self.state = 'ERROR';
+      self.ctx.validationErrors = [err.message || err];
+      self.effects.showError && self.effects.showError(err);
+      self.log('DELETE_FAILED', err);
+    });
+  };
+
+  SessionFSM.prototype._sessionDeleted = function(payload){
+    this.state = 'IDLE';
+    this.ctx = {
+      sessionIndex: null,
+      postId: null,
+      isDirty: false,
+      validationErrors: [],
+      pendingChanges: {}
+    };
+    this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
+    this.log('SESSION_DELETED', payload);
+  };
+
+  SessionFSM.prototype._deleteFailed = function(payload){
+    this.state = 'ERROR';
+    this.ctx.validationErrors = [payload.message || 'Delete failed'];
+    this.effects.showError && this.effects.showError(payload.message || 'Failed to delete session');
+    this.log('DELETE_FAILED', payload);
   };
 
   SessionFSM.prototype._fieldChanged = function(payload){
@@ -188,6 +246,19 @@
 
   SessionFSM.prototype.hasUnsavedChanges = function(){
     return this.ctx.isDirty;
+  };
+
+  SessionFSM.prototype.canDeleteSession = function(sessionIndex){
+    // Can't delete if FSM is busy
+    if(this.state !== 'IDLE') return false;
+
+    // Can't delete if timer is running on this session
+    if(this.timerFSM && this.timerFSM.state === 'RUNNING' &&
+       this.timerFSM.ctx.sessionIndex === sessionIndex){
+      return false;
+    }
+
+    return true;
   };
 
   root.PTT = root.PTT || {}; 
