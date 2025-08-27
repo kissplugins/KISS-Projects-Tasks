@@ -1,5 +1,18 @@
 # Changelog
 
+## Version 2.2.50 - Phase 2: Bulk Session Operations Complete
+Released: 2025-08-27
+- Implemented comprehensive bulk session operations with BULK_PROCESSING state
+- Added selection checkboxes to all session rows for multi-select functionality
+- Created bulk operations toolbar with Select All/None controls and action dropdown
+- Bulk Delete: Select multiple sessions and delete them all at once with confirmation
+- Bulk Export: Export selected sessions to timestamped CSV files with complete data
+- Smart selection UI: Dynamic count display, indeterminate checkbox states, enabled/disabled controls
+- Sequential deletion algorithm: Deletes from bottom up to preserve indices during operation
+- CSV export with proper escaping: Headers, session data, duration calculations, manual overrides
+- Protection against bulk operations while timer is running to prevent conflicts
+- Complete FSM lifecycle: IDLE → BULK_PROCESSING → IDLE with comprehensive validation
+
 ## Version 2.2.49 - Phase 2: Session Reordering with Conflict Detection
 Released: 2025-08-27
 - Implemented session reordering FSM coordination with REORDERING state

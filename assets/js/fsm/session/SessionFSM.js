@@ -34,12 +34,15 @@
     if(s==='IDLE' && e==='DELETE_SESSION') return this._deleteSession(payload);
     if(s==='IDLE' && e==='DUPLICATE_SESSION') return this._duplicateSession(payload);
     if(s==='IDLE' && e==='REORDER_SESSION') return this._reorderSession(payload);
+    if(s==='IDLE' && e==='BULK_OPERATION') return this._bulkOperation(payload);
     if(s==='CREATING' && e==='SESSION_CREATED') return this._afterCreate(payload);
     if(s==='CREATING' && e==='CREATE_FAILED') return this._createFailed(payload);
     if(s==='DUPLICATING' && e==='SESSION_DUPLICATED') return this._sessionDuplicated(payload);
     if(s==='DUPLICATING' && e==='DUPLICATE_FAILED') return this._duplicateFailed(payload);
     if(s==='REORDERING' && e==='SESSION_REORDERED') return this._sessionReordered(payload);
     if(s==='REORDERING' && e==='REORDER_FAILED') return this._reorderFailed(payload);
+    if(s==='BULK_PROCESSING' && e==='BULK_COMPLETED') return this._bulkCompleted(payload);
+    if(s==='BULK_PROCESSING' && e==='BULK_FAILED') return this._bulkFailed(payload);
     if(s==='EDITING' && e==='FIELD_CHANGED') return this._fieldChanged(payload);
     if(s==='EDITING' && e==='VALIDATE_SESSION') return this._validateSession(payload);
     if(s==='EDITING' && e==='SAVE_SESSION') return this._saveSession(payload);
@@ -258,6 +261,70 @@
     this.log('REORDER_FAILED', payload);
   };
 
+  SessionFSM.prototype._bulkOperation = function(payload){
+    this.state = 'BULK_PROCESSING';
+    this.ctx.bulkOperation = payload.operation;
+    this.ctx.selectedIndices = payload.selectedIndices;
+    this.ctx.postId = payload.postId;
+    var self = this;
+
+    // Check if timer is running - prevent bulk operations while timer active
+    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+      this.state = 'ERROR';
+      this.ctx.validationErrors = ['Cannot perform bulk operations while timer is running'];
+      this.effects.showError && this.effects.showError('Stop the current timer before performing bulk operations');
+      this.log('BULK_FAILED', 'Timer running');
+      return;
+    }
+
+    // Validate selection
+    if(!payload.selectedIndices || payload.selectedIndices.length === 0){
+      this.state = 'ERROR';
+      this.ctx.validationErrors = ['No sessions selected for bulk operation'];
+      this.effects.showError && this.effects.showError('Please select at least one session');
+      this.log('BULK_FAILED', 'No selection');
+      return;
+    }
+
+    return this.effects.performBulkOperation(payload).then(function(res){
+      self.state = 'IDLE';
+      self.ctx = {
+        sessionIndex: null,
+        postId: null,
+        isDirty: false,
+        validationErrors: [],
+        pendingChanges: {}
+      };
+      self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
+      self.log('BULK_COMPLETED', res);
+    }).catch(function(err){
+      self.state = 'ERROR';
+      self.ctx.validationErrors = [err.message || err];
+      self.effects.showError && self.effects.showError(err);
+      self.log('BULK_FAILED', err);
+    });
+  };
+
+  SessionFSM.prototype._bulkCompleted = function(payload){
+    this.state = 'IDLE';
+    this.ctx = {
+      sessionIndex: null,
+      postId: null,
+      isDirty: false,
+      validationErrors: [],
+      pendingChanges: {}
+    };
+    this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
+    this.log('BULK_COMPLETED', payload);
+  };
+
+  SessionFSM.prototype._bulkFailed = function(payload){
+    this.state = 'ERROR';
+    this.ctx.validationErrors = [payload.message || 'Bulk operation failed'];
+    this.effects.showError && this.effects.showError(payload.message || 'Failed to perform bulk operation');
+    this.log('BULK_FAILED', payload);
+  };
+
   SessionFSM.prototype._fieldChanged = function(payload){
     if(this.state !== 'EDITING') return;
     
@@ -392,6 +459,18 @@
     if(this.state !== 'IDLE') return false;
 
     // Can't reorder if timer is running (to avoid confusion and index mismatches)
+    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+      return false;
+    }
+
+    return true;
+  };
+
+  SessionFSM.prototype.canPerformBulkOperations = function(){
+    // Can't perform bulk operations if FSM is busy
+    if(this.state !== 'IDLE') return false;
+
+    // Can't perform bulk operations if timer is running (to avoid conflicts)
     if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
       return false;
     }

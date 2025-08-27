@@ -246,6 +246,77 @@
       }
     });
 
+    // Bulk operations event handlers
+
+    // Selection checkbox changes
+    jQuery(document).off('change.pttSessionSelect');
+    jQuery(document).on('change.pttSessionSelect', '.acf-field[data-key="field_ptt_sessions"] .ptt-session-select', function(e){
+      if (typeof effects.updateSelectionCount === 'function') {
+        effects.updateSelectionCount();
+      }
+    });
+
+    // Select all checkbox
+    jQuery(document).off('change.pttSelectAll');
+    jQuery(document).on('change.pttSelectAll', '.acf-field[data-key="field_ptt_sessions"] .ptt-select-all', function(e){
+      var isChecked = jQuery(this).prop('checked');
+      jQuery('.acf-field[data-key="field_ptt_sessions"] .ptt-session-select').prop('checked', isChecked);
+      if (typeof effects.updateSelectionCount === 'function') {
+        effects.updateSelectionCount();
+      }
+    });
+
+    // Select none button
+    jQuery(document).off('click.pttSelectNone');
+    jQuery(document).on('click.pttSelectNone', '.acf-field[data-key="field_ptt_sessions"] .ptt-select-none', function(e){
+      e.preventDefault();
+      jQuery('.acf-field[data-key="field_ptt_sessions"] .ptt-session-select').prop('checked', false);
+      if (typeof effects.updateSelectionCount === 'function') {
+        effects.updateSelectionCount();
+      }
+    });
+
+    // Bulk action dropdown change
+    jQuery(document).off('change.pttBulkAction');
+    jQuery(document).on('change.pttBulkAction', '.acf-field[data-key="field_ptt_sessions"] .ptt-bulk-action', function(e){
+      if (typeof effects.updateSelectionCount === 'function') {
+        effects.updateSelectionCount();
+      }
+    });
+
+    // Bulk execute button
+    jQuery(document).off('click.pttBulkExecute');
+    jQuery(document).on('click.pttBulkExecute', '.acf-field[data-key="field_ptt_sessions"] .ptt-bulk-execute', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+
+      var selectedIndices = effects.getSelectedIndices();
+      var operation = jQuery('.ptt-bulk-action').val();
+      var postId = jQuery('#post_ID').val();
+
+      if(!sessionFSM.canPerformBulkOperations()){
+        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot perform bulk operations in current state' });
+        return false;
+      }
+
+      if(!operation){
+        sessionFSM.transition('SESSION_ERROR', { message: 'Please select a bulk operation' });
+        return false;
+      }
+
+      if(selectedIndices.length === 0){
+        sessionFSM.transition('SESSION_ERROR', { message: 'Please select at least one session' });
+        return false;
+      }
+
+      sessionFSM.transition('BULK_OPERATION', {
+        operation: operation,
+        selectedIndices: selectedIndices,
+        postId: postId
+      });
+      return false;
+    });
+
     // Handle post save completion
     jQuery(document).on('ptt:post_saved', function(){
       if(sessionStorage.getItem('ptt_session_save_pending') === '1'){
@@ -275,6 +346,13 @@
           sessionFSM.transition('SESSION_REORDERED');
         }
       }
+
+      if(sessionStorage.getItem('ptt_session_bulk_delete_pending') === '1'){
+        sessionStorage.removeItem('ptt_session_bulk_delete_pending');
+        if(sessionFSM.state === 'BULK_PROCESSING'){
+          sessionFSM.transition('BULK_COMPLETED');
+        }
+      }
     });
 
     // Re-initialize when new rows are added by ACF
@@ -291,9 +369,13 @@
       });
     }
 
-    // Initialize duplicate buttons for existing rows
+    // Initialize buttons and bulk operations UI for existing rows
     if (typeof effects.initializeAllRowButtons === 'function') {
       effects.initializeAllRowButtons();
+    }
+
+    if (typeof effects.ensureBulkOperationsUI === 'function') {
+      effects.ensureBulkOperationsUI();
     }
 
     // Expose SessionFSM globally for debugging

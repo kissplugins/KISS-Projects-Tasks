@@ -400,6 +400,243 @@
     return conflicts;
   };
 
+  // Perform bulk operations on selected sessions
+  SessionEffects.prototype.performBulkOperation = function(payload){
+    var self = this;
+    return new Promise(function(resolve, reject){
+      try {
+        var operation = payload.operation;
+        var selectedIndices = payload.selectedIndices;
+
+        if(operation === 'delete'){
+          self.bulkDeleteSessions(selectedIndices).then(resolve).catch(reject);
+        } else if(operation === 'export'){
+          self.bulkExportSessions(selectedIndices).then(resolve).catch(reject);
+        } else {
+          reject(new Error('Unknown bulk operation: ' + operation));
+        }
+      } catch(err) {
+        reject(err);
+      }
+    });
+  };
+
+  // Bulk delete selected sessions
+  SessionEffects.prototype.bulkDeleteSessions = function(selectedIndices){
+    var self = this;
+    return new Promise(function(resolve, reject){
+      try {
+        // Sort indices in descending order to delete from bottom up (preserves indices)
+        var sortedIndices = selectedIndices.slice().sort(function(a, b){ return b - a; });
+        var sessionTitles = [];
+        var hasActiveTimer = false;
+
+        // Validate all sessions before deletion
+        for(var i = 0; i < sortedIndices.length; i++){
+          var index = sortedIndices[i];
+          var sessionData = self.getSessionData(index);
+
+          if(sessionData){
+            sessionTitles.push(sessionData.title || 'Untitled Session');
+
+            // Check for active timers
+            if(sessionData.startTime && !sessionData.stopTime){
+              hasActiveTimer = true;
+            }
+          }
+        }
+
+        if(hasActiveTimer){
+          reject(new Error('Cannot delete sessions with active timers'));
+          return;
+        }
+
+        // Confirm bulk deletion
+        var confirmMsg = 'Are you sure you want to delete ' + selectedIndices.length + ' sessions?\n\n' +
+                        sessionTitles.join('\n') + '\n\nThis action cannot be undone.';
+
+        if(!confirm(confirmMsg)){
+          reject(new Error('Bulk deletion cancelled by user'));
+          return;
+        }
+
+        // Delete sessions one by one (from bottom up)
+        var deletedCount = 0;
+        var errors = [];
+
+        function deleteNext(){
+          if(deletedCount >= sortedIndices.length){
+            // All deletions complete
+            if(errors.length > 0){
+              reject(new Error('Some deletions failed: ' + errors.join(', ')));
+            } else {
+              // Trigger save to persist all deletions
+              var $saveButton = jQuery('#publish');
+              if($saveButton.length && $saveButton.is(':enabled')){
+                sessionStorage.setItem('ptt_session_bulk_delete_pending', '1');
+                $saveButton.trigger('click');
+              }
+              resolve({
+                operation: 'delete',
+                deletedCount: deletedCount,
+                sessionTitles: sessionTitles
+              });
+            }
+            return;
+          }
+
+          var currentIndex = sortedIndices[deletedCount];
+          var $row = self.getSessionRow(currentIndex);
+
+          if($row && $row.length){
+            var $deleteButton = $row.find('[data-event="remove-row"], .acf-icon.-minus');
+            if($deleteButton.length){
+              $deleteButton.trigger('click');
+              deletedCount++;
+
+              // Wait a bit before next deletion to allow DOM updates
+              setTimeout(deleteNext, 50);
+            } else {
+              errors.push('Delete button not found for session ' + currentIndex);
+              deletedCount++;
+              setTimeout(deleteNext, 50);
+            }
+          } else {
+            errors.push('Session row not found: ' + currentIndex);
+            deletedCount++;
+            setTimeout(deleteNext, 50);
+          }
+        }
+
+        deleteNext();
+
+      } catch(err) {
+        reject(err);
+      }
+    });
+  };
+
+  // Bulk export selected sessions
+  SessionEffects.prototype.bulkExportSessions = function(selectedIndices){
+    var self = this;
+    return new Promise(function(resolve, reject){
+      try {
+        var exportData = [];
+        var sessionTitles = [];
+
+        // Collect data from selected sessions
+        for(var i = 0; i < selectedIndices.length; i++){
+          var index = selectedIndices[i];
+          var sessionData = self.getSessionData(index);
+
+          if(sessionData){
+            sessionTitles.push(sessionData.title || 'Untitled Session');
+
+            // Calculate duration
+            var duration = 0;
+            if(sessionData.manualOverride && sessionData.manualDuration > 0){
+              duration = sessionData.manualDuration;
+            } else if(sessionData.calculatedDuration > 0){
+              duration = sessionData.calculatedDuration;
+            } else if(sessionData.startTime && sessionData.stopTime){
+              var start = new Date(sessionData.startTime);
+              var stop = new Date(sessionData.stopTime);
+              duration = (stop - start) / (1000 * 60 * 60); // Convert to hours
+            }
+
+            exportData.push({
+              index: index,
+              title: sessionData.title || '',
+              notes: sessionData.notes || '',
+              startTime: sessionData.startTime || '',
+              stopTime: sessionData.stopTime || '',
+              duration: duration,
+              manualOverride: sessionData.manualOverride || false,
+              manualDuration: sessionData.manualDuration || 0,
+              calculatedDuration: sessionData.calculatedDuration || 0
+            });
+          }
+        }
+
+        if(exportData.length === 0){
+          reject(new Error('No valid session data found for export'));
+          return;
+        }
+
+        // Generate export filename
+        var now = new Date();
+        var dateStr = now.getFullYear() + '-' +
+                     ('0'+(now.getMonth()+1)).slice(-2) + '-' +
+                     ('0'+now.getDate()).slice(-2) + '_' +
+                     ('0'+now.getHours()).slice(-2) + '-' +
+                     ('0'+now.getMinutes()).slice(-2);
+        var filename = 'sessions_export_' + dateStr + '.csv';
+
+        // Convert to CSV format
+        var csvContent = self.convertToCSV(exportData);
+
+        // Create and trigger download
+        self.downloadFile(csvContent, filename, 'text/csv');
+
+        resolve({
+          operation: 'export',
+          exportedCount: exportData.length,
+          sessionTitles: sessionTitles,
+          filename: filename
+        });
+
+      } catch(err) {
+        reject(err);
+      }
+    });
+  };
+
+  // Convert session data to CSV format
+  SessionEffects.prototype.convertToCSV = function(data){
+    if(!data || data.length === 0) return '';
+
+    // CSV headers
+    var headers = ['Index', 'Title', 'Notes', 'Start Time', 'Stop Time', 'Duration (Hours)', 'Manual Override', 'Manual Duration', 'Calculated Duration'];
+    var csvRows = [headers.join(',')];
+
+    // Add data rows
+    for(var i = 0; i < data.length; i++){
+      var row = data[i];
+      var csvRow = [
+        row.index,
+        '"' + (row.title || '').replace(/"/g, '""') + '"', // Escape quotes
+        '"' + (row.notes || '').replace(/"/g, '""') + '"',
+        row.startTime,
+        row.stopTime,
+        row.duration.toFixed(2),
+        row.manualOverride ? 'Yes' : 'No',
+        row.manualDuration,
+        row.calculatedDuration
+      ];
+      csvRows.push(csvRow.join(','));
+    }
+
+    return csvRows.join('\n');
+  };
+
+  // Download file to user's computer
+  SessionEffects.prototype.downloadFile = function(content, filename, mimeType){
+    var blob = new Blob([content], { type: mimeType });
+    var url = window.URL.createObjectURL(blob);
+
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Clean up the URL object
+    setTimeout(function(){ window.URL.revokeObjectURL(url); }, 100);
+  };
+
   // Update session UI based on FSM state
   SessionEffects.prototype.updateSessionUI = function(state, ctx){
     var $rows = this.getSessionRows();
@@ -435,13 +672,14 @@
       $errorContainer.hide();
     }
 
-    // Add duplicate and reorder buttons if not already present
+    // Add duplicate, reorder, and selection buttons if not already present
     this.ensureDuplicateButton($row);
     this.ensureReorderButtons($row);
+    this.ensureSelectionCheckbox($row);
 
     // Update field states based on FSM state
     var $inputs = $row.find('input, textarea, select');
-    if(state === 'SAVING' || state === 'DELETING' || state === 'DUPLICATING' || state === 'REORDERING'){
+    if(state === 'SAVING' || state === 'DELETING' || state === 'DUPLICATING' || state === 'REORDERING' || state === 'BULK_PROCESSING'){
       $inputs.prop('disabled', true);
     } else {
       $inputs.prop('disabled', false);
@@ -512,24 +750,112 @@
     var $addButton = jQuery('.acf-field[data-key="field_ptt_sessions"] [data-event="add-row"], .acf-field[data-key="field_ptt_sessions"] [data-name="add-row"]');
 
     // Disable add button if we can't create sessions
-    if(state === 'CREATING' || state === 'SAVING' || state === 'DUPLICATING' || state === 'REORDERING'){
+    if(state === 'CREATING' || state === 'SAVING' || state === 'DUPLICATING' || state === 'REORDERING' || state === 'BULK_PROCESSING'){
       $addButton.prop('disabled', true);
     } else {
       $addButton.prop('disabled', false);
     }
 
-    // Ensure all rows have duplicate and reorder buttons
+    // Ensure all rows have buttons and bulk operations UI
     this.initializeAllRowButtons();
+    this.ensureBulkOperationsUI();
   };
 
-  // Initialize duplicate and reorder buttons for all existing rows
+  // Initialize duplicate, reorder, and selection elements for all existing rows
   SessionEffects.prototype.initializeAllRowButtons = function(){
     var self = this;
     this.getSessionRows().each(function(){
       var $row = jQuery(this);
       self.ensureDuplicateButton($row);
       self.ensureReorderButtons($row);
+      self.ensureSelectionCheckbox($row);
     });
+  };
+
+  // Ensure selection checkbox exists in session row
+  SessionEffects.prototype.ensureSelectionCheckbox = function($row){
+    if($row.find('.ptt-session-select').length) return; // Already exists
+
+    // Find the row handle area
+    var $handle = $row.find('.acf-row-handle');
+    if(!$handle.length) return;
+
+    // Create selection checkbox
+    var $checkbox = jQuery('<input type="checkbox" class="ptt-session-select" style="margin-right: 8px;" title="Select for bulk operations">');
+
+    // Insert at the beginning of the handle
+    $handle.prepend($checkbox);
+  };
+
+  // Ensure bulk operations UI exists
+  SessionEffects.prototype.ensureBulkOperationsUI = function(){
+    var $sessionsField = jQuery('.acf-field[data-key="field_ptt_sessions"]');
+    if(!$sessionsField.length) return;
+
+    if($sessionsField.find('.ptt-bulk-operations').length) return; // Already exists
+
+    // Create bulk operations toolbar
+    var $toolbar = jQuery('<div class="ptt-bulk-operations" style="margin: 10px 0; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px;"></div>');
+
+    // Select all/none controls
+    var $selectControls = jQuery('<div style="margin-bottom: 8px;"></div>');
+    $selectControls.append('<label style="margin-right: 15px;"><input type="checkbox" class="ptt-select-all" style="margin-right: 5px;"> Select All</label>');
+    $selectControls.append('<button type="button" class="ptt-select-none button button-small" style="margin-right: 15px;">Select None</button>');
+    $selectControls.append('<span class="ptt-selection-count" style="color: #666; font-style: italic;">0 sessions selected</span>');
+
+    // Bulk action controls
+    var $actionControls = jQuery('<div></div>');
+    $actionControls.append('<select class="ptt-bulk-action" style="margin-right: 8px;"><option value="">Choose bulk action...</option><option value="delete">Delete Selected</option><option value="export">Export Selected</option></select>');
+    $actionControls.append('<button type="button" class="ptt-bulk-execute button button-primary" disabled>Execute</button>');
+
+    $toolbar.append($selectControls);
+    $toolbar.append($actionControls);
+
+    // Insert toolbar before the sessions field
+    $sessionsField.find('.acf-input').prepend($toolbar);
+  };
+
+  // Get selected session indices
+  SessionEffects.prototype.getSelectedIndices = function(){
+    var indices = [];
+    this.getSessionRows().each(function(index){
+      var $checkbox = jQuery(this).find('.ptt-session-select');
+      if($checkbox.length && $checkbox.prop('checked')){
+        indices.push(index);
+      }
+    });
+    return indices;
+  };
+
+  // Update selection count display
+  SessionEffects.prototype.updateSelectionCount = function(){
+    var selectedCount = this.getSelectedIndices().length;
+    var totalCount = this.getSessionRows().length;
+
+    var $countDisplay = jQuery('.ptt-selection-count');
+    if($countDisplay.length){
+      $countDisplay.text(selectedCount + ' of ' + totalCount + ' sessions selected');
+    }
+
+    // Enable/disable bulk execute button
+    var $executeBtn = jQuery('.ptt-bulk-execute');
+    var $actionSelect = jQuery('.ptt-bulk-action');
+
+    if(selectedCount > 0 && $actionSelect.val()){
+      $executeBtn.prop('disabled', false);
+    } else {
+      $executeBtn.prop('disabled', true);
+    }
+
+    // Update select all checkbox state
+    var $selectAll = jQuery('.ptt-select-all');
+    if(selectedCount === 0){
+      $selectAll.prop('checked', false).prop('indeterminate', false);
+    } else if(selectedCount === totalCount){
+      $selectAll.prop('checked', true).prop('indeterminate', false);
+    } else {
+      $selectAll.prop('checked', false).prop('indeterminate', true);
+    }
   };
 
   // Show error message
