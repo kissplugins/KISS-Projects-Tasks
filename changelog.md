@@ -1,5 +1,19 @@
 # Changelog
 
+## Version 2.2.43 - Fix Editor Timer Rehydration
+Released: 2025-08-27
+- Fixed critical FSM rehydration issue in Editor where running timers were not properly restored on page refresh
+- EditorEffects.rehydrate() now correctly includes taskId in response payload to match FSM expectations
+- Editor page FSM now properly transitions to RUNNING state when active timer is detected
+- Timer UI correctly displays running state and active timer controls after page reload
+
+## Version 2.2.42 - Fix Timer Rehydration for Today Page
+Released: 2025-08-27
+- Fixed critical timer rehydration issue where running timers were lost on page refresh
+- Added missing `ptt_rehydrate_timer` AJAX endpoint for Today page FSM
+- Today page now properly restores running timer state after page reload
+- FSM rehydration now works consistently across both Today and Editor pages
+
 ## Version 2.2.41 - Editor UX: hide Start/Timer on saved sessions; toggle Manual Duration
 Released: 2025-08-27
 - Editor: If a session already has time saved (manual duration > 0 or calculated duration > 0) the default 00:00:00 and Start button are hidden. Avoids confusing controls on completed entries.

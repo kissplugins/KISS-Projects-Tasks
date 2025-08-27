@@ -68,7 +68,7 @@
       }).done(function(resp){
         if(resp && resp.success && resp.data){
           if(resp.data.running && postId && parseInt(resp.data.post_id,10)===parseInt(postId,10)){
-            resolve({ running:true, postId: resp.data.post_id, sessionIndex: resp.data.session_index, startUtc: resp.data.start_time });
+            resolve({ running:true, taskId: resp.data.post_id, postId: resp.data.post_id, sessionIndex: resp.data.session_index, startUtc: resp.data.start_time });
             return;
           }
         }

@@ -1,10 +1,16 @@
-# Today Page FSM Plan (Revised)
+# FSM Implementation Plan (Revised)
 
-This document defines a pragmatic, low‑risk path to introduce a Finite State Machine (FSM) to the Today page. The goal is clearer state management, fewer race conditions, and better debugging without breaking existing behavior.
+This document defines a pragmatic, low‑risk path to introduce a Finite State Machine (FSM) to the plugin. The goal is clearer state management, fewer race conditions, and better debugging without breaking existing behavior.
+
+## 🎯 **Current Priority: CPT Task Editor First**
+
+**DEFERRED**: Today page FSM work is postponed until CPT Task Editor FSM is complete and stable.
 
 ## 🎯 **Current Status (Updated)**
 - ✅ **Phase 0**: Complete - Feature flags, effects stubs, debug hooks
-- ✅ **Phase 1**: Complete - TimerFSM implemented for Today + Editor contexts, dual-system conflicts resolved
+- ✅ **Phase 1**: Complete - TimerFSM implemented for Editor context
+- 🔄 **Current Focus**: CPT Task Editor timer rehydration and state management
+- ⏸️ **Deferred**: Today page FSM implementation
 - ❌ **Phase 2**: Not started - DataFSM for loading/refresh
 - ❌ **Phase 3**: Partial - Legacy delegation implemented, full cleanup pending
 

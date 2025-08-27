@@ -177,7 +177,7 @@ if (!function_exists('ptt_get_or_create_quick_start_project')) {
 if (!function_exists('ptt_get_or_create_daily_quick_start_task')) {
     /**
      * Get or create the per-user placeholder Task under the placeholder project
-     * 
+     *
      * @param int $user_id User ID
      * @param int $project_term_id Project term ID
      * @param int $client_term_id Client term ID
@@ -185,6 +185,17 @@ if (!function_exists('ptt_get_or_create_daily_quick_start_task')) {
      */
     function ptt_get_or_create_daily_quick_start_task($user_id, $project_term_id, $client_term_id) {
         return TodayController::getOrCreateDailyQuickStartTask($user_id, $project_term_id, $client_term_id);
+    }
+}
+
+if (!function_exists('ptt_rehydrate_timer_callback')) {
+    /**
+     * AJAX handler to rehydrate timer state for Today page FSM
+     *
+     * @return void
+     */
+    function ptt_rehydrate_timer_callback() {
+        TodayController::rehydrateTimerCallback();
     }
 }
 
@@ -202,3 +213,4 @@ add_action('wp_ajax_ptt_delete_session', 'ptt_delete_session_callback');
 add_action('wp_ajax_ptt_move_session', 'ptt_move_session_callback');
 add_action('wp_ajax_ptt_today_start_timer', 'ptt_today_start_timer_callback');
 add_action('wp_ajax_ptt_today_quick_start', 'ptt_today_quick_start_callback');
+add_action('wp_ajax_ptt_rehydrate_timer', 'ptt_rehydrate_timer_callback');
