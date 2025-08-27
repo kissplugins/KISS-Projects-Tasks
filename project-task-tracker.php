@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
- * Description:       A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
+ * Description:       Hotfix Assignee Sorting & Filtering- A robust system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
  * Version:           2.2.30
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
