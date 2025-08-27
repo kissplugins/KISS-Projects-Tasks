@@ -12,6 +12,7 @@ use KISS\PTT\Domain\Timer\TimerService;
 use KISS\PTT\Admin\Assets as AdminAssets;
 use KISS\PTT\Admin\SelfTestController;
 use KISS\PTT\Admin\DataMigrationController;
+use KISS\PTT\Admin\ListTable;
 
 class Plugin {
     // Simple, low-risk: register services directly on Plugin
@@ -30,6 +31,7 @@ class Plugin {
         AdminAssets::register();
         SelfTestController::register();
         DataMigrationController::register();
+        ListTable::register();
         \KISS\PTT\Admin\SchemaStatusPage::register();
 
         self::register_hooks();

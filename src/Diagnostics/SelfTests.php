@@ -347,6 +347,24 @@ class SelfTests {
             'message' => $range_ok ? "Computed range {$start_str} to {$end_str} (7 days inclusive)." : "Unexpected range {$start_str} to {$end_str} (span_days={$span_days})."
         ];
 
+        // TEST – All Tasks List Table functionality
+        if (class_exists('\KISS\PTT\Diagnostics\SelfTests\ListTableSelfTests')) {
+            $list_table_results = \KISS\PTT\Diagnostics\SelfTests\ListTableSelfTests::runTests();
+            foreach ($list_table_results as $test_result) {
+                $results[] = [
+                    'name' => $test_result['test'],
+                    'status' => $test_result['status'],
+                    'message' => $test_result['message']
+                ];
+            }
+        } else {
+            $results[] = [
+                'name' => 'All Tasks: List Table Tests',
+                'status' => 'Fail',
+                'message' => 'ListTableSelfTests class not found - All Tasks functionality may not be working'
+            ];
+        }
+
         // TEST – Today session appears on local date boundary
         $tz = function_exists('wp_timezone') ? wp_timezone() : new \DateTimeZone(get_option('timezone_string') ?: 'UTC');
         $local_now = new \DateTime('now', $tz);

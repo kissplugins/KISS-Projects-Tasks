@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 2.2.30 - Restore All Tasks assignee filter and sorting functionality
+
+- **Fixed**: Restored missing assignee filter dropdown on All Tasks admin page
+- **Fixed**: Restored assignee column sorting (ascending/descending) on All Tasks admin page
+- **Added**: `src/Admin/ListTable.php` class to handle All Tasks list table functionality
+- **Added**: Filter dropdown includes "All Assignees", "Unassigned", and all users assigned to tasks
+- **Added**: Proper query handling for both assignee filtering and sorting
+- **Technical**: Registered ListTable class in Plugin.php to ensure hooks are properly initialized
+
 ## Version 2.2.29 - Preserve historical manual sessions; disable auto-timestamp on save
 - **Changed**: Manual session entries without start/stop timestamps are no longer auto-stamped on save. This prevents older manual entries from being pulled into the current day when a new timer is stopped.
 - **Updated**: Self-tests adjusted to verify that manual sessions without timestamps remain unchanged.
