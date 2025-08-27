@@ -1,5 +1,16 @@
 # Changelog
 
+## Version 2.2.49 - Phase 2: Session Reordering with Conflict Detection
+Released: 2025-08-27
+- Implemented session reordering FSM coordination with REORDERING state
+- Added contextual reorder buttons (↑↓ arrows) to all session rows
+- Smart conflict detection: warns users about potential time overlaps before reordering
+- Protection against reordering while timer is running to prevent index mismatches
+- DOM-based reordering with automatic ACF index updates
+- Complete FSM lifecycle: IDLE → REORDERING → IDLE with proper validation
+- Automatic post save after reordering to persist changes immediately
+- Contextual button display: first row shows only ↓, last row shows only ↑, middle rows show both
+
 ## Version 2.2.48 - Phase 2: Session Duplication with FSM Validation
 Released: 2025-08-27
 - Implemented session duplication FSM coordination with DUPLICATING state

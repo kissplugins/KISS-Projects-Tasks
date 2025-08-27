@@ -291,6 +291,115 @@
     });
   };
 
+  // Reorder session row
+  SessionEffects.prototype.reorderSession = function(payload){
+    var self = this;
+    return new Promise(function(resolve, reject){
+      try {
+        var fromIndex = payload.fromIndex;
+        var toIndex = payload.toIndex;
+        var direction = payload.direction; // 'up' or 'down'
+
+        var $rows = self.getSessionRows();
+        var $fromRow = $rows.eq(fromIndex);
+
+        if(!$fromRow || !$fromRow.length){
+          reject(new Error('Source session row not found'));
+          return;
+        }
+
+        // Validate target position
+        if(toIndex < 0 || toIndex >= $rows.length){
+          reject(new Error('Invalid target position'));
+          return;
+        }
+
+        if(fromIndex === toIndex){
+          reject(new Error('Source and target positions are the same'));
+          return;
+        }
+
+        // Check for time conflicts after reordering
+        var conflicts = self.detectReorderConflicts(fromIndex, toIndex);
+        if(conflicts.length > 0){
+          var confirmMsg = 'Reordering may create time conflicts:\n' + conflicts.join('\n') + '\n\nContinue anyway?';
+          if(!confirm(confirmMsg)){
+            reject(new Error('Reorder cancelled due to time conflicts'));
+            return;
+          }
+        }
+
+        // Perform the reorder using DOM manipulation
+        var $targetRow = $rows.eq(toIndex);
+
+        if(direction === 'up' || fromIndex > toIndex){
+          // Moving up: insert before target
+          $fromRow.insertBefore($targetRow);
+        } else {
+          // Moving down: insert after target
+          $fromRow.insertAfter($targetRow);
+        }
+
+        // Update ACF row indices (ACF handles this automatically when DOM changes)
+        // Trigger save to persist the reordering
+        var $saveButton = jQuery('#publish');
+        if($saveButton.length && $saveButton.is(':enabled')){
+          sessionStorage.setItem('ptt_session_reorder_pending', '1');
+          $saveButton.trigger('click');
+        }
+
+        resolve({
+          reordered: true,
+          fromIndex: fromIndex,
+          toIndex: toIndex,
+          direction: direction,
+          conflicts: conflicts
+        });
+
+      } catch(err) {
+        reject(err);
+      }
+    });
+  };
+
+  // Detect potential time conflicts when reordering sessions
+  SessionEffects.prototype.detectReorderConflicts = function(fromIndex, toIndex){
+    var conflicts = [];
+    var $rows = this.getSessionRows();
+    var movingSession = this.getSessionData(fromIndex);
+
+    if(!movingSession || !movingSession.startTime) return conflicts;
+
+    var movingStart = new Date(movingSession.startTime);
+    var movingEnd = movingSession.stopTime ? new Date(movingSession.stopTime) : new Date();
+
+    // Check sessions around the target position for time overlaps
+    var checkIndices = [];
+    var start = Math.max(0, Math.min(fromIndex, toIndex) - 1);
+    var end = Math.min($rows.length - 1, Math.max(fromIndex, toIndex) + 1);
+
+    for(var i = start; i <= end; i++){
+      if(i !== fromIndex) checkIndices.push(i);
+    }
+
+    for(var j = 0; j < checkIndices.length; j++){
+      var checkIndex = checkIndices[j];
+      var checkSession = this.getSessionData(checkIndex);
+
+      if(!checkSession || !checkSession.startTime) continue;
+
+      var checkStart = new Date(checkSession.startTime);
+      var checkEnd = checkSession.stopTime ? new Date(checkSession.stopTime) : new Date();
+
+      // Check for time overlap
+      if(movingStart < checkEnd && movingEnd > checkStart){
+        conflicts.push('Session "' + (movingSession.title || 'Untitled') + '" overlaps with "' + (checkSession.title || 'Untitled') + '"');
+      }
+    }
+
+    return conflicts;
+  };
+
   // Update session UI based on FSM state
   SessionEffects.prototype.updateSessionUI = function(state, ctx){
     var $rows = this.getSessionRows();
@@ -326,12 +435,13 @@
       $errorContainer.hide();
     }
 
-    // Add duplicate button if not already present
+    // Add duplicate and reorder buttons if not already present
     this.ensureDuplicateButton($row);
+    this.ensureReorderButtons($row);
 
     // Update field states based on FSM state
     var $inputs = $row.find('input, textarea, select');
-    if(state === 'SAVING' || state === 'DELETING' || state === 'DUPLICATING'){
+    if(state === 'SAVING' || state === 'DELETING' || state === 'DUPLICATING' || state === 'REORDERING'){
       $inputs.prop('disabled', true);
     } else {
       $inputs.prop('disabled', false);
@@ -358,26 +468,67 @@
     }
   };
 
+  // Ensure reorder buttons exist in session row
+  SessionEffects.prototype.ensureReorderButtons = function($row){
+    if($row.find('.ptt-session-reorder').length) return; // Already exists
+
+    // Find the row controls area
+    var $controls = $row.find('.acf-row-handle');
+    if(!$controls.length) return;
+
+    var rowIndex = $row.index();
+    var totalRows = this.getSessionRows().length;
+
+    // Create reorder buttons container
+    var $reorderContainer = jQuery('<span class="ptt-session-reorder" style="margin-left: 5px;"></span>');
+
+    // Create up button (only if not first row)
+    if(rowIndex > 0){
+      var $upBtn = jQuery('<a href="#" class="ptt-session-reorder-up acf-icon" title="Move Up" style="color: #666; text-decoration: none; font-size: 12px;">↑</a>');
+      $reorderContainer.append($upBtn);
+    }
+
+    // Create down button (only if not last row)
+    if(rowIndex < totalRows - 1){
+      var $downBtn = jQuery('<a href="#" class="ptt-session-reorder-down acf-icon" title="Move Down" style="color: #666; text-decoration: none; font-size: 12px;">↓</a>');
+      $reorderContainer.append($downBtn);
+    }
+
+    // Insert after duplicate button or delete button
+    var $duplicateBtn = $controls.find('.ptt-session-duplicate');
+    var $deleteBtn = $controls.find('.acf-icon.-minus');
+
+    if($duplicateBtn.length){
+      $duplicateBtn.after($reorderContainer);
+    } else if($deleteBtn.length){
+      $deleteBtn.after($reorderContainer);
+    } else {
+      $controls.append($reorderContainer);
+    }
+  };
+
   // Update global session UI
   SessionEffects.prototype.updateGlobalSessionUI = function(state, ctx){
     var $addButton = jQuery('.acf-field[data-key="field_ptt_sessions"] [data-event="add-row"], .acf-field[data-key="field_ptt_sessions"] [data-name="add-row"]');
 
     // Disable add button if we can't create sessions
-    if(state === 'CREATING' || state === 'SAVING' || state === 'DUPLICATING'){
+    if(state === 'CREATING' || state === 'SAVING' || state === 'DUPLICATING' || state === 'REORDERING'){
       $addButton.prop('disabled', true);
     } else {
       $addButton.prop('disabled', false);
     }
 
-    // Ensure all rows have duplicate buttons
+    // Ensure all rows have duplicate and reorder buttons
     this.initializeAllRowButtons();
   };
 
-  // Initialize duplicate buttons for all existing rows
+  // Initialize duplicate and reorder buttons for all existing rows
   SessionEffects.prototype.initializeAllRowButtons = function(){
     var self = this;
     this.getSessionRows().each(function(){
-      self.ensureDuplicateButton(jQuery(this));
+      var $row = jQuery(this);
+      self.ensureDuplicateButton($row);
+      self.ensureReorderButtons($row);
     });
   };
 

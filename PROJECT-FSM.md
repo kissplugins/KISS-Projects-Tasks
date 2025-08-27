@@ -230,7 +230,7 @@ Acceptance Criteria:
 #### **Enhanced Session Management**
 - [x] Implement session deletion FSM coordination (prevent deleting active timer sessions)
 - [x] Add session duplication functionality with FSM validation
-- [ ] Implement session reordering with conflict detection
+- [x] Implement session reordering with conflict detection
 - [ ] Add bulk session operations (delete multiple, export selected)
 
 #### **Advanced Validation & Error Recovery**

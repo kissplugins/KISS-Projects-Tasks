@@ -3,7 +3,7 @@
  * Plugin Name:       KISS - Project & Task Time Tracker
  * Plugin URI:        https://kissplugins.com
  * Description:       A robust Finite State Machine (FSM) centric system for WordPress users to track time spent on client projects and individual tasks. Requires ACF Pro.
- * Version:           2.2.48
+ * Version:           2.2.49
  * Author:            KISS Plugins
  * Author URI:        https://kissplugins.com
  * License:           GPL-2.0+

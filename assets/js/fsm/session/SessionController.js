@@ -175,6 +175,57 @@
       return false;
     });
 
+    // Intercept session reordering - Move Up
+    jQuery(document).off('click.pttSessionReorderUp');
+    jQuery(document).on('click.pttSessionReorderUp', '.acf-field[data-key="field_ptt_sessions"] .ptt-session-reorder-up', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+
+      var $row = jQuery(this).closest('.acf-row');
+      var fromIndex = $row.index();
+      var toIndex = fromIndex - 1;
+      var postId = jQuery('#post_ID').val();
+
+      if(!sessionFSM.canReorderSessions()){
+        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot reorder sessions in current state' });
+        return false;
+      }
+
+      if(toIndex < 0){
+        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot move session further up' });
+        return false;
+      }
+
+      sessionFSM.transition('REORDER_SESSION', { fromIndex: fromIndex, toIndex: toIndex, direction: 'up', postId: postId });
+      return false;
+    });
+
+    // Intercept session reordering - Move Down
+    jQuery(document).off('click.pttSessionReorderDown');
+    jQuery(document).on('click.pttSessionReorderDown', '.acf-field[data-key="field_ptt_sessions"] .ptt-session-reorder-down', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+
+      var $row = jQuery(this).closest('.acf-row');
+      var fromIndex = $row.index();
+      var toIndex = fromIndex + 1;
+      var postId = jQuery('#post_ID').val();
+      var totalRows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row').length;
+
+      if(!sessionFSM.canReorderSessions()){
+        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot reorder sessions in current state' });
+        return false;
+      }
+
+      if(toIndex >= totalRows){
+        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot move session further down' });
+        return false;
+      }
+
+      sessionFSM.transition('REORDER_SESSION', { fromIndex: fromIndex, toIndex: toIndex, direction: 'down', postId: postId });
+      return false;
+    });
+
     // Intercept WordPress save to validate sessions
     jQuery(document).off('click.pttSessionSave');
     jQuery(document).on('click.pttSessionSave', '#publish', function(e){
@@ -215,6 +266,13 @@
         sessionStorage.removeItem('ptt_session_duplicate_pending');
         if(sessionFSM.state === 'DUPLICATING'){
           sessionFSM.transition('SESSION_DUPLICATED');
+        }
+      }
+
+      if(sessionStorage.getItem('ptt_session_reorder_pending') === '1'){
+        sessionStorage.removeItem('ptt_session_reorder_pending');
+        if(sessionFSM.state === 'REORDERING'){
+          sessionFSM.transition('SESSION_REORDERED');
         }
       }
     });
