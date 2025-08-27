@@ -1,9 +1,25 @@
 # Changelog
 
+## Version 2.2.40 - Editor: show timer value before start
+Released: 2025-08-27
+- Editor session controls now display the 00:00:00 timer value to the left of the Start Timer button even before a session has started. This improves discoverability and preserves layout.
 
+## Version 2.2.39 - Editor timer badge CSS fix
+Released: 2025-08-27
+- Fixed malformed CSS block around .ptt-session-elapsed-time which prevented the red badge background from applying on the Task Editor. The rule now closes correctly and styles take effect.
+- Bumped asset version to cache-bust (PTT_VERSION=2.2.39).
 
+## Version 2.2.38 - Admin bar fix + guard comments
+Released: 2025-08-27
+- Fixed PHP error in Admin Bar indicator (string concatenation in inline style now uses proper concatenation and escaping).
+- Added clear DO NOT EDIT guard comments around Active Timer display styles to avoid unintended refactors.
 
-## Version 2.2.35 - Editor FSM live ticking wired to shared timer
+Released: 2025-08-27
+- Restored Editor timer styling to match legacy look: seven-seg red badge and red Stop button; Start button styled green.
+- If session title is blank at Start, auto-fills as "Session mm-dd-yy HH:mm" (client-side) and server enforces same default.
+- Added Admin Bar item: "KISS Tasks – vX.Y.Z" with a green (pass) or red (fail) dot showing last self-test summary; clicking opens Self Test and auto-runs.
+
+## Version 2.2.37 - UI polish + defaults + admin bar indicator
 
 ## Version 2.2.36 - Editor stop persists end/duration under FSM
 Released: 2025-08-26
@@ -15,6 +31,8 @@ Released: 2025-08-26
 - Reused existing manageLiveTimer/stopLiveTimer via window.PTT helpers and invoked from EditorEffects.updateTimerUI.
 - Start input is set immediately from server UTC in FSM RUNNING state for consistent display.
 - Note: If you still see an admin-ajax 400, please share the failing action name from Network tab; rehydrate/start should be ptt_get_active_session_for_user and ptt_start_session_timer respectively.
+
+## Version 2.2.35 - Editor FSM live ticking wired to shared timer
 
 ## Version 2.2.34 - Editor timer: prevent legacy handler during FSM
 Released: 2025-08-26

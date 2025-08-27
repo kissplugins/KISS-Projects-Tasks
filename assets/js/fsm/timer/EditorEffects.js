@@ -19,6 +19,18 @@
       var v = $row.find('[data-key="field_ptt_session_start_time"] input').val();
       if(!v){ index = i; title = ($row.find('[data-key="field_ptt_session_title"] input').val()||'').trim(); return false; }
     });
+    // If title is blank, auto-generate and set it on the input before sending
+    if(!title){
+      var now = new Date();
+      var mm = ('0'+(now.getMonth()+1)).slice(-2);
+      var dd = ('0'+now.getDate()).slice(-2);
+      var yy = String(now.getFullYear()).slice(-2);
+      var HH = ('0'+now.getHours()).slice(-2);
+      var MM = ('0'+now.getMinutes()).slice(-2);
+      title = 'Session ' + mm + '-' + dd + '-' + yy + ' ' + HH + ':' + MM;
+      var $rowSet = $rows.eq(index);
+      $rowSet.find('[data-key="field_ptt_session_title"] input').val(title).trigger('change');
+    }
     return ajax('ptt_start_session_timer', { post_id: taskId, row_index: index, session_title: title })
       .then(function(data){
         // Normalize result for FSM: { startUtc, postId, sessionIndex }

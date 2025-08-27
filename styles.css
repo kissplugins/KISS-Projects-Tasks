@@ -118,6 +118,14 @@
 
 .ptt-session-elapsed-time {
     font-family: 'DSEG7Classic-Italic', monospace, sans-serif;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #f44336; /* Red for running timer */
+    background: #fdf2f2;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #fde0e0;
+}
 
 /* Total Duration hh:mm inline badge */
 .acf-field[data-key="field_ptt_total_duration_display"] .acf-input {
@@ -133,15 +141,6 @@
 /* On small screens, let the badge wrap under nicely */
 @media (max-width: 782px){
   .acf-field[data-key="field_ptt_total_duration_display"] .acf-input{flex-direction: column; align-items: flex-start; gap: 4px;}
-}
-
-    font-size: 1.2em;
-    font-weight: bold;
-    color: #f44336; /* Red for running timer */
-    background: #fdf2f2;
-    padding: 2px 6px;
-    border-radius: 3px;
-    border: 1px solid #fde0e0;
 }
 
 .ptt-session-elapsed-time .colon {
@@ -243,6 +242,11 @@
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+/* ===================== DO NOT EDIT =====================
+   Active timer display (frontend and shared styles)
+   This block was previously refactored and should not be modified without approval.
+   ======================================================= */
 
 /* Active timer display */
 #ptt-active-task-timer {

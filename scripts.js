@@ -345,15 +345,14 @@ jQuery(document).ready(function ($) {
             const debugHtml = `<div class="ptt-debug" style="margin-top:6px;color:#666;font-size:12px;">[PTT] Timer UI initialized${debugEnabled? ' (debug on)':''}</div>`;
 
             const controlsHtml = `
-                <div class="ptt-session-controls">
-                    <button type="button" class="button ptt-session-start">Start Timer</button>
-                    <div class="ptt-session-active-timer" style="display: none;">
-                        <span class="duration-label">Duration: </span>
-                        <span class="ptt-session-elapsed-time">00:00:00</span>
-                        <button type="button" class="button ptt-session-stop ptt-stop-button">Stop Timer</button>
+                <div class=\"ptt-session-controls\">
+                    <span class=\"ptt-session-elapsed-time\">00:00:00</span>
+                    <button type=\"button\" class=\"button ptt-session-start ptt-start-button\">Start Timer</button>
+                    <div class=\"ptt-session-active-timer\" style=\"display: none;\">
+                        <button type=\"button\" class=\"button ptt-session-stop ptt-stop-button\">Stop Timer</button>
                     </div>
-                    <div class="ptt-session-message" style="display: none;"></div>
-                    <div class="ptt-ajax-spinner" style="display: none; margin-left: 8px;"></div>
+                    <div class=\"ptt-session-message\" style=\"display: none;\"></div>
+                    <div class=\"ptt-ajax-spinner\" style=\"display: none; margin-left: 8px;\"></div>
                 </div>` + debugHtml;
             $container.find('.acf-input').html(controlsHtml);
 

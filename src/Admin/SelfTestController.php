@@ -143,6 +143,8 @@ class SelfTestController {
                 }
             }
 
+            // Persist last summary for Admin Bar indicator
+            update_option('ptt_tests_last_summary', $summary);
             wp_send_json_success( [
                 'results' => $results,
                 'time' => date_i18n( get_option( 'time_format' ), $timestamp ),
