@@ -2,7 +2,7 @@
 
 ## Version 2.2.30 - Restore All Tasks assignee filter and sorting functionality
 
-Hotfix Branch: 
+**Hotfix** Branch: 
 https://github.com/kissplugins/KISS-Projects-Tasks/tree/psr4-08-27-hotfix-add-assignee-filtering-v2.2.30
 
 - **Fixed**: Restored missing assignee filter dropdown on All Tasks admin page
