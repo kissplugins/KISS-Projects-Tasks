@@ -1,8 +1,37 @@
 # Changelog
 
+
+
+
+## Version 2.2.36 - FSM guard + Test Data helper
+- EditorFSM now distinguishes EDITING.DIRTY vs EDITING.SAVED and prevents START_TIMER on non-empty rows via effects.getSessionRowState guard (FSM-first).
+- Added admin test data helper: “Insert Test Data” button on Task editor pulls random titles from assets/test-data/samples.csv and fills the post/session title fields.
+- Localized pluginUrl to JS for asset fetches.
+- Note: Bulk Session operations remain deferred per PROJECT-FSM-SINGLE.md.
+
+## Version 2.2.35 - Guardrail: Prevent overwriting completed sessions
+- Server-side check in ptt_start_session_timer: do not allow starting on a row that already has any time recorded (start or stop). Returns an error asking the user to add a new session row instead.
+- Maintains invariant that past sessions are immutable without explicit delete.
+
+## Version 2.2.34 - EditorFSM: Live timer now increments
+- Reused existing manageLiveTimer/stopLiveTimer from legacy UI for the Editor FSM.
+- EditorEffects.updateTimerUI now starts/stops the shared interval using UTC start time from FSM context.
+- Prevents stuck 00:00:00 display when FSM is active; UI mirrors DB immediately after Start.
+
+## Version 2.2.33 - EditorFSM: Mirror server timestamps into ACF fields
+- On successful Start: set session_start_time input and clear session_stop_time for the targeted row; UI updates immediately without reload.
+- On successful Stop: set session_stop_time and session_calculated_duration inputs for the targeted row to match the server response.
+- Keeps ACF UI and DB state perfectly in sync during FSM operations.
+
+
+## Version 2.2.32 - EditorFSM: AJAX call logging in debug panel
+- Added explicit logging of AJAX requests/responses/errors for ptt_start_session_timer and ptt_stop_session_timer into the Editor FSM debug panel.
+- Helps verify server roundtrips in Safari without digging through Network inspector.
+
+
 ## Version 2.2.30 - Restore All Tasks assignee filter and sorting functionality
 
-**Hotfix** Branch: 
+**Hotfix** Branch:
 https://github.com/kissplugins/KISS-Projects-Tasks/tree/psr4-08-27-hotfix-add-assignee-filtering-v2.2.30
 
 - **Fixed**: Restored missing assignee filter dropdown on All Tasks admin page
@@ -300,6 +329,14 @@ https://github.com/kissplugins/KISS-Projects-Tasks/tree/psr4-08-27-hotfix-add-as
 
 ## Version 1.11.0 - Today Page Workflow Enhancements & Parent-Level Timer Cleanup
 *Release Date: 2025-01-11*
+
+
+## Version 2.2.31 - Phase 1: EditorFSM scaffolding
+- Added unified EditorFSM core (assets/js/fsm/editor/EditorFSM.js) behind existing FSM flags.
+- EditorTimerController now uses EditorFSM and sets a guard to disable legacy handlers when active.
+- Extended EditorEffects with validate/save/updateUI/showInfo stubs for Phase 1 wiring.
+- Enqueued new EditorFSM script; preserved debug panels and labels.
+- No behavioral changes when flags are off; minimal timer start/stop now flows through EditorFSM when Editor flag is on.
 
 ### Added
 - **"Start Timer" Button for Tasks**: Added green "Start Timer" button for task-level entries without active sessions

@@ -302,6 +302,10 @@ jQuery(document).ready(function ($) {
         }
     }
 
+        // Expose live timer helpers for FSM to reuse (DRY)
+        try { window.PTT_manageLiveTimer = manageLiveTimer; window.PTT_stopLiveTimer = stopLiveTimer; } catch(e) {}
+
+
     /**
      * Initializes the timer controls for each session row.
      */
@@ -380,6 +384,36 @@ jQuery(document).ready(function ($) {
 
 	    // Initialize on load and when ACF appends new content
 	    addUpdateButtonToSessionsRepeater();
+
+            // Admin-only Test Data injection button (Editor page)
+            try{
+                if($('body').hasClass('post-type-project_task') && $('.ptt-insert-test-data').length===0){
+                    const $btn=$('<button type="button" class="button ptt-insert-test-data" style="margin-left:8px">Insert Test Data</button>');
+                    $container.find('.acf-input .ptt-session-controls').length? $container.find('.acf-input .ptt-session-controls').append($btn):$container.find('.acf-input').append($btn);
+                    $(document).off('click.pttTestData').on('click.pttTestData','.ptt-insert-test-data',async function(){
+                        try{
+                            const url=(window.ptt_ajax_object&&ptt_ajax_object.pluginUrl?ptt_ajax_object.pluginUrl:'')+'assets/test-data/samples.csv';
+                            const res=await fetch(url, { credentials:'same-origin' });
+                            const csv=await res.text();
+                            const lines=csv.trim().split(/\r?\n/).slice(1);
+                            if(!lines.length) return alert('No test data.');
+                            // pick random
+                            const pick=lines[Math.floor(Math.random()*lines.length)].split(',');
+                            const taskTitle=(pick[0]||'Sample Task').trim();
+                            const sessionTitle=(pick[1]||('Session '+new Date().toLocaleTimeString())).trim();
+                            // Set post title if empty
+                            const $title=$('#title'); if($title.length && !$title.val()){ $title.val(taskTitle).trigger('change'); }
+                            // Find first empty session row title
+                            const $rows=$('.acf-field[data-key="field_ptt_sessions"] .acf-row');
+                            let $target=null; $rows.each(function(){ const t=$(this).find('[data-key="field_ptt_session_title"] input').val(); if(!t){ $target=$(this); return false; } });
+                            $target=$target||$rows.eq(0);
+                            $target.find('[data-key="field_ptt_session_title"] input').val(sessionTitle).trigger('change');
+                            alert('Inserted test data: '+taskTitle+' / '+sessionTitle);
+                        }catch(e){ console.warn(e); alert('Failed to insert test data.'); }
+                    });
+                }
+            }catch(e){}
+
 	    if (window.acf) {
 	        window.acf.addAction('append', function($el){ addUpdateButtonToSessionsRepeater($el); });
 	        window.acf.addAction('ready', function($el){ addUpdateButtonToSessionsRepeater($el); });
@@ -419,6 +453,7 @@ jQuery(document).ready(function ($) {
 
     // New unified click handlers using event delegation
     $(document).on('click', '.ptt-session-start', function(e) {
+        if (window.PTT_EDITOR_FSM_ACTIVE) { return; }
         e.preventDefault();
         const $btn = $(this);
         const $controls = $btn.closest('.ptt-session-controls');
@@ -452,6 +487,7 @@ jQuery(document).ready(function ($) {
     });
 
     $(document).on('click', '.ptt-session-stop', function(e) {
+        if (window.PTT_EDITOR_FSM_ACTIVE) { return; }
         e.preventDefault();
         const $btn = $(this);
         const $controls = $btn.closest('.ptt-session-controls');

@@ -1,10 +1,17 @@
 (function(root){
   function init(){
+    // Pull flags from localized PTT_FSM_FLAGS when available
+    var flags = (root.PTT_FSM_FLAGS || {});
+    root.PTT_FSM_ENABLED = !!flags.PTT_FSM_ENABLED;
+    root.PTT_FSM_EDITOR_ENABLED = !!flags.PTT_FSM_EDITOR_ENABLED;
+
     if(!root.PTT_FSM_ENABLED || !root.PTT_FSM_EDITOR_ENABLED) return;
-    if(!root.PTT || !root.PTT.TimerFSM || !root.PTT.EditorEffects) return;
+    if(!root.PTT || !root.PTT.EditorFSM || !root.PTT.EditorEffects) return;
     if(!jQuery('body').hasClass('post-type-project_task')) return;
     var effects = new root.PTT.EditorEffects();
-    var fsm = new root.PTT.TimerFSM(effects, { debug: true }); // Always debug while FSM is enabled
+    var fsm = new root.PTT.EditorFSM(effects, { debug: true }); // Always debug while FSM is enabled
+    // Mark EditorFSM active so legacy handlers can no-op
+    root.PTT_EDITOR_FSM_ACTIVE = true; try{ jQuery('body').addClass('ptt-editor-fsm-active'); }catch(e){}
 
     // --- Semi‑permanent debug panel (Do NOT remove without explicit product approval) ---
     // Maintainers/LLMs: Do not remove this panel unless explicitly instructed by the product owner.
@@ -21,7 +28,12 @@
         });
       }
     }
-    function setStateLabel(){ var $p=jQuery('#ptt-fsm-debug-editor .state'); if($p.length){ $p.text(fsm.state); } }
+    function setStateLabel(){
+      var $p=jQuery('#ptt-fsm-debug-editor .state'); if(!$p.length) return;
+      var label=fsm.state||'IDLE';
+      if(label==='EDITING'){ label='EDITING.'+((fsm.ctx&&fsm.ctx.isDirty)?'DIRTY':'SAVED'); }
+      $p.text(label);
+    }
     function appendLog(){ var $pre = jQuery('#ptt-fsm-debug-editor .logs'); if(!$pre.length) return; var args = Array.prototype.slice.call(arguments); var ts = new Date().toISOString().split('T')[1].replace('Z',''); $pre.append('['+ts+'] '+args.join(' ')+'\n'); $pre.scrollTop($pre[0].scrollHeight); }
     ensureDebugPanel();
 
@@ -33,8 +45,19 @@
     }
 
     fsm.rehydrate();
-    jQuery(document).on('click', '.ptt-session-start', function(e){ e.preventDefault(); var postId = jQuery('#post_ID').val(); fsm.transition('START_TIMER', { taskId: postId }); });
-    jQuery(document).on('click', '.ptt-session-stop', function(e){ e.preventDefault(); fsm.transition('STOP_TIMER'); });
+    jQuery(document).on('click', '.ptt-session-start', function(e){
+      e.preventDefault();
+      var postId = jQuery('#post_ID').val();
+      var $row = jQuery(this).closest('.acf-row');
+      var sessionIndex = $row.length ? $row.index() : null;
+      fsm.send('START_TIMER', { postId: postId, sessionIndex: sessionIndex });
+    });
+    jQuery(document).on('click', '.ptt-session-stop', function(e){
+      e.preventDefault();
+      var $row = jQuery(this).closest('.acf-row');
+      var sessionIndex = $row.length ? $row.index() : null;
+      fsm.send('STOP_TIMER', { sessionIndex: sessionIndex });
+    });
     root.PTT_EditorFSM = fsm;
   }
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }

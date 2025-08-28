@@ -8,20 +8,49 @@
     });
   };
   function EditorEffects(opts){ this.opts = opts||{}; }
+  function fsmLog(){ try{ if(root.PTT_EditorFSM && root.PTT_EditorFSM.log){ root.PTT_EditorFSM.log.apply(root.PTT_EditorFSM, arguments); } }catch(e){} }
   // Post Editor uses session-level start/stop by row index
-  EditorEffects.prototype.startTimer = function(taskId){
-    // Find first session row without a start time; fallback to index 0
-    var $rows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row');
-    var index = 0;
-    $rows.each(function(i){ var v = jQuery(this).find('[data-key="field_ptt_session_start_time"] input').val(); if(!v){ index = i; return false; } });
-    return ajax('ptt_start_session_timer', { post_id: taskId, row_index: index });
+  EditorEffects.prototype.startTimer = function(params){
+    var postId = (params && params.postId) || (window.jQuery && jQuery('#post_ID').val()) || null;
+    var index = (params && params.sessionIndex != null) ? params.sessionIndex : 0;
+    // If index not provided, find first session row without a start time; fallback to 0
+    if (params == null || params.sessionIndex == null){
+      var $rows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row');
+      $rows.each(function(i){ var v = jQuery(this).find('[data-key="field_ptt_session_start_time"] input').val(); if(!v){ index = i; return false; } });
+    }
+    fsmLog('AJAX -> ptt_start_session_timer', JSON.stringify({ post_id: postId, row_index: index }));
+    return ajax('ptt_start_session_timer', { post_id: postId, row_index: index }).then(function(resp){
+      fsmLog('AJAX ✓ ptt_start_session_timer', JSON.stringify({ start_time: resp.start_time, post_id: postId, row_index: index }));
+      // Mirror into ACF inputs immediately so UI matches DB without reload
+      try{
+        var $row = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row').eq(index);
+        $row.find('[data-key="field_ptt_session_start_time"] input').val(resp.start_time).trigger('change');
+        $row.find('[data-key="field_ptt_session_stop_time"] input').val('').trigger('change');
+      }catch(e){}
+      return { postId: postId, sessionIndex: index, startUtc: resp.start_time };
+    }).catch(function(err){ fsmLog('AJAX ✗ ptt_start_session_timer', String(err)); throw err; });
   };
-  EditorEffects.prototype.stopTimer  = function(postId){
-    // Determine index from visible running row
-    var $rows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row');
-    var index = 0;
-    $rows.each(function(i){ var start = jQuery(this).find('[data-key="field_ptt_session_start_time"] input').val(); var stop = jQuery(this).find('[data-key="field_ptt_session_stop_time"] input').val(); if(start && !stop){ index = i; return false; } });
-    return ajax('ptt_stop_session_timer', { post_id: postId, row_index: index });
+  EditorEffects.prototype.stopTimer  = function(params){
+    var postId = (params && params.postId) || (window.jQuery && jQuery('#post_ID').val()) || null;
+    var index = (params && params.sessionIndex != null) ? params.sessionIndex : 0;
+    if (params == null || params.sessionIndex == null){
+      // Determine index from visible running row
+      var $rows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row');
+      $rows.each(function(i){ var start = jQuery(this).find('[data-key="field_ptt_session_start_time"] input').val(); var stop = jQuery(this).find('[data-key="field_ptt_session_stop_time"] input').val(); if(start && !stop){ index = i; return false; } });
+    }
+    fsmLog('AJAX -> ptt_stop_session_timer', JSON.stringify({ post_id: postId, row_index: index }));
+    return ajax('ptt_stop_session_timer', { post_id: postId, row_index: index }).then(function(resp){
+      fsmLog('AJAX ✓ ptt_stop_session_timer', JSON.stringify({ stop_time: resp.stop_time, duration: resp.duration, post_id: postId, row_index: index }));
+      // Mirror into ACF inputs immediately
+      try{
+        var $row = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row').eq(index);
+        $row.find('[data-key="field_ptt_session_stop_time"] input').val(resp.stop_time).trigger('change');
+        if(typeof resp.duration !== 'undefined'){
+          $row.find('[data-key="field_ptt_session_calculated_duration"] input').val(resp.duration).trigger('change');
+        }
+      }catch(e){}
+      return { stoppedUtc: resp.stop_time, sessionIndex: index, postId: postId, duration: resp.duration };
+    }).catch(function(err){ fsmLog('AJAX ✗ ptt_stop_session_timer', String(err)); throw err; });
   };
   EditorEffects.prototype.rehydrate  = function(){
     // If a row has start and no stop, consider running
@@ -30,17 +59,45 @@
     $rows.each(function(i){ var s = jQuery(this).find('[data-key="field_ptt_session_start_time"] input').val(); var e = jQuery(this).find('[data-key="field_ptt_session_stop_time"] input').val(); if(s && !e){ running=true; sessionIndex=i; startUtc=s; return false; } });
     return Promise.resolve(running ? { running:true, postId:postId, sessionIndex:sessionIndex, startUtc:startUtc } : { running:false });
   };
+  // Phase 1 minimal: validate/save stubs for FSM hooks
+  EditorEffects.prototype.validateSession = function(ctx){ return Promise.resolve({ valid:true }); };
+  EditorEffects.prototype.saveSession = function(ctx){ return Promise.resolve({ ok:true }); };
+  // UI hooks used by EditorFSM
+  EditorEffects.prototype.updateUI = function(state, ctx){ /* no-op in Phase 1; debug panel shows state */ };
+  // Lightweight introspection used by FSM guards
+  EditorEffects.prototype.getSessionRowState = function(params){
+    var index = (params && params.sessionIndex != null) ? params.sessionIndex : 0;
+    var $row = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row').eq(index);
+    if(!$row.length) return 'UNKNOWN';
+    var s = $row.find('[data-key="field_ptt_session_start_time"] input').val();
+    var e = $row.find('[data-key="field_ptt_session_stop_time"] input').val();
+    if(!s && !e) return 'EMPTY';
+    if(s && !e) return 'RUNNING';
+    return 'COMPLETED';
+  };
   EditorEffects.prototype.updateTimerUI = function(state, ctx){
     var $rows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row');
     if(state==='RUNNING'){
-      var $row = $rows.eq(ctx.sessionIndex);
+      var idx = (ctx && ctx.sessionIndex != null) ? ctx.sessionIndex : (ctx && ctx.runningSessionIndex != null ? ctx.runningSessionIndex : 0);
+      var $row = $rows.eq(idx);
+      var $controls = $row.find('.ptt-session-controls');
       $row.find('.ptt-session-start').hide();
       $row.find('.ptt-session-active-timer').css('display','inline-flex');
+      // Start/update the shared live timer with the UTC start timestamp
+      try { if (window.PTT_manageLiveTimer) { window.PTT_manageLiveTimer($controls, ctx && ctx.startUtc); } } catch(e){}
     } else {
+      // Ensure any existing intervals are cleared and UI reset (across all rows)
+      try {
+        if (window.PTT_stopLiveTimer) {
+          $rows.find('.ptt-session-controls').each(function(){ window.PTT_stopLiveTimer(jQuery(this)); });
+        }
+      } catch(e){}
       $rows.find('.ptt-session-start').show();
       $rows.find('.ptt-session-active-timer').hide();
     }
   };
+
+  EditorEffects.prototype.showInfo = function(msg){ if(root.console) console.info('[PTT EditorEffects]', msg); };
   EditorEffects.prototype.showError = function(msg){ if(root.console) console.warn('[PTT EditorEffects]', msg); };
   root.PTT = root.PTT || {}; root.PTT.EditorEffects = EditorEffects;
 })(window);

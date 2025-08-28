@@ -413,6 +413,16 @@ function ptt_start_session_timer_callback() {
         ptt_stop_session( $post_id, $active );
     }
 
+    // Guardrail: Do NOT overwrite an existing/complete session row
+    $sessions = get_field( 'sessions', $post_id );
+    if ( is_array( $sessions ) && array_key_exists( $row_index, $sessions ) ) {
+        $target = $sessions[ $row_index ];
+        $has_existing = ! empty( $target['session_start_time'] ) || ! empty( $target['session_stop_time'] );
+        if ( $has_existing ) {
+            wp_send_json_error( [ 'message' => 'This session already has time recorded. Please add a new session row instead.' ] );
+        }
+    }
+
     $current_time = current_time( 'mysql', 1 ); // Use UTC time
     update_sub_field( array( 'sessions', $row_index + 1, 'session_start_time' ), $current_time, $post_id );
     update_sub_field( array( 'sessions', $row_index + 1, 'session_stop_time' ), '', $post_id );

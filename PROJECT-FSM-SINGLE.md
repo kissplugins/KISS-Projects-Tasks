@@ -3,7 +3,7 @@
 This document defines a single unified FSM (EditorFSM) to manage all CPT Task Editor interactions: session lifecycle and timer lifecycle. It consolidates the current TimerFSM + SessionFSM to reduce race conditions, centralize validation, and make error recovery uniform.
 
 ## Goals
-- Single source of truth for editor operations (no cross-FSM coordination bugs)
+- Most Important Issue: Single source of truth for editor operations (no cross-FSM coordination bugs)
 - Strong guardrails and watchdogs to prevent stuck/brittle states
 - Server-authoritative invariants
 - Minimal DOM coupling via Effects layer (pure FSM core)
@@ -14,10 +14,12 @@ This document defines a single unified FSM (EditorFSM) to manage all CPT Task Ed
 - All UI events flow through EditorFSM; legacy jQuery handlers are thin shims that send events
 - Effects implement DOM/AJAX, keeping FSM pure/testable
 
-
 ## Scope note — Today page FSM (Deferred)
 - All Today page FSM work is deferred to a future phase. This document and the immediate implementation plan focus exclusively on the CPT Task Editor (EditorFSM).
 - Do not wire Today page controllers/effects to the FSM in Phases 1–3 below; keep Today behavior as-is until explicitly scheduled.
+
+> Bulk Session operations (multi-select delete/duplicate/move) are explicitly deferred to a later phase. Only single-row operations are in scope for Phases 1–3. Any references to BULK below are placeholders for the deferred phase and are not to be implemented now.
+
 
 ## Phased implementation plan (actionable)
 
