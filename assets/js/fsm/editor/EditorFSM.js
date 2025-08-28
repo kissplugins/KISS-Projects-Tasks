@@ -74,8 +74,15 @@
 
     switch(e){
       case 'EDIT_FIELD':
-        this.ctx.isDirty = true; this.ctx.pendingChanges = Object.assign({}, this.ctx.pendingChanges, payload||{});
-        this.state = 'EDITING.DIRTY'; this._updateUI(); return;
+        // Update context with field changes
+        this.ctx.isDirty = true;
+        this.ctx.postId = (payload && payload.postId) || this.ctx.postId;
+        this.ctx.sessionIndex = (payload && payload.sessionIndex != null) ? payload.sessionIndex : this.ctx.sessionIndex;
+        this.ctx.pendingChanges = Object.assign({}, this.ctx.pendingChanges, (payload && payload.changes) || {});
+        this.state = 'EDITING.DIRTY';
+        this._updateUI();
+        this.log('Field edited:', payload && payload.fieldName, '=', payload && payload.value);
+        return;
 
       case 'VALIDATE':
         if(this._enqueueOrIgnore(e, payload)) return;

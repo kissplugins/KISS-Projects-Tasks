@@ -59,9 +59,69 @@
     $rows.each(function(i){ var s = jQuery(this).find('[data-key="field_ptt_session_start_time"] input').val(); var e = jQuery(this).find('[data-key="field_ptt_session_stop_time"] input').val(); if(s && !e){ running=true; sessionIndex=i; startUtc=s; return false; } });
     return Promise.resolve(running ? { running:true, postId:postId, sessionIndex:sessionIndex, startUtc:startUtc } : { running:false });
   };
-  // Phase 1 minimal: validate/save stubs for FSM hooks
-  EditorEffects.prototype.validateSession = function(ctx){ return Promise.resolve({ valid:true }); };
-  EditorEffects.prototype.saveSession = function(ctx){ return Promise.resolve({ ok:true }); };
+  // Phase 1: Real session validation and saving
+  EditorEffects.prototype.validateSession = function(ctx){
+    fsmLog('VALIDATE -> validateSession', JSON.stringify({ postId: ctx.postId, sessionIndex: ctx.sessionIndex, pendingChanges: ctx.pendingChanges }));
+
+    var errors = [];
+    var changes = ctx.pendingChanges || {};
+
+    // Basic validation rules
+    if (changes.session_title !== undefined && changes.session_title.trim() === '') {
+      errors.push('Session title cannot be empty');
+    }
+
+    if (changes.session_start_time !== undefined && changes.session_stop_time !== undefined) {
+      var start = new Date(changes.session_start_time);
+      var stop = new Date(changes.session_stop_time);
+      if (start >= stop) {
+        errors.push('Start time must be before stop time');
+      }
+    }
+
+    var isValid = errors.length === 0;
+    fsmLog('VALIDATE ✓ validateSession', JSON.stringify({ valid: isValid, errors: errors }));
+
+    return Promise.resolve({ valid: isValid, errors: errors });
+  };
+
+  EditorEffects.prototype.saveSession = function(ctx){
+    fsmLog('SAVE -> saveSession', JSON.stringify({ postId: ctx.postId, sessionIndex: ctx.sessionIndex, pendingChanges: ctx.pendingChanges }));
+
+    if (!ctx.postId || !ctx.pendingChanges || Object.keys(ctx.pendingChanges).length === 0) {
+      fsmLog('SAVE ✓ saveSession (no changes)', 'Nothing to save');
+      return Promise.resolve({ ok: true });
+    }
+
+    // Apply pending changes to ACF fields immediately (optimistic update)
+    try {
+      var sessionIndex = ctx.sessionIndex || 0;
+      var $row = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row').eq(sessionIndex);
+
+      Object.keys(ctx.pendingChanges).forEach(function(fieldName) {
+        var value = ctx.pendingChanges[fieldName];
+        var $field = $row.find('[data-key="field_ptt_' + fieldName + '"] input, [data-key="field_ptt_' + fieldName + '"] textarea');
+        if ($field.length) {
+          $field.val(value).trigger('change');
+          fsmLog('SAVE -> Applied field', fieldName + ' = ' + value);
+        }
+      });
+
+      // Trigger ACF save (this will persist to database)
+      if (jQuery('#publish').length) {
+        // Use ACF's built-in save mechanism
+        fsmLog('SAVE -> Triggering ACF save via publish button');
+        jQuery('#publish').trigger('click');
+      }
+
+      fsmLog('SAVE ✓ saveSession', 'Changes applied to ACF fields');
+      return Promise.resolve({ ok: true });
+
+    } catch (error) {
+      fsmLog('SAVE ✗ saveSession', 'Error: ' + error.message);
+      return Promise.reject(new Error('Failed to save session: ' + error.message));
+    }
+  };
   // UI hooks used by EditorFSM
   EditorEffects.prototype.updateUI = function(state, ctx){ /* no-op in Phase 1; debug panel shows state */ };
   // Lightweight introspection used by FSM guards

@@ -45,6 +45,8 @@
     }
 
     fsm.rehydrate();
+
+    // Timer controls
     jQuery(document).on('click', '.ptt-session-start', function(e){
       e.preventDefault();
       var postId = jQuery('#post_ID').val();
@@ -58,6 +60,68 @@
       var sessionIndex = $row.length ? $row.index() : null;
       fsm.send('STOP_TIMER', { sessionIndex: sessionIndex });
     });
+
+    // Session field editing events - wire to FSM
+    function setupSessionFieldHandlers() {
+      // Handle ACF field changes in session repeater
+      jQuery(document).on('change input', '.acf-field[data-key="field_ptt_sessions"] input, .acf-field[data-key="field_ptt_sessions"] textarea', function(e) {
+        var $field = jQuery(this);
+        var $row = $field.closest('.acf-row');
+        var sessionIndex = $row.index();
+        var fieldKey = $field.closest('.acf-field').data('key');
+        var fieldName = '';
+        var value = $field.val();
+
+        // Map ACF field keys to field names
+        var fieldMap = {
+          'field_ptt_session_title': 'session_title',
+          'field_ptt_session_notes': 'session_notes',
+          'field_ptt_session_start_time': 'session_start_time',
+          'field_ptt_session_stop_time': 'session_stop_time',
+          'field_ptt_session_manual_duration': 'session_manual_duration'
+        };
+
+        fieldName = fieldMap[fieldKey];
+        if (!fieldName) return; // Unknown field, ignore
+
+        var postId = jQuery('#post_ID').val();
+        var changes = {};
+        changes[fieldName] = value;
+
+        fsm.send('EDIT_FIELD', {
+          postId: postId,
+          sessionIndex: sessionIndex,
+          fieldName: fieldName,
+          value: value,
+          changes: changes
+        });
+      });
+
+      // Handle manual override checkbox
+      jQuery(document).on('change', '.acf-field[data-key="field_ptt_session_manual_override"] input[type="checkbox"]', function(e) {
+        var $field = jQuery(this);
+        var $row = $field.closest('.acf-row');
+        var sessionIndex = $row.index();
+        var value = $field.is(':checked');
+        var postId = jQuery('#post_ID').val();
+
+        fsm.send('EDIT_FIELD', {
+          postId: postId,
+          sessionIndex: sessionIndex,
+          fieldName: 'session_manual_override',
+          value: value,
+          changes: { 'session_manual_override': value }
+        });
+      });
+    }
+
+    // Set up field handlers immediately and on ACF ready
+    setupSessionFieldHandlers();
+    if (window.acf && typeof window.acf.addAction === 'function') {
+      window.acf.addAction('ready', setupSessionFieldHandlers);
+      window.acf.addAction('append', setupSessionFieldHandlers); // When new rows are added
+    }
+
     root.PTT_EditorFSM = fsm;
   }
   if(document.readyState==='loading'){ document.addEventListener('DOMContentLoaded', init); } else { init(); }

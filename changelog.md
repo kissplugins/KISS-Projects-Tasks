@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 2.3.7 - Complete EditorFSM Phase 1 Implementation
+- **MAJOR**: Implemented real session saving and validation in EditorEffects.js (FSM-first architecture)
+- **MAJOR**: Wired ACF field change events to send EDIT_FIELD events to EditorFSM for complete session editing flow
+- **MAJOR**: Enhanced EditorFSM to handle field editing with proper context tracking (postId, sessionIndex, pendingChanges)
+- Session validation now includes title validation and start/stop time logic checks
+- Session saving applies changes to ACF fields and triggers WordPress save mechanism
+- All session editing operations now flow through unified EditorFSM state machine
+- **RESULT**: Phase 1 of PROJECT-FSM-SINGLE.md is now complete - unified timer + session editing FSM
+
 ## Version 2.3.6 - Remove Today-related tests and fix Filter Query Handling test
 - Removed all Today-related self-tests since Today functionality was removed in v2.3.0.
 - Fixed Filter Query Handling test to properly simulate admin context and main query conditions.
