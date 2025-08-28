@@ -38,25 +38,22 @@ class Calculator {
     }
 
     public static function calculate_session_duration( $post_id, $index ) {
-        $sessions = get_field( 'sessions', $post_id );
-        if ( empty( $sessions ) || ! isset( $sessions[ $index ] ) ) {
-            return '0.00';
-        }
+        // Read direct meta to avoid any ACF in-request caching after update_sub_field()
+        $i = (int) $index;
+        $duration = 0.00;
 
-        $session = $sessions[ $index ];
-
-        if ( ! empty( $session['session_manual_override'] ) ) {
-            $duration = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.00;
+        // Manual override takes precedence
+        $manual = get_post_meta( $post_id, "sessions_{$i}_session_manual_override", true );
+        if ( ! empty( $manual ) ) {
+            $duration = (float) get_post_meta( $post_id, "sessions_{$i}_session_manual_duration", true );
         } else {
-            $start_time_str = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
-            $stop_time_str  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
-            $duration       = 0.00;
+            $start_time_str = (string) get_post_meta( $post_id, "sessions_{$i}_session_start_time", true );
+            $stop_time_str  = (string) get_post_meta( $post_id, "sessions_{$i}_session_stop_time", true );
 
             if ( $start_time_str && $stop_time_str ) {
                 try {
                     $start_time = new DateTime( $start_time_str, new DateTimeZone( 'UTC' ) );
                     $stop_time  = new DateTime( $stop_time_str, new DateTimeZone( 'UTC' ) );
-
                     if ( $stop_time > $start_time ) {
                         $diff_seconds   = $stop_time->getTimestamp() - $start_time->getTimestamp();
                         $duration_hours = $diff_seconds / 3600;
@@ -69,23 +66,25 @@ class Calculator {
         }
 
         $formatted = number_format( (float) $duration, 2, '.', '' );
-        update_sub_field( [ 'sessions', $index + 1, 'session_calculated_duration' ], $formatted, $post_id );
+        // Persist the calculated duration on the same request
+        update_sub_field( [ 'sessions', $i + 1, 'session_calculated_duration' ], $formatted, $post_id );
         return $formatted;
     }
 
     protected static function get_total_sessions_duration( $post_id ) {
-        $sessions = get_field( 'sessions', $post_id );
-        $total    = 0.0;
+        // Use raw meta to avoid potential stale ACF caches within the same request
+        $row_count = (int) get_post_meta( $post_id, 'sessions', true );
+        $total     = 0.0;
 
-        if ( ! empty( $sessions ) && is_array( $sessions ) ) {
-            foreach ( $sessions as $session ) {
-                if ( ! empty( $session['session_manual_override'] ) ) {
-                    $dur = isset( $session['session_manual_duration'] ) ? floatval( $session['session_manual_duration'] ) : 0.0;
+        if ( $row_count > 0 ) {
+            for ( $i = 0; $i < $row_count; $i++ ) {
+                $manual = get_post_meta( $post_id, "sessions_{$i}_session_manual_override", true );
+                if ( ! empty( $manual ) ) {
+                    $dur = (float) get_post_meta( $post_id, "sessions_{$i}_session_manual_duration", true );
                 } else {
-                    $start = isset( $session['session_start_time'] ) ? $session['session_start_time'] : '';
-                    $stop  = isset( $session['session_stop_time'] ) ? $session['session_stop_time'] : '';
+                    $start = (string) get_post_meta( $post_id, "sessions_{$i}_session_start_time", true );
+                    $stop  = (string) get_post_meta( $post_id, "sessions_{$i}_session_stop_time", true );
                     $dur   = 0.0;
-
                     if ( $start && $stop ) {
                         try {
                             $start_time = new DateTime( $start, new DateTimeZone( 'UTC' ) );
@@ -99,7 +98,7 @@ class Calculator {
                         }
                     }
                 }
-                $total += $dur;
+                $total += (float) $dur;
             }
         }
 

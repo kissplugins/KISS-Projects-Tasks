@@ -3,6 +3,12 @@
 
 
 
+## Version 2.2.37 - Fix: Calculated (hrs) not updating
+- Fixed a regression where session duration wasn’t saved into the Calculated (hrs) field after stopping a timer.
+- Root cause: ACF field caching within the same request caused stale reads during duration calculation.
+- Change: Duration calculations now read raw post meta for sessions within the request to ensure fresh values, and then write back to the ACF sub field and total display.
+
+
 ## Version 2.2.36 - FSM guard + Test Data helper
 - EditorFSM now distinguishes EDITING.DIRTY vs EDITING.SAVED and prevents START_TIMER on non-empty rows via effects.getSessionRowState guard (FSM-first).
 - Added admin test data helper: “Insert Test Data” button on Task editor pulls random titles from assets/test-data/samples.csv and fills the post/session title fields.

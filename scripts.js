@@ -221,20 +221,29 @@ jQuery(document).ready(function ($) {
             const dateButton = $('<button type="button" id="ptt-use-todays-date" class="button" style="margin-bottom: 10px;">Use Today\'s Date</button>');
             $titlewrap.after(dateButton); // Place button after the title wrapper
 
+            function formatNowForTitle(){
+                const now = new Date();
+                const mm = ('0' + (now.getMonth() + 1)).slice(-2);
+                const dd = ('0' + now.getDate()).slice(-2);
+                const yy = String(now.getFullYear()).slice(-2);
+                let h = now.getHours();
+                const ampm = (h >= 12) ? 'PM' : 'AM';
+                h = h % 12; if (h === 0) h = 12;
+                const hh = ('0' + h).slice(-2);
+                const min = ('0' + now.getMinutes()).slice(-2);
+                return { stamp: `${mm}-${dd}-${yy} ${hh}:${min} ${ampm}`, short: `${mm}-${dd}-${yy}` };
+            }
+
             dateButton.on('click', function(e) {
                 e.preventDefault();
-                const today = ptt_ajax_object.todays_date_formatted;
+                const { stamp, short } = formatNowForTitle();
                 const $titleInput = $('#title');
-                const currentTitle = $titleInput.val();
-                let newTitle = today + ' - ' + currentTitle;
+                const currentTitle = ($titleInput.val()||'');
 
-                if ( !currentTitle.trim() ) {
-                    newTitle = today + ' - ';
-                } else if (currentTitle.includes(today)) {
-                    // Don't add if date is already there
-                    return;
-                }
+                // If the title already begins with today\'s date, don\'t add another
+                if (currentTitle.trim().startsWith(short)) return;
 
+                const newTitle = (currentTitle.trim()) ? `${stamp} - ${currentTitle}` : `${stamp} - `;
                 $titleInput.val(newTitle);
                 $('#title-prompt-text').addClass('screen-reader-text');
             });
