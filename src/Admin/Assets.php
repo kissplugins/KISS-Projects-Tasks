@@ -14,11 +14,6 @@ class Assets {
             return;
         }
 
-        // Today page
-        if ( $hook === 'project_task_page_ptt-today' ) {
-            self::enqueueCore($hook);
-            return;
-        }
 
         // Reports page
         if ( $hook === 'project_task_page_ptt-reports' ) {
@@ -45,19 +40,14 @@ class Assets {
             'pluginUrl' => PTT_PLUGIN_URL,
         ] );
 
-        // FSM bundles (Today + Editor share core; flags disabled by default)
-        wp_enqueue_script( 'ptt-fsm-timer-core', PTT_PLUGIN_URL . 'assets/js/fsm/timer/TimerFSM.js', [], PTT_VERSION, true );
-        wp_enqueue_script( 'ptt-fsm-timer-today', PTT_PLUGIN_URL . 'assets/js/fsm/timer/TodayEffects.js', [ 'ptt-fsm-timer-core', 'jquery' ], PTT_VERSION, true );
-        wp_enqueue_script( 'ptt-fsm-timer-today-controller', PTT_PLUGIN_URL . 'assets/js/fsm/timer/TodayTimerController.js', [ 'ptt-fsm-timer-today' ], PTT_VERSION, true );
         // Editor unified FSM core and controller
         wp_enqueue_script( 'ptt-fsm-editor-core', PTT_PLUGIN_URL . 'assets/js/fsm/editor/EditorFSM.js', [ 'jquery' ], PTT_VERSION, true );
-        wp_enqueue_script( 'ptt-fsm-timer-editor', PTT_PLUGIN_URL . 'assets/js/fsm/timer/EditorEffects.js', [ 'ptt-fsm-editor-core', 'ptt-fsm-timer-core', 'jquery' ], PTT_VERSION, true );
+        wp_enqueue_script( 'ptt-fsm-timer-editor', PTT_PLUGIN_URL . 'assets/js/fsm/timer/EditorEffects.js', [ 'ptt-fsm-editor-core', 'jquery' ], PTT_VERSION, true );
         wp_enqueue_script( 'ptt-fsm-timer-editor-controller', PTT_PLUGIN_URL . 'assets/js/fsm/timer/EditorTimerController.js', [ 'ptt-fsm-timer-editor' ], PTT_VERSION, true );
         // FSM flags from settings helper (defaults ON). Applies to all users (internal testers).
         $flags = Settings::getFlags();
-        wp_localize_script( 'ptt-fsm-timer-today-controller', 'PTT_FSM_FLAGS', [
+        wp_localize_script( 'ptt-fsm-timer-editor-controller', 'PTT_FSM_FLAGS', [
             'PTT_FSM_ENABLED' => $flags['enabled'],
-            'PTT_FSM_TODAY_ENABLED' => $flags['enabled'] && $flags['today'],
             'PTT_FSM_EDITOR_ENABLED' => $flags['enabled'] && $flags['editor'],
         ] );
     }

@@ -3,6 +3,14 @@
 
 
 
+## Version 2.3.0 - Remove Today page and related FSM bundles (deferred feature)
+- Removed Today admin page, controllers, and helper classes under src/Presentation/Today/.
+- Removed Today FSM bundles: assets/js/fsm/timer/TimerFSM.js, TodayEffects.js, TodayTimerController.js.
+- Assets: stopped enqueuing Today FSM scripts and flags; Editor FSM remains intact.
+- Plugin bootstrap: removed today-compat include and Today imports.
+- Note: Scripts still retain legacy non-Today features; Today-specific UI is gated off. A future rebuild will introduce a new Today experience.
+
+
 ## Version 2.2.37 - Fix: Calculated (hrs) not updating
 - Fixed a regression where session duration wasn’t saved into the Calculated (hrs) field after stopping a timer.
 - Root cause: ACF field caching within the same request caused stale reads during duration calculation.

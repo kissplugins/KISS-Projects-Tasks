@@ -1204,7 +1204,7 @@ jQuery(document).ready(function ($) {
      * TODAY PAGE
      * ---------------------------------------------------------------
      */
-    if ($('#ptt-today-page-container').length) {
+    if (false && $('#ptt-today-page-container').length) {
         const $projectFilter = $('#ptt-today-project-filter');
         const $clientFilter = $('#ptt-today-client-filter');
         const $taskSelect = $('#ptt-today-task-select');
