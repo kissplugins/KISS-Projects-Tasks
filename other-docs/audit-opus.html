@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FSM Guard Rails Implementation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            line-height: 1.6;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+        h1 { margin: 0 0 10px 0; }
+        .subtitle { opacity: 0.95; font-size: 18px; }
+        
+        .section {
+            background: white;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .code-header {
+            background: #667eea;
+            color: white;
+            padding: 8px 15png;
+            border-radius: 6px 6px 0 0;
+            font-weight: bold;
+            margin-bottom: -4px;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .implementation-step {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 6px;
+        }
+        
+        .step-number {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+            border-radius: 50%;
+            margin-right: 10px;
+            font-weight: bold;
+        }
+        
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #d73a49;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+        
+        ul { line-height: 1.8; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ FSM Guard Rails & Recovery System</h1>
+        <div class="subtitle">Immediate fixes to stabilize your Timer/Session FSM implementation</div>
+    </div>
+
+    <div class="section">
+        <h2>🚨 Problem Analysis</h2>
+        <p>Your FSM system is brittle due to:</p>
+        <ul>
+            <li><strong>State Synchronization Issues:</strong> TimerFSM and SessionFSM aren't properly synchronized</li>
+            <li><strong>Stuck States:</strong> SessionFSM gets stuck in EDITING state with no recovery mechanism</li>
+            <li><strong>Event Handler Conflicts:</strong> Multiple event handlers competing for the same actions</li>
+            <li><strong>Missing State Validation:</strong> No guards preventing invalid state transitions</li>
+            <li><strong>Poor Error Recovery:</strong> When things go wrong, the FSMs don't self-heal</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>🛠️ Immediate Guard Rails Implementation</h2>
+        
+        <div class="implementation-step">
+            <div class="code-header">File: assets/js/fsm/guards/FSMGuardSystem.js</div>
+            <pre>// Create this new file for centralized guard system
+(function(root) {
+    'use strict';
+    
+    /**
+     * FSM Guard System - Prevents invalid states and provides recovery
+     */
+    function FSMGuardSystem() {
+        this.watchdogInterval = null;
+        this.stateHistory = [];
+        this.maxHistorySize = 50;
+        this.stuckStateThreshold = 5000; // 5 seconds
+        this.lastStateChange = {};
+    }
+    
+    /**
+     * Initialize the guard system for both FSMs
+     */
+    FSMGuardSystem.prototype.init = function() {
+        if (!root.PTT_FSM_ENABLED) return;
+        
+        this.startWatchdog();
+        this.installStateInterceptors();
+        this.installEventValidation();
+        this.installRecoveryMechanisms();
+        
+        console.log('[FSM Guard] System initialized');
+    };
+    
+    /**
+     * Watchdog timer to detect stuck states
+     */
+    FSMGuardSystem.prototype.startWatchdog = function() {
+        var self = this;
+        
+        this.watchdogInterval = setInterval(function() {
+            self.checkForStuckStates();
+            self.validateFSMConsistency();
+            self.cleanupOrphanedState();
+        }, 2000); // Check every 2 seconds
+    };
+    
+    /**
+     * Check if any FSM is stuck in a state too long
+     */
+    FSMGuardSystem.prototype.checkForStuckStates = function() {
+        var now = Date.now();
+        
+        // Check SessionFSM
+        if (root.PTT_SessionFSM) {
+            var sessionState = root.PTT_SessionFSM.state;
+            var lastChange = this.lastStateChange['session_' + sessionState] || now;
+            
+            if (sessionState === 'EDITING' && (now - lastChange) > this.stuckStateThreshold) {
+                if (!root.PTT_SessionFSM._hasMeaningfulChanges()) {
+                    console.warn('[FSM Guard] SessionFSM stuck in EDITING with no changes - recovering');
+                    root.PTT_SessionFSM.transition('RESET');
+                }
+            }
+            
+            if (sessionState === 'SAVING' && (now - lastChange) > 30000) {
+                console.error('[FSM Guard] SessionFSM stuck in SAVING for 30s - force reset');
+                root.PTT_SessionFSM.forceReset();
+            }
+        }
+        
+        // Check TimerFSM
+        if (root.PTT_EditorFSM) {
+            var timerState = root.PTT_EditorFSM.state;
+            var lastChange = this.lastStateChange['timer_' + timerState] || now;
+            
+            if (timerState === 'STARTING' && (now - lastChange) > 10000) {
+                console.error('[FSM Guard] TimerFSM stuck in STARTING for 10s - resetting');
+                root.PTT_EditorFSM.state = 'IDLE';
+                root.PTT_EditorFSM.ctx = { taskId: null, postId: null, sessionIndex: null, startUtc: null };
+            }
+        }
+    };
+    
+    /**
+     * Validate consistency between Timer and Session FSMs
+     */
+    FSMGuardSystem.prototype.validateFSMConsistency = function() {
+        if (!root.PTT_EditorFSM || !root.PTT_SessionFSM) return;
+        
+        var timerState = root.PTT_EditorFSM.state;
+        var sessionState = root.PTT_SessionFSM.state;
+        
+        // Invalid state combinations
+        var invalidCombos = [
+            { timer: 'RUNNING', session: 'CREATING', action: 'stop_timer' },
+            { timer: 'IDLE', session: 'AUTO_SAVING', action: 'reset_session' },
+            { timer: 'RUNNING', session: 'DELETING', action: 'stop_timer' }
+        ];
+        
+        invalidCombos.forEach(function(combo) {
+            if (timerState === combo.timer && sessionState === combo.session) {
+                console.warn('[FSM Guard] Invalid state combination detected:', combo);
+                if (combo.action === 'stop_timer') {
+                    root.PTT_EditorFSM.transition('STOP_TIMER');
+                } else if (combo.action === 'reset_session') {
+                    root.PTT_SessionFSM.transition('RESET');
+                }
+            }
+        });
+    };
+    
+    /**
+     * Clean up orphaned state data
+     */
+    FSMGuardSystem.prototype.cleanupOrphanedState = function() {
+        // Clean up session storage flags
+        var flags = [
+            'ptt_session_save_pending',
+            'ptt_session_delete_pending',
+            'ptt_session_duplicate_pending',
+            'ptt_session_reorder_pending',
+            'ptt_session_bulk_delete_pending',
+            'ptt_session_autosave_pending'
+        ];
+        
+        flags.forEach(function(flag) {
+            var value = sessionStorage.getItem(flag);
+            if (value === '1') {
+                var key = 'ptt_guard_' + flag + '_time';
+                var setTime = sessionStorage.getItem(key);
+                var now = Date.now();
+                
+                if (!setTime) {
+                    sessionStorage.setItem(key, now);
+                } else if (now - parseInt(setTime) > 30000) {
+                    // Flag has been set for more than 30 seconds - clear it
+                    console.warn('[FSM Guard] Clearing orphaned flag:', flag);
+                    sessionStorage.removeItem(flag);
+                    sessionStorage.removeItem(key);
+                }
+            }
+        });
+    };
+    
+    /**
+     * Install state change interceptors
+     */
+    FSMGuardSystem.prototype.installStateInterceptors = function() {
+        var self = this;
+        
+        // Intercept SessionFSM transitions
+        if (root.PTT_SessionFSM) {
+            var originalTransition = root.PTT_SessionFSM.transition;
+            root.PTT_SessionFSM.transition = function(event, payload) {
+                var prevState = this.state;
+                
+                // Pre-transition validation
+                if (!self.validateTransition('session', prevState, event)) {
+                    console.warn('[FSM Guard] Blocked invalid transition:', prevState, '->', event);
+                    return;
+                }
+                
+                // Call original transition
+                var result = originalTransition.call(this, event, payload);
+                
+                // Record state change
+                self.recordStateChange('session', prevState, this.state, event);
+                
+                return result;
+            };
+        }
+        
+        // Intercept TimerFSM transitions
+        if (root.PTT_EditorFSM) {
+            var originalTransition = root.PTT_EditorFSM.transition;
+            root.PTT_EditorFSM.transition = function(event, payload) {
+                var prevState = this.state;
+                
+                // Pre-transition validation
+                if (!self.validateTransition('timer', prevState, event)) {
+                    console.warn('[FSM Guard] Blocked invalid transition:', prevState, '->', event);
+                    return;
+                }
+                
+                // Call original transition
+                var result = originalTransition.call(this, event, payload);
+                
+                // Record state change
+                self.recordStateChange('timer', prevState, this.state, event);
+                
+                return result;
+            };
+        }
+    };
+    
+    /**
+     * Validate if a transition is allowed
+     */
+    FSMGuardSystem.prototype.validateTransition = function(fsm, state, event) {
+        // Define invalid transitions
+        var invalidTransitions = {
+            session: {
+                'SAVING': ['CREATE_SESSION', 'EDIT_SESSION', 'DELETE_SESSION'],
+                'DELETING': ['CREATE_SESSION', 'EDIT_SESSION', 'SAVE_SESSION'],
+                'AUTO_SAVING': ['CREATE_SESSION', 'DELETE_SESSION']
+            },
+            timer: {
+                'STARTING': ['START_TIMER'],
+                'STOPPING': ['STOP_TIMER'],
+                'RUNNING': ['START_TIMER']
+            }
+        };
+        
+        var fsmInvalid = invalidTransitions[fsm];
+        if (!fsmInvalid) return true;
+        
+        var stateInvalid = fsmInvalid[state];
+        if (!stateInvalid) return true;
+        
+        return stateInvalid.indexOf(event) === -1;
+    };
+    
+    /**
+     * Record state changes for history and debugging
+     */
+    FSMGuardSystem.prototype.recordStateChange = function(fsm, prevState, newState, event) {
+        var now = Date.now();
+        
+        this.lastStateChange[fsm + '_' + newState] = now;
+        
+        this.stateHistory.push({
+            fsm: fsm,
+            prev: prevState,
+            next: newState,
+            event: event,
+            timestamp: now
+        });
+        
+        // Keep history size limited
+        if (this.stateHistory.length > this.maxHistorySize) {
+            this.stateHistory.shift();
+        }
+    };
+    
+    /**
+     * Install event validation to prevent duplicate handlers
+     */
+    FSMGuardSystem.prototype.installEventValidation = function() {
+        var self = this;
+        var processedEvents = {};
+        
+        // Override jQuery event binding to detect duplicates
+        var originalOn = jQuery.fn.on;
+        jQuery.fn.on = function(events, selector, data, handler) {
+            if (typeof events === 'string' && events.indexOf('ptt') !== -1) {
+                var eventKey = events + '_' + (selector || 'document');
+                
+                if (processedEvents[eventKey]) {
+                    console.warn('[FSM Guard] Duplicate event handler detected:', eventKey);
+                    // Allow but warn - don't block in case it's intentional
+                }
+                processedEvents[eventKey] = true;
+            }
+            
+            return originalOn.apply(this, arguments);
+        };
+    };
+    
+    /**
+     * Install recovery mechanisms
+     */
+    FSMGuardSystem.prototype.installRecoveryMechanisms = function() {
+        var self = this;
+        
+        // Global error handler for FSM errors
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message.indexOf('FSM') !== -1) {
+                console.error('[FSM Guard] Caught FSM error:', e.message);
+                self.attemptRecovery();
+            }
+        });
+        
+        // Add keyboard shortcut for emergency reset (Ctrl+Shift+R)
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.shiftKey && e.key === 'R') {
+                e.preventDefault();
+                if (confirm('Reset all FSM states? This will clear any pending operations.')) {
+                    self.emergencyReset();
+                }
+            }
+        });
+    };
+    
+    /**
+     * Attempt automatic recovery
+     */
+    FSMGuardSystem.prototype.attemptRecovery = function() {
+        console.warn('[FSM Guard] Attempting automatic recovery...');
+        
+        // Reset stuck FSMs
+        if (root.PTT_SessionFSM && root.PTT_SessionFSM.state === 'ERROR') {
+            root.PTT_SessionFSM.transition('RESET');
+        }
+        
+        if (root.PTT_EditorFSM && root.PTT_EditorFSM.state === 'ERROR') {
+            root.PTT_EditorFSM.state = 'IDLE';
+        }
+        
+        // Clear all pending flags
+        this.cleanupOrphanedState();
+        
+        // Re-enable UI elements
+        jQuery('.acf-button[disabled]').prop('disabled', false);
+        jQuery('.ptt-session-start[disabled]').prop('disabled', false);
+        
+        console.log('[FSM Guard] Recovery attempt completed');
+    };
+    
+    /**
+     * Emergency reset - nuclear option
+     */
+    FSMGuardSystem.prototype.emergencyReset = function() {
+        console.warn('[FSM Guard] EMERGENCY RESET INITIATED');
+        
+        // Reset SessionFSM
+        if (root.PTT_SessionFSM) {
+            root.PTT_SessionFSM.state = 'IDLE';
+            root.PTT_SessionFSM.ctx = {
+                sessionIndex: null,
+                postId: null,
+                isDirty: false,
+                validationErrors: [],
+                pendingChanges: {}
+            };
+        }
+        
+        // Reset TimerFSM
+        if (root.PTT_EditorFSM) {
+            root.PTT_EditorFSM.state = 'IDLE';
+            root.PTT_EditorFSM.ctx = {
+                taskId: null,
+                postId: null,
+                sessionIndex: null,
+                startUtc: null
+            };
+        }
+        
+        // Clear all storage
+        Object.keys(sessionStorage).forEach(function(key) {
+            if (key.indexOf('ptt_') === 0) {
+                sessionStorage.removeItem(key);
+            }
+        });
+        
+        // Reset UI
+        location.reload();
+    };
+    
+    /**
+     * Get diagnostic information
+     */
+    FSMGuardSystem.prototype.getDiagnostics = function() {
+        return {
+            sessionFSM: root.PTT_SessionFSM ? {
+                state: root.PTT_SessionFSM.state,
+                context: root.PTT_SessionFSM.ctx,
+                hasPendingChanges: root.PTT_SessionFSM.hasUnsavedChanges()
+            } : null,
+            timerFSM: root.PTT_EditorFSM ? {
+                state: root.PTT_EditorFSM.state,
+                context: root.PTT_EditorFSM.ctx
+            } : null,
+            stateHistory: this.stateHistory.slice(-10),
+            orphanedFlags: this.getOrphanedFlags()
+        };
+    };
+    
+    /**
+     * Get orphaned flags from session storage
+     */
+    FSMGuardSystem.prototype.getOrphanedFlags = function() {
+        var orphaned = [];
+        Object.keys(sessionStorage).forEach(function(key) {
+            if (key.indexOf('ptt_session_') === 0 && key.indexOf('_pending') !== -1) {
+                orphaned.push(key);
+            }
+        });
+        return orphaned;
+    };
+    
+    // Export to global scope
+    root.PTT_FSMGuard = new FSMGuardSystem();
+    
+    // Auto-initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            root.PTT_FSMGuard.init();
+        });
+    } else {
+        root.PTT_FSMGuard.init();
+    }
+    
+    // Add console commands for debugging
+    root.PTT_FSM_DEBUG = {
+        diagnostics: function() {
+            return root.PTT_FSMGuard.getDiagnostics();
+        },
+        reset: function() {
+            root.PTT_FSMGuard.emergencyReset();
+        },
+        recover: function() {
+            root.PTT_FSMGuard.attemptRecovery();
+        },
+        history: function() {
+            return root.PTT_FSMGuard.stateHistory;
+        }
+    };
+    
+    console.log('[FSM Guard] Debug commands available: PTT_FSM_DEBUG.diagnostics(), .reset(), .recover(), .history()');
+    
+})(window);</pre>
+        </div>
+
+        <div class="implementation-step">
+            <div class="code-header">Addition to src/Admin/Assets.php</div>
+            <pre>// Add this to the enqueueCore method after existing FSM scripts
+wp_enqueue_script( 
+    'ptt-fsm-guards', 
+    PTT_PLUGIN_URL . 'assets/js/fsm/guards/FSMGuardSystem.js', 
+    ['ptt-fsm-session-controller'], 
+    PTT_VERSION, 
+    true 
+);</pre>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🔧 Quick Fixes for Current Issues</h2>
+        
+        <div class="implementation-step">
+            <p><span class="step-number">1</span><strong>Fix the SessionFSM stuck in EDITING state:</strong></p>
+            <div class="code-header">Quick Console Fix (immediate relief)</div>
+            <pre>// Run this in browser console when stuck:
+PTT_SessionFSM.forceReset();
+
+// Or use the guard system:
+PTT_FSM_DEBUG.recover();</pre>
+        </div>
+
+        <div class="implementation-step">
+            <p><span class="step-number">2</span><strong>Add this to SessionFSM.js to prevent getting stuck:</strong></p>
+            <div class="code-header">File: assets/js/fsm/session/SessionFSM.js - Add after line 50</div>
+            <pre>// Add auto-recovery for stuck EDITING state
+SessionFSM.prototype.checkAndRecover = function() {
+    if (this.state === 'EDITING' && !this._hasMeaningfulChanges()) {
+        var now = Date.now();
+        this._lastEditCheck = this._lastEditCheck || now;
+        
+        if (now - this._lastEditCheck > 3000) {
+            console.log('[SessionFSM] Auto-recovering from stuck EDITING state');
+            this.transition('RESET');
+        }
+    } else {
+        this._lastEditCheck = Date.now();
+    }
+};
+
+// Call this periodically
+setInterval(function() {
+    if (root.PTT_SessionFSM) {
+        root.PTT_SessionFSM.checkAndRecover();
+    }
+}, 2000);</pre>
+        </div>
+
+        <div class="implementation-step">
+            <p><span class="step-number">3</span><strong>Fix the Update button getting stuck:</strong></p>
+            <div class="code-header">Add to SessionController.js after line 145</div>
+            <pre>// Add timeout protection for update operations
+jQuery(document).on('click.pttSessionUpdate', '.acf-field[data-key="field_ptt_sessions"] [data-event="update-row"]', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    var $btn = jQuery(this);
+    var updateTimeout;
+    
+    // Set a timeout to recover if update gets stuck
+    updateTimeout = setTimeout(function() {
+        console.warn('[PTT] Update operation timed out - recovering');
+        $btn.prop('disabled', false).text('Update');
+        if (sessionFSM.state === 'SAVING') {
+            sessionFSM.transition('RESET');
+        }
+    }, 10000); // 10 second timeout
+    
+    // Store timeout ID for cleanup
+    $btn.data('timeout', updateTimeout);
+    
+    // ... rest of existing code ...
+});</pre>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>✅ Testing the Guard Rails</h2>
+        
+        <div class="success">
+            <strong>After implementing the guard system, test these scenarios:</strong>
+        </div>
+        
+        <ol>
+            <li><strong>Stuck State Recovery:</strong> Click "Add Session", then click outside. The system should auto-recover within 3 seconds.</li>
+            <li><strong>Update Button Recovery:</strong> Click Update and wait. If it gets stuck, it should auto-recover within 10 seconds.</li>
+            <li><strong>Emergency Reset:</strong> Press <code>Ctrl+Shift+R</code> to trigger emergency FSM reset.</li>
+            <li><strong>Diagnostics:</strong> Open console and run <code>PTT_FSM_DEBUG.diagnostics()</code> to see current state.</li>
+        </ol>
+    </div>
+
+    <div class="section">
+        <h2>📊 Monitoring & Debugging</h2>
+        
+        <p>Use these console commands to monitor and fix issues:</p>
+        
+        <div class="code-header">Browser Console Commands</div>
+        <pre>// View current FSM states and history
+PTT_FSM_DEBUG.diagnostics()
+
+// Check for stuck states
+PTT_FSMGuard.checkForStuckStates()
+
+// Attempt automatic recovery
+PTT_FSM_DEBUG.recover()
+
+// Emergency reset (nuclear option)
+PTT_FSM_DEBUG.reset()
+
+// View state transition history
+PTT_FSM_DEBUG.history()
+
+// Check specific FSM states
+console.log('Timer:', PTT_EditorFSM.state)
+console.log('Session:', PTT_SessionFSM.state)</pre>
+    </div>
+
+    <div class="section">
+        <h2>🚀 Long-term Solution</h2>
+        
+        <div class="warning">
+            <strong>Recommendation:</strong> After stabilizing with these guard rails, consider:
+        </div>
+        
+        <ul>
+            <li><strong>Consolidate to Single FSM:</strong> Merge TimerFSM and SessionFSM into a single EditorFSM to eliminate coordination issues</li>
+            <li><strong>Use XState:</strong> Migrate to XState library for better state management and built-in guards</li>
+            <li><strong>Server-Side State:</strong> Move critical state to server with optimistic UI updates</li>
+            <li><strong>Event Sourcing:</strong> Log all state transitions server-side for debugging and recovery</li>
+        </ul>
+        
+        <div class="implementation-step">
+            <div class="code-header">Example: Simplified Single FSM Structure</div>
+            <pre>// Future consolidated EditorFSM structure
+const editorMachine = {
+    id: 'editor',
+    initial: 'idle',
+    context: {
+        taskId: null,
+        sessionIndex: null,
+        timerRunning: false,
+        hasChanges: false,
+        validationErrors: []
+    },
+    states: {
+        idle: {
+            on: {
+                CREATE_SESSION: 'creatingSession',
+                START_TIMER: 'startingTimer',
+                EDIT_SESSION: 'editing'
+            }
+        },
+        creatingSession: {
+            invoke: {
+                src: 'createSession',
+                onDone: 'idle',
+                onError: 'error'
+            }
+        },
+        editing: {
+            on: {
+                SAVE: 'saving',
+                CANCEL: 'idle',
+                START_TIMER: 'savingBeforeTimer'
+            }
+        },
+        savingBeforeTimer: {
+            invoke: {
+                src: 'autoSave',
+                onDone: 'startingTimer',
+                onError: 'editing'
+            }
+        },
+        startingTimer: {
+            invoke: {
+                src: 'startTimer',
+                onDone: 'timerRunning',
+                onError: 'error'
+            }
+        },
+        timerRunning: {
+            on: {
+                STOP_TIMER: 'stoppingTimer'
+            }
+        },
+        // ... more states
+    }
+};</pre>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🎯 Implementation Priority</h2>
+        
+        <ol>
+            <li><span class="step-number">1</span><strong>Immediate:</strong> Deploy FSMGuardSystem.js</li>
+            <li><span class="step-number">2</span><strong>Today:</strong> Add recovery methods to SessionFSM</li>
+            <li><span class="step-number">3</span><strong>This Week:</strong> Fix event handler duplications</li>
+            <li><span class="step-number">4</span><strong>Next Sprint:</strong> Complete project-fsm.md documentation</li>
+            <li><span class="step-number">5</span><strong>Future:</strong> Consider FSM consolidation or XState migration</li>
+        </ol>
+    </div>
+
+</body>
+</html>

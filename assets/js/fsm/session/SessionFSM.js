@@ -17,18 +17,56 @@
     this.debug = (opts && opts.debug) || false;
     this.timerFSM = opts.timerFSM || null; // Reference to coordinate with TimerFSM
     this.saveTimeout = null; // Track save operation timeouts
+    this._watchdogTimeout = null; // Generic watchdog for long-running ops
+    this._watchdogState = null;   // Which state the watchdog is guarding
+    this._lastIgnoredMsgAt = 0;   // Debounce for ignored-event user notices
   }
 
-  SessionFSM.prototype.log = function(){ 
-    if(this.debug && root.console){ 
-      console.log.apply(console, ['[PTT SessionFSM]'].concat([].slice.call(arguments))); 
-    } 
+
+  SessionFSM.prototype.log = function(){
+
+  // Internal: start and clear a generic watchdog for long-running states
+  SessionFSM.prototype._startWatchdog = function(state, ms, onTimeoutMsg){
+    var self = this;
+    if(this._watchdogTimeout){ clearTimeout(this._watchdogTimeout); this._watchdogTimeout = null; }
+    this._watchdogState = state;
+    this._watchdogTimeout = setTimeout(function(){
+      // Only act if still in the guarded state
+      if(self.state === state){
+        // Return to a safe state
+        if(state === 'SAVING' || state === 'VALIDATING' || state === 'AUTO_SAVING' || state === 'CREATING' || state === 'DELETING' || state === 'DUPLICATING' || state === 'REORDERING' || state === 'BULK_PROCESSING'){
+          // Prefer EDITING if we were editing, else IDLE
+          self.state = (self.ctx && (self.ctx.isDirty || self.ctx.sessionIndex !== null)) ? 'EDITING' : 'IDLE';
+          self.ctx.validationErrors = [onTimeoutMsg || 'Operation timed out. Please try again.'];
+          self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
+          self.effects.showError && self.effects.showError(self.ctx.validationErrors[0]);
+          self.log('WATCHDOG_TIMEOUT', state);
+        }
+      }
+      // Clear watchdog
+      clearTimeout(self._watchdogTimeout);
+      self._watchdogTimeout = null;
+      self._watchdogState = null;
+    }, ms || 30000); // default 30s
+  };
+
+  SessionFSM.prototype._clearWatchdog = function(){
+    if(this._watchdogTimeout){
+      clearTimeout(this._watchdogTimeout);
+      this._watchdogTimeout = null;
+      this._watchdogState = null;
+    }
+  };
+
+    if(this.debug && root.console){
+      console.log.apply(console, ['[PTT SessionFSM]'].concat([].slice.call(arguments)));
+    }
   };
 
   SessionFSM.prototype.transition = function(event, payload){
-    const s = this.state; 
+    const s = this.state;
     const e = event;
-    
+
     // State transition table
     if(s==='IDLE' && e==='CREATE_SESSION') return this._createSession(payload);
     if(s==='IDLE' && e==='EDIT_SESSION') return this._editSession(payload);
@@ -67,15 +105,32 @@
       this.effects.showError && this.effects.showError(errorMsg);
       return;
     }
-    
+
     this.log('Ignored', e, 'in', s);
+    // Guardrail C: user-friendly ignored-event message (debounced)
+    var nowTs = Date.now ? Date.now() : new Date().getTime();
+    if(!this._lastIgnoredMsgAt || (nowTs - this._lastIgnoredMsgAt) > 2000){
+      this._lastIgnoredMsgAt = nowTs;
+      var friendly = 'This action is not available right now because sessions are ' + s + '. Please wait for the current operation to finish.';
+      if(s === 'EDITING') friendly = 'Please complete or cancel your current edit before doing that.';
+      if(s === 'SAVING') friendly = 'Saving changes… Please wait a moment and retry.';
+      if(s === 'VALIDATING') friendly = 'Validating changes… Please wait a moment.';
+      if(s === 'AUTO_SAVING') friendly = 'Saving in background for timer… Please wait.';
+      this.effects && this.effects.showError && this.effects.showError(friendly);
+      // Keep ctx errors informative without hard-blocking
+      this.ctx.validationErrors = [friendly];
+      this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
+    }
   };
 
   SessionFSM.prototype._createSession = function(payload){
     this.state = 'CREATING';
     this.ctx.postId = payload.postId;
     var self = this;
-    
+
+    // Start watchdog for creating
+    this._startWatchdog('CREATING', 30000, 'Create operation timed out. Please try again.');
+
     // Check if timer is running - prevent creating new session if timer active
     if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
       this.state = 'ERROR';
@@ -86,11 +141,13 @@
     }
 
     return this.effects.createSession(payload).then(function(res){
+      self._clearWatchdog();
       self.ctx.sessionIndex = res.sessionIndex;
       self.state = 'IDLE';
       self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
       self.log('SESSION_CREATED', self.ctx);
     }).catch(function(err){
+      self._clearWatchdog();
       self.state = 'ERROR';
       self.ctx.validationErrors = [err.message || err];
       self.effects.showError && self.effects.showError(err);
@@ -116,6 +173,9 @@
     this.ctx.postId = payload.postId;
     var self = this;
 
+    // Start watchdog for deleting
+    this._startWatchdog('DELETING', 30000, 'Delete operation timed out. Please try again.');
+
     // Check if trying to delete active timer session
     if(this.timerFSM && this.timerFSM.state === 'RUNNING' &&
        this.timerFSM.ctx.sessionIndex === payload.sessionIndex){
@@ -127,6 +187,7 @@
     }
 
     return this.effects.deleteSession(payload).then(function(res){
+      self._clearWatchdog();
       self.state = 'IDLE';
       self.ctx = {
         sessionIndex: null,
@@ -171,6 +232,9 @@
     this.ctx.postId = payload.postId;
     var self = this;
 
+    // Start watchdog for duplicating
+    this._startWatchdog('DUPLICATING', 30000, 'Duplicate operation timed out. Please try again.');
+
     // Check if timer is running - prevent duplicating while timer active
     if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
       this.state = 'ERROR';
@@ -181,6 +245,7 @@
     }
 
     return this.effects.duplicateSession(payload).then(function(res){
+      self._clearWatchdog();
       self.state = 'IDLE';
       self.ctx = {
         sessionIndex: null,
@@ -225,6 +290,9 @@
     this.ctx.postId = payload.postId;
     var self = this;
 
+    // Start watchdog for reordering
+    this._startWatchdog('REORDERING', 30000, 'Reorder operation timed out. Please try again.');
+
     // Check if timer is running - prevent reordering while timer active
     if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
       this.state = 'ERROR';
@@ -235,6 +303,7 @@
     }
 
     return this.effects.reorderSession(payload).then(function(res){
+      self._clearWatchdog();
       self.state = 'IDLE';
       self.ctx = {
         sessionIndex: null,
@@ -280,6 +349,9 @@
     this.ctx.postId = payload.postId;
     var self = this;
 
+    // Start watchdog for bulk ops
+    this._startWatchdog('BULK_PROCESSING', 45000, 'Bulk operation timed out. Please try again.');
+
     // Check if timer is running - prevent bulk operations while timer active
     if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
       this.state = 'ERROR';
@@ -299,6 +371,7 @@
     }
 
     return this.effects.performBulkOperation(payload).then(function(res){
+      self._clearWatchdog();
       self.state = 'IDLE';
       self.ctx = {
         sessionIndex: null,
@@ -362,7 +435,10 @@
   SessionFSM.prototype._validateSession = function(payload){
     this.state = 'VALIDATING';
     var self = this;
-    
+
+    // Start watchdog for validating
+    this._startWatchdog('VALIDATING', 20000, 'Validation took too long. Please try again.');
+
     return this.effects.validateSession(this.ctx).then(function(result){
       if(result.valid){
         self.transition('VALIDATION_PASSED', result);
@@ -375,6 +451,7 @@
   };
 
   SessionFSM.prototype._validationPassed = function(payload){
+    this._clearWatchdog();
     this.state = 'EDITING';
     this.ctx.validationErrors = [];
     this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
@@ -382,6 +459,7 @@
   };
 
   SessionFSM.prototype._validationFailed = function(payload){
+    this._clearWatchdog();
     this.state = 'EDITING';
     this.ctx.validationErrors = payload.errors || [];
     this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
@@ -395,6 +473,9 @@
     this.ctx.autoSaveReason = 'timer_start';
     this.ctx.timerPayload = payload; // Store timer payload for after save
     var self = this;
+
+    // Start watchdog for auto-save
+    this._startWatchdog('AUTO_SAVING', 20000, 'Auto-save took too long. Please try again.');
 
     // Clear any existing timeout
     if(this.saveTimeout){
@@ -433,6 +514,7 @@
       clearTimeout(this.saveTimeout);
       this.saveTimeout = null;
     }
+    this._clearWatchdog();
 
     this.state = 'IDLE';
     this.ctx.isDirty = false;
@@ -454,6 +536,7 @@
       clearTimeout(this.saveTimeout);
       this.saveTimeout = null;
     }
+    this._clearWatchdog();
 
     this.state = 'EDITING';
     this.ctx.validationErrors = [payload.message || payload];
@@ -482,6 +565,9 @@
     this.state = 'SAVING';
     var self = this;
 
+    // Start watchdog for saving
+    this._startWatchdog('SAVING', 30000, 'Save operation timed out. Please try again.');
+
     // Clear any existing timeout
     if(this.saveTimeout){
       clearTimeout(this.saveTimeout);
@@ -504,6 +590,7 @@
         clearTimeout(self.saveTimeout);
         self.saveTimeout = null;
       }
+      self._clearWatchdog();
       self.ctx.isDirty = false;
       self.ctx.pendingChanges = {};
       self.state = 'IDLE';
@@ -515,6 +602,7 @@
         clearTimeout(self.saveTimeout);
         self.saveTimeout = null;
       }
+      self._clearWatchdog();
 
       // Always return to EDITING state on save failure, not ERROR
       self.state = 'EDITING';
@@ -774,6 +862,6 @@
     return true;
   };
 
-  root.PTT = root.PTT || {}; 
+  root.PTT = root.PTT || {};
   root.PTT.SessionFSM = SessionFSM;
 })(window);
