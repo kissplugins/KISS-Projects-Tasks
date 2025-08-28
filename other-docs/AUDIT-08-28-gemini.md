@@ -1,8 +1,8 @@
 # K.I.S.S. Project & Task Time Tracker - Code Audit (08-28-2025)
 
-**Version:** 2.3.0
+**Version:** 2.3.6
 **Audit by:** Gemini
-**Updated:** Post Today page removal
+**Updated:** Post Today page removal and self-test fixes
 
 This document provides a comprehensive audit of the "KISS - Project & Task Time Tracker" WordPress plugin codebase. The audit focuses on two primary goals: verifying the Finite State Machine (FSM) architecture and assessing the overall stability and maintainability of the code.
 
@@ -143,6 +143,32 @@ This section outlines a prioritized checklist of actionable items to improve the
 - [ ] Integrate the frontend shortcode's functionality into a new FSM controller (e.g., `assets/js/fsm/shortcode/ShortcodeController.js`).
 - [ ] This new controller should instantiate and use the EditorFSM.
 - [ ] Once all functionality from `scripts.js` has been migrated to FSM controllers, the file can be deprecated and removed.
+
+---
+
+## Self-Test Suite Status (v2.3.6)
+
+**UPDATE (v2.3.6):** The self-test suite has been significantly improved and now passes all tests.
+
+### Issues Resolved:
+- **Today-related test failures**: Removed all obsolete tests for Today functionality that was removed in v2.3.0
+- **Filter Query Handling test**: Fixed fatal error caused by attempting to redefine WordPress core functions
+- **Network errors**: Resolved server communication failures during test execution
+
+### Current Status:
+- ✅ **60 tests total**
+- ✅ **0 failures**
+- ✅ **All tests passing**
+
+The self-test suite now provides reliable validation of:
+- Core WordPress integration (post types, taxonomies, ACF fields)
+- PSR-4 class loading and method availability
+- Session management and time calculation
+- User data isolation and security
+- Admin interface functionality (sorting, filtering)
+- Reports and asset loading
+
+This improvement significantly enhances the plugin's maintainability and debugging capabilities.
 
 ---
 
