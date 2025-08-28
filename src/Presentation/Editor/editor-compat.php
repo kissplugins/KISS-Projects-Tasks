@@ -24,21 +24,30 @@ class EditorCompat
         }
 
         $userId = get_current_user_id();
+        error_log("PTT DEBUG: getActiveSessionForUser called for user ID: $userId");
+
         if (!$userId || !function_exists('ptt_get_active_session_index_for_user')) {
+            error_log("PTT DEBUG: No user ID or function not available");
             wp_send_json_success(['running' => false]);
         }
 
         $active = ptt_get_active_session_index_for_user($userId);
+        error_log("PTT DEBUG: Active session result: " . print_r($active, true));
+
         if (!$active || empty($active['post_id'])) {
+            error_log("PTT DEBUG: No active session found");
             wp_send_json_success(['running' => false]);
         }
 
         $postId = (int) $active['post_id'];
         $index0 = (int) $active['index'];
         $sessions = function_exists('get_field') ? get_field('sessions', $postId) : [];
+        error_log("PTT DEBUG: Sessions for post $postId: " . print_r($sessions, true));
+
         $start = '';
         if (is_array($sessions) && isset($sessions[$index0])) {
             $start = $sessions[$index0]['session_start_time'] ?? '';
+            error_log("PTT DEBUG: Found session at index $index0 with start time: $start");
         }
 
         wp_send_json_success([

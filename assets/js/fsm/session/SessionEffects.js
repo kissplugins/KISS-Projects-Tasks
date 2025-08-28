@@ -140,19 +140,144 @@
     });
   };
 
+  // Auto-save post for timer start (FSM-centric)
+  SessionEffects.prototype.autoSavePost = function(ctx){
+    return new Promise(function(resolve, reject){
+      try {
+        var $saveButton = jQuery('#publish, #save-post');
+        var $form = jQuery('#post');
+
+        // Check if there are unsaved changes
+        var hasUnsavedChanges = false;
+
+        // Check if WordPress thinks there are unsaved changes
+        if(window.wp && window.wp.autosave && window.wp.autosave.server && window.wp.autosave.server.postChanged){
+          hasUnsavedChanges = window.wp.autosave.server.postChanged();
+        }
+
+        // Check if ACF has unsaved changes
+        if(window.acf && typeof window.acf.validation === 'object'){
+          var $acfForm = jQuery('.acf-form, #post');
+          if($acfForm.length && $acfForm.hasClass('acf-form-changed')){
+            hasUnsavedChanges = true;
+          }
+        }
+
+        // Check for any changed inputs
+        if(!hasUnsavedChanges){
+          var $changedInputs = jQuery('#post input[data-changed="1"], #post textarea[data-changed="1"], #post select[data-changed="1"]');
+          hasUnsavedChanges = $changedInputs.length > 0;
+        }
+
+        if(!hasUnsavedChanges){
+          // No changes to save, proceed immediately
+          resolve({ saved: false, reason: 'no_changes' });
+          return;
+        }
+
+        if($saveButton.length && $saveButton.is(':enabled') && !$saveButton.hasClass('disabled')){
+          // Set up one-time listener for save completion
+          var saveCompleted = false;
+          var timeoutId = setTimeout(function(){
+            if(!saveCompleted){
+              saveCompleted = true;
+              resolve({ saved: true, reason: 'timeout' });
+            }
+          }, 5000); // 5 second timeout
+
+          // Listen for ACF save success
+          if(window.acf && typeof window.acf.addAction === 'function'){
+            var actionAdded = false;
+            window.acf.addAction('submit_success', function(){
+              if(!saveCompleted && !actionAdded){
+                actionAdded = true;
+                saveCompleted = true;
+                clearTimeout(timeoutId);
+                resolve({ saved: true, reason: 'acf_success' });
+              }
+            });
+          }
+
+          // Listen for WordPress save events
+          $form.one('submit.pttAutoSave', function(){
+            if(!saveCompleted){
+              setTimeout(function(){
+                if(!saveCompleted){
+                  saveCompleted = true;
+                  clearTimeout(timeoutId);
+                  resolve({ saved: true, reason: 'wp_submit' });
+                }
+              }, 1000);
+            }
+          });
+
+          // Set flag to track save completion
+          sessionStorage.setItem('ptt_session_autosave_pending', '1');
+
+          // Trigger the save
+          $saveButton.trigger('click');
+        } else {
+          // Save button not available, proceed anyway but warn
+          console.warn('[PTT] Auto-save requested but save button not available');
+          resolve({ saved: false, reason: 'no_save_button' });
+        }
+      } catch(err) {
+        reject(err);
+      }
+    });
+  };
+
   // Save session (trigger WordPress save)
   SessionEffects.prototype.saveSession = function(ctx){
     return new Promise(function(resolve, reject){
       try {
         // Trigger WordPress post save
         var $saveButton = jQuery('#publish');
-        if($saveButton.length && $saveButton.is(':enabled')){
+        var $form = jQuery('#post');
+
+        if($saveButton.length && $saveButton.is(':enabled') && !$saveButton.hasClass('disabled')){
+          // Set up one-time listener for save completion
+          var saveCompleted = false;
+          var timeoutId = setTimeout(function(){
+            if(!saveCompleted){
+              saveCompleted = true;
+              reject(new Error('Save operation timed out'));
+            }
+          }, 30000); // 30 second timeout to match SessionFSM timeout
+
+          // Listen for ACF save success
+          if(window.acf && typeof window.acf.addAction === 'function'){
+            var actionAdded = false;
+            window.acf.addAction('submit_success', function(){
+              if(!saveCompleted && !actionAdded){
+                actionAdded = true;
+                saveCompleted = true;
+                clearTimeout(timeoutId);
+                resolve({ saved: true, reason: 'acf_success' });
+              }
+            });
+          }
+
+          // Listen for WordPress save events
+          $form.one('submit.pttSessionSave', function(){
+            if(!saveCompleted){
+              setTimeout(function(){
+                if(!saveCompleted){
+                  saveCompleted = true;
+                  clearTimeout(timeoutId);
+                  resolve({ saved: true, reason: 'wp_submit' });
+                }
+              }, 1000);
+            }
+          });
+
           // Set flag to track save completion
           sessionStorage.setItem('ptt_session_save_pending', '1');
+
+          // Trigger the save
           $saveButton.trigger('click');
-          resolve({ saved: true });
         } else {
-          reject(new Error('Save button not available'));
+          reject(new Error('Save button not available or disabled'));
         }
       } catch(err) {
         reject(err);
@@ -640,7 +765,23 @@
   // Update session UI based on FSM state
   SessionEffects.prototype.updateSessionUI = function(state, ctx){
     var $rows = this.getSessionRows();
-    
+
+    // Handle AUTO_SAVING state for timer start
+    if(state === 'AUTO_SAVING'){
+      $rows.each(function(){
+        var $row = jQuery(this);
+        var $updateBtn = $row.find('.acf-button[data-event="update-row"]');
+        var $startBtn = $row.find('.ptt-session-start');
+        if($updateBtn.length){
+          $updateBtn.prop('disabled', true).text('Auto-saving...');
+        }
+        if($startBtn.length){
+          $startBtn.prop('disabled', true).text('Auto-saving...');
+        }
+      });
+      return;
+    }
+
     // Update specific session row if we have an index
     if(ctx.sessionIndex !== null && ctx.sessionIndex >= 0){
       var $row = $rows.eq(ctx.sessionIndex);
@@ -774,6 +915,13 @@
 
   // Ensure selection checkbox exists in session row
   SessionEffects.prototype.ensureSelectionCheckbox = function($row){
+    // Check if bulk actions are enabled via settings
+    if(!window.PTT_BULK_ACTIONS_ENABLED) {
+      // Remove selection checkboxes if they exist but bulk actions are disabled
+      $row.find('.ptt-session-select').remove();
+      return;
+    }
+
     if($row.find('.ptt-session-select').length) return; // Already exists
 
     // Find the row handle area
@@ -791,6 +939,13 @@
   SessionEffects.prototype.ensureBulkOperationsUI = function(){
     var $sessionsField = jQuery('.acf-field[data-key="field_ptt_sessions"]');
     if(!$sessionsField.length) return;
+
+    // Check if bulk actions are enabled via settings
+    if(!window.PTT_BULK_ACTIONS_ENABLED) {
+      // Remove bulk operations UI if it exists but is disabled
+      $sessionsField.find('.ptt-bulk-operations').remove();
+      return;
+    }
 
     if($sessionsField.find('.ptt-bulk-operations').length) return; // Already exists
 

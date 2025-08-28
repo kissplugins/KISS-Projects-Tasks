@@ -36,22 +36,30 @@ class Helpers
     public static function getActiveSessionIndexForUser(int $userId)
     {
         if (!$userId) {
+            error_log("PTT DEBUG: getActiveSessionIndexForUser - No user ID provided");
             return false;
         }
 
         if (!function_exists('get_field')) {
+            error_log("PTT DEBUG: getActiveSessionIndexForUser - get_field function not available");
             return false;
         }
 
         // Get tasks assigned to user
         $taskIds = self::getTasksForUser($userId);
+        error_log("PTT DEBUG: getActiveSessionIndexForUser - Task IDs for user $userId: " . print_r($taskIds, true));
+
         if (empty($taskIds)) {
+            error_log("PTT DEBUG: getActiveSessionIndexForUser - No tasks found for user");
             return false;
         }
 
         foreach ($taskIds as $taskId) {
             $sessions = get_field('sessions', $taskId);
+            error_log("PTT DEBUG: getActiveSessionIndexForUser - Sessions for task $taskId: " . print_r($sessions, true));
+
             if (empty($sessions) || !is_array($sessions)) {
+                error_log("PTT DEBUG: getActiveSessionIndexForUser - No sessions or not array for task $taskId");
                 continue;
             }
 
@@ -60,7 +68,10 @@ class Helpers
                 $hasStop = !empty($session['session_stop_time']);
                 $isRunning = $hasStart && !$hasStop;
 
+                error_log("PTT DEBUG: getActiveSessionIndexForUser - Task $taskId, Session $idx: start=" . ($session['session_start_time'] ?? 'empty') . ", stop=" . ($session['session_stop_time'] ?? 'empty') . ", running=" . ($isRunning ? 'true' : 'false'));
+
                 if ($isRunning) {
+                    error_log("PTT DEBUG: getActiveSessionIndexForUser - Found running session: task $taskId, index $idx");
                     return [
                         'post_id' => (int) $taskId,
                         'index' => (int) $idx
@@ -69,6 +80,7 @@ class Helpers
             }
         }
 
+        error_log("PTT DEBUG: getActiveSessionIndexForUser - No running sessions found");
         return false;
     }
 

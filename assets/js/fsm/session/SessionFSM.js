@@ -1,21 +1,22 @@
 (function(root){
   /**
    * SessionFSM - Manages session lifecycle for CPT Task Editor
-   * States: IDLE, CREATING, EDITING, VALIDATING, SAVING, ERROR
-   * Coordinates with TimerFSM to prevent conflicts
+   * States: IDLE, CREATING, EDITING, VALIDATING, SAVING, AUTO_SAVING, ERROR
+   * Coordinates with TimerFSM to prevent conflicts and handle auto-save before timer start
    */
   function SessionFSM(effects, opts){
     this.effects = effects || {};
     this.state = 'IDLE';
-    this.ctx = { 
-      sessionIndex: null, 
-      postId: null, 
-      isDirty: false, 
+    this.ctx = {
+      sessionIndex: null,
+      postId: null,
+      isDirty: false,
       validationErrors: [],
       pendingChanges: {}
     };
     this.debug = (opts && opts.debug) || false;
     this.timerFSM = opts.timerFSM || null; // Reference to coordinate with TimerFSM
+    this.saveTimeout = null; // Track save operation timeouts
   }
 
   SessionFSM.prototype.log = function(){ 
@@ -46,6 +47,10 @@
     if(s==='EDITING' && e==='FIELD_CHANGED') return this._fieldChanged(payload);
     if(s==='EDITING' && e==='VALIDATE_SESSION') return this._validateSession(payload);
     if(s==='EDITING' && e==='SAVE_SESSION') return this._saveSession(payload);
+    if(s==='EDITING' && e==='AUTO_SAVE_FOR_TIMER') return this._autoSaveForTimer(payload);
+    if(s==='EDITING' && e==='AUTO_IDLE') return this._autoIdle(payload);
+    if(s==='AUTO_SAVING' && e==='AUTO_SAVE_COMPLETE') return this._autoSaveComplete(payload);
+    if(s==='AUTO_SAVING' && e==='AUTO_SAVE_FAILED') return this._autoSaveFailed(payload);
     if(s==='DELETING' && e==='SESSION_DELETED') return this._sessionDeleted(payload);
     if(s==='DELETING' && e==='DELETE_FAILED') return this._deleteFailed(payload);
     if(s==='VALIDATING' && e==='VALIDATION_PASSED') return this._validationPassed(payload);
@@ -54,7 +59,14 @@
     if(s==='SAVING' && e==='SAVE_FAILED') return this._saveFailed(payload);
     if(s==='ERROR' && e==='RETRY') return this._retry(payload);
     if(s==='ERROR' && e==='RESET') return this._reset();
-    if(e==='SESSION_ERROR') { this.state='ERROR'; this.log('ERROR', payload); return; }
+    if(e==='SESSION_ERROR') {
+      this.state='ERROR';
+      var errorMsg = payload && payload.message ? payload.message : (typeof payload === 'string' ? payload : 'Unknown error');
+      this.ctx.validationErrors = [errorMsg];
+      this.log('ERROR', errorMsg);
+      this.effects.showError && this.effects.showError(errorMsg);
+      return;
+    }
     
     this.log('Ignored', e, 'in', s);
   };
@@ -327,10 +339,10 @@
 
   SessionFSM.prototype._fieldChanged = function(payload){
     if(this.state !== 'EDITING') return;
-    
+
     this.ctx.isDirty = true;
     this.ctx.pendingChanges[payload.field] = payload.value;
-    
+
     // Real-time validation for certain fields
     if(payload.field === 'session_title' && !payload.value.trim()){
       this.ctx.validationErrors = ['Session title is required'];
@@ -339,9 +351,12 @@
     } else {
       this.ctx.validationErrors = [];
     }
-    
+
     this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
     this.log('FIELD_CHANGED', payload.field, payload.value);
+
+    // Auto-transition back to IDLE if no meaningful changes
+    this._checkAutoIdle();
   };
 
   SessionFSM.prototype._validateSession = function(payload){
@@ -374,21 +389,144 @@
     this.log('VALIDATION_FAILED', this.ctx.validationErrors);
   };
 
+  // Auto-save for timer start - FSM-centric approach
+  SessionFSM.prototype._autoSaveForTimer = function(payload){
+    this.state = 'AUTO_SAVING';
+    this.ctx.autoSaveReason = 'timer_start';
+    this.ctx.timerPayload = payload; // Store timer payload for after save
+    var self = this;
+
+    // Clear any existing timeout
+    if(this.saveTimeout){
+      clearTimeout(this.saveTimeout);
+    }
+
+    // Set a timeout for auto-save
+    this.saveTimeout = setTimeout(function(){
+      if(self.state === 'AUTO_SAVING'){
+        self.state = 'EDITING';
+        self.ctx.validationErrors = ['Auto-save timed out. Please try again.'];
+        self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
+        self.effects.showError && self.effects.showError('Auto-save timed out');
+        self.log('AUTO_SAVE_TIMEOUT');
+
+        // Notify TimerFSM that auto-save failed
+        if(self.timerFSM){
+          self.timerFSM.transition('START_FAILED', new Error('Auto-save failed'));
+        }
+      }
+    }, 10000); // 10 second timeout for auto-save
+
+    this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
+    this.log('AUTO_SAVE_STARTING', 'for timer start');
+
+    return this.effects.autoSavePost(this.ctx).then(function(result){
+      self.transition('AUTO_SAVE_COMPLETE', result);
+    }).catch(function(err){
+      self.transition('AUTO_SAVE_FAILED', err);
+    });
+  };
+
+  SessionFSM.prototype._autoSaveComplete = function(payload){
+    // Clear timeout on successful auto-save
+    if(this.saveTimeout){
+      clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+    }
+
+    this.state = 'IDLE';
+    this.ctx.isDirty = false;
+    this.ctx.pendingChanges = {};
+    this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
+    this.log('AUTO_SAVE_COMPLETE', payload);
+
+    // Now proceed with timer start through TimerFSM
+    if(this.timerFSM && this.ctx.timerPayload){
+      var timerPayload = this.ctx.timerPayload;
+      this.ctx.timerPayload = null; // Clear stored payload
+      this.timerFSM.transition('START_TIMER', timerPayload);
+    }
+  };
+
+  SessionFSM.prototype._autoSaveFailed = function(payload){
+    // Clear timeout on auto-save failure
+    if(this.saveTimeout){
+      clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+    }
+
+    this.state = 'EDITING';
+    this.ctx.validationErrors = [payload.message || payload];
+    this.effects.updateSessionUI && self.effects.updateSessionUI(this.state, this.ctx);
+    this.effects.showError && this.effects.showError('Auto-save failed: ' + (payload.message || payload));
+    this.log('AUTO_SAVE_FAILED', payload);
+
+    // Notify TimerFSM that auto-save failed
+    if(this.timerFSM){
+      this.timerFSM.transition('START_FAILED', payload);
+    }
+  };
+
   SessionFSM.prototype._saveSession = function(payload){
+    // Pre-save validation to prevent getting stuck
+    var validationError = this.getValidationError('save sessions');
+    if(validationError){
+      this.state = 'EDITING'; // Stay in editing state
+      this.ctx.validationErrors = [validationError];
+      this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
+      this.effects.showError && this.effects.showError(validationError);
+      this.log('SAVE_BLOCKED', validationError);
+      return Promise.reject(new Error(validationError));
+    }
+
     this.state = 'SAVING';
     var self = this;
-    
+
+    // Clear any existing timeout
+    if(this.saveTimeout){
+      clearTimeout(this.saveTimeout);
+    }
+
+    // Set a timeout to prevent indefinite "Updating..." state
+    this.saveTimeout = setTimeout(function(){
+      if(self.state === 'SAVING'){
+        self.state = 'EDITING';
+        self.ctx.validationErrors = ['Save operation timed out. Please try again.'];
+        self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
+        self.effects.showError && self.effects.showError('Save operation timed out');
+        self.log('SAVE_TIMEOUT');
+      }
+    }, 30000); // 30 second timeout
+
     return this.effects.saveSession(this.ctx).then(function(result){
+      // Clear timeout on successful save
+      if(self.saveTimeout){
+        clearTimeout(self.saveTimeout);
+        self.saveTimeout = null;
+      }
       self.ctx.isDirty = false;
       self.ctx.pendingChanges = {};
       self.state = 'IDLE';
       self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
       self.log('SESSION_SAVED', result);
     }).catch(function(err){
-      self.state = 'ERROR';
+      // Clear timeout on save failure
+      if(self.saveTimeout){
+        clearTimeout(self.saveTimeout);
+        self.saveTimeout = null;
+      }
+
+      // Always return to EDITING state on save failure, not ERROR
+      self.state = 'EDITING';
       self.ctx.validationErrors = [err.message || err];
+      self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
       self.effects.showError && self.effects.showError(err);
       self.log('SAVE_FAILED', err);
+
+      // Ensure UI is properly updated to remove "Updating..." state
+      setTimeout(function(){
+        self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
+      }, 100);
     });
   };
 
@@ -400,11 +538,21 @@
   };
 
   SessionFSM.prototype._reset = function(){
+    // Clear any pending timeouts
+    if(this.saveTimeout){
+      clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+    }
+    if(this._autoIdleTimeout){
+      clearTimeout(this._autoIdleTimeout);
+      this._autoIdleTimeout = null;
+    }
+
     this.state = 'IDLE';
-    this.ctx = { 
-      sessionIndex: null, 
-      postId: null, 
-      isDirty: false, 
+    this.ctx = {
+      sessionIndex: null,
+      postId: null,
+      isDirty: false,
       validationErrors: [],
       pendingChanges: {}
     };
@@ -412,9 +560,147 @@
     this.log('RESET');
   };
 
+  // Emergency recovery method for stuck states
+  SessionFSM.prototype.forceReset = function(){
+    // Clear any pending timeouts
+    if(this.saveTimeout){
+      clearTimeout(this.saveTimeout);
+      this.saveTimeout = null;
+    }
+    if(this._autoIdleTimeout){
+      clearTimeout(this._autoIdleTimeout);
+      this._autoIdleTimeout = null;
+    }
+
+    this.log('FORCE_RESET', 'Emergency recovery from stuck state:', this.state);
+    this.transition('RESET');
+
+    // Force UI update for all sessions
+    var self = this;
+    setTimeout(function(){
+      // Remove any stuck "Updating..." buttons
+      jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-button[disabled]').prop('disabled', false).text('Update');
+
+      // Update all session UIs
+      self.effects.updateSessionUI && self.effects.updateSessionUI(self.state, self.ctx);
+    }, 100);
+
+    return 'SessionFSM has been reset. You can now try your operation again.';
+  };
+
+  // Auto-transition to IDLE when no meaningful changes exist
+  SessionFSM.prototype._checkAutoIdle = function(){
+    var self = this;
+
+    // Debounce the check to avoid rapid state changes
+    if(this._autoIdleTimeout){
+      clearTimeout(this._autoIdleTimeout);
+    }
+
+    this._autoIdleTimeout = setTimeout(function(){
+      // Only auto-transition if we're still in EDITING state and have no meaningful changes
+      if(self.state === 'EDITING' && !self._hasMeaningfulChanges()){
+        self.transition('AUTO_IDLE');
+      }
+    }, 1000); // 1 second debounce
+  };
+
+  SessionFSM.prototype._autoIdle = function(payload){
+    this.state = 'IDLE';
+    this.ctx.isDirty = false;
+    this.ctx.pendingChanges = {};
+    this.ctx.sessionIndex = null;
+    this.ctx.validationErrors = [];
+    this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
+    this.log('AUTO_IDLE', 'Automatically returned to IDLE - no meaningful changes');
+  };
+
+  // Check if there are meaningful changes that warrant staying in EDITING state
+  SessionFSM.prototype._hasMeaningfulChanges = function(){
+    // If explicitly marked as dirty, we have changes
+    if(this.ctx.isDirty && Object.keys(this.ctx.pendingChanges).length > 0){
+      // Check if any pending changes are non-empty/meaningful
+      for(var field in this.ctx.pendingChanges){
+        var value = this.ctx.pendingChanges[field];
+        if(value !== null && value !== undefined && value !== ''){
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
   // Helper methods
   SessionFSM.prototype.canCreateSession = function(){
     return this.state === 'IDLE' && (!this.timerFSM || this.timerFSM.state !== 'RUNNING');
+  };
+
+  // Enhanced validation with descriptive error messages
+  SessionFSM.prototype.getValidationError = function(action){
+    // Check if user is assignee of this task
+    var currentUserId = this._getCurrentUserId();
+    var taskAssigneeId = this._getTaskAssigneeId();
+
+    if(currentUserId && taskAssigneeId && currentUserId !== taskAssigneeId){
+      return 'You are not the assignee of this task, so you cannot ' + action + '.';
+    }
+
+    // Check timer state with specific messages
+    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+      switch(action){
+        case 'create sessions':
+          return 'You already have a timer running. Stop the current timer before creating new sessions.';
+        case 'delete sessions':
+          return 'You cannot delete sessions while a timer is running. Stop the timer first.';
+        case 'duplicate sessions':
+          return 'You cannot duplicate sessions while a timer is running. Stop the timer first.';
+        case 'reorder sessions':
+          return 'You cannot reorder sessions while a timer is running. Stop the timer first.';
+        case 'perform bulk operations':
+          return 'You cannot perform bulk operations while a timer is running. Stop the timer first.';
+        default:
+          return 'You cannot ' + action + ' while a timer is running. Stop the timer first.';
+      }
+    }
+
+    // Check FSM state
+    if(this.state !== 'IDLE'){
+      return 'Session system is busy (' + this.state + '). Please wait and try again.';
+    }
+
+    return null; // No error
+  };
+
+  // Helper to get current user ID from page context
+  SessionFSM.prototype._getCurrentUserId = function(){
+    // Try to get from global WordPress admin context
+    if(window.userSettings && window.userSettings.uid){
+      return parseInt(window.userSettings.uid, 10);
+    }
+    // Try to get from PTT global if available
+    if(window.ptt_ajax_object && window.ptt_ajax_object.current_user_id){
+      return parseInt(window.ptt_ajax_object.current_user_id, 10);
+    }
+    return null;
+  };
+
+  // Helper to get task assignee ID from page context
+  SessionFSM.prototype._getTaskAssigneeId = function(){
+    // Try to get from ACF field if available
+    var $assigneeField = jQuery('[data-key="field_ptt_assignee"] select, [data-key="field_ptt_assignee"] input[type="hidden"]');
+    if($assigneeField.length){
+      var assigneeId = $assigneeField.val();
+      return assigneeId ? parseInt(assigneeId, 10) : null;
+    }
+
+    // Try to get from meta box if available
+    var $metaAssignee = jQuery('#ptt_assignee, input[name="ptt_assignee"]');
+    if($metaAssignee.length){
+      var assigneeId = $metaAssignee.val();
+      return assigneeId ? parseInt(assigneeId, 10) : null;
+    }
+
+    return null;
   };
 
   SessionFSM.prototype.canEditSession = function(){
@@ -426,7 +712,17 @@
   };
 
   SessionFSM.prototype.hasUnsavedChanges = function(){
-    return this.ctx.isDirty;
+    // Check if SessionFSM has unsaved changes
+    if(this.ctx.isDirty) return true;
+
+    // Check if WordPress indicates the post is dirty (more reliable than manual checks)
+    if(typeof wp !== 'undefined' && wp.autosave && wp.autosave.server && wp.autosave.server.postChanged){
+      return wp.autosave.server.postChanged();
+    }
+
+    // For new posts, only intercept if we have actual SessionFSM changes
+    // Let WordPress handle normal publish flow for new posts with just title/content
+    return false;
   };
 
   SessionFSM.prototype.canDeleteSession = function(sessionIndex){

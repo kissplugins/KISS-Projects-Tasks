@@ -1,6 +1,130 @@
 # Changelog
 
-## Version 2.2.50 - Phase 2: Bulk Session Operations Complete
+## Version 2.2.66 - Fix SessionFSM Stuck in EDITING State
+- **CRITICAL FIX**: Fixed SessionFSM getting stuck in EDITING state when clicking "Add Session" button
+- **Enhanced**: Added auto-reset logic to detect when FSM is stuck in EDITING with no meaningful changes
+- **Improved**: Added click-outside-session-fields handler to auto-transition back to IDLE state
+- **Fixed**: "Session system is busy (EDITING)" error now automatically resolves when appropriate
+- **Robust**: SessionFSM now has better recovery mechanisms to prevent getting stuck in intermediate states
+
+## Version 2.2.65 - Route Update Button Through FSM
+- **CRITICAL FIX**: Added missing event handler for ACF "Update" button to route through SessionFSM instead of bypassing it
+- **Enhanced**: Update button now properly goes through EDIT_SESSION → VALIDATE_SESSION → SAVE_SESSION FSM flow
+- **Improved**: Update button now respects FSM validation and state management like other session operations
+- **Fixed**: Update button operations are now properly tracked and managed by the FSM system
+- **Consistent**: All session operations (add, update, delete, duplicate, reorder) now go through FSM
+
+## Version 2.2.64 - Fix Session Update Button Save Completion
+- **CRITICAL FIX**: Fixed "Update" button getting stuck in "Updating..." state and triggering "Session system is busy (EDITING)" errors
+- **Enhanced**: SessionEffects.saveSession() now properly waits for save completion like autoSavePost() does
+- **Improved**: Added proper timeout handling (30 seconds) and ACF/WordPress save event listeners to saveSession()
+- **Fixed**: Session FSM no longer gets stuck in EDITING state when save operations don't complete properly
+- **Resolved**: Update button now correctly transitions from SAVING back to IDLE state after successful save
+
+## Version 2.2.63 - Restore Safe Auto-Save Features
+- **Restored**: Safe auto-save after timer start/stop - now only triggers when WordPress detects unsaved changes
+- **Restored**: Safe auto-save when adding session rows - now only triggers when WordPress detects unsaved changes
+- **Enhanced**: Added `ptt-saving` CSS class to prevent duplicate save triggers during auto-save operations
+- **Improved**: Auto-save logic now uses `window.wp.autosave.server.postChanged()` to detect actual unsaved changes
+- **Documented**: Added deferred fixes section to PROJECT-FSM.md for ACF auto-reload and session update button features
+- **Safe**: Auto-save only occurs when there are genuine unsaved changes, preventing unnecessary saves
+
+## Version 2.2.62 - Fix Publish Button Conflicts
+- **CRITICAL FIX**: Disabled multiple automatic save triggers that were causing publish conflicts
+- Disabled auto-save after timer start/stop to prevent draft status override
+- Disabled auto-save when adding session rows to prevent interference
+- Disabled ACF auto-reload after save that was causing page refresh issues
+- Disabled session update button auto-save trigger
+- These changes should resolve the issue where posts appear to publish but revert to draft status
+
+## Version 2.2.61 - Fix Publish Button Interception Issue
+Released: 2025-08-27
+- **Fixed**: Critical issue where SessionFSM was intercepting and preventing normal WordPress publish button clicks
+- **Resolved**: New posts with titles were being saved as drafts instead of published due to overly aggressive unsaved changes detection
+- **Enhanced**: SessionFSM.hasUnsavedChanges() now only intercepts when there are actual SessionFSM changes, allowing normal WordPress publish flow
+- **Improved**: Posts can now be properly published without SessionFSM interference when only title/content changes exist
+
+## Version 2.2.60 - SessionFSM Auto-Idle Fix
+Released: 2025-08-27
+- **Fixed**: Critical issue where SessionFSM got stuck in EDITING state, preventing new session creation
+- **Enhanced**: Added auto-idle mechanism that transitions back to IDLE when no meaningful changes exist
+- **Improved**: SessionFSM now automatically returns to IDLE state after 1 second of inactivity with no pending changes
+- **Resolved**: "Session system is busy (EDITING). Please wait and try again" error when trying to add sessions
+
+## Version 2.2.59 - SessionFSM Promise Handling Fix
+Released: 2025-08-27
+- **Fixed**: TypeError in SessionController when calling transition('VALIDATE_SESSION').then() - added proper Promise handling and state checking
+- **Enhanced**: Save operation now properly handles FSM state transitions without Promise errors
+
+## Version 2.2.58 - Auto-Save Detection Fix for New Posts
+Released: 2025-08-27
+- **Fixed**: Critical issue where new posts weren't being saved when starting timers
+- **Enhanced**: SessionFSM.hasUnsavedChanges() now detects when main post fields (title, content) need saving
+- **Improved**: Timer start now properly triggers auto-save for new posts with content, preventing "Auto Draft" issues
+- **Resolved**: Posts with titles/descriptions are now fully saved when timer is started, not just session data
+
+## Version 2.2.57 - Timer UI State Fix
+Released: 2025-08-27
+- **Fixed**: Critical timer UI bug where RUNNING state was immediately overwritten by IDLE logic
+- **Enhanced**: Added proper return statement in updateTimerUI to prevent state conflicts
+- **Improved**: Timer now correctly shows "Stop Timer" button when FSM is in RUNNING state
+- **Resolved**: UI now properly reflects FSM state without interference from subsequent processing
+
+## Version 2.2.56 - Timer Persistence Debug & Fix
+Released: 2025-08-27
+- **Fixed**: Timer persistence across page reloads - enhanced rehydration logic with proper error handling
+- **Enhanced**: Added comprehensive debugging to rehydration process for troubleshooting timer state restoration
+- **Improved**: FSM rehydration now properly updates UI state after successful restoration
+- **Debug**: Added console logging to track rehydration flow and identify persistence issues
+
+## Version 2.2.55 - FSM Timer UI Constraints
+Released: 2025-08-27
+- **Fixed**: FSM-centric session timer constraints to prevent multiple "Start Timer" buttons
+- **Enhanced**: Only the next available session can show an active "Start Timer" button, preventing user confusion
+- **Improved**: Sequential session logic - sessions must be completed in order with clear messaging
+- **Refined**: Timer target selection uses consistent FSM logic between UI and startTimer method
+
+## Version 2.2.54 - FSM-Centric Auto-Save Architecture
+Released: 2025-08-27
+- **Architecture**: Moved auto-save logic from Effects layer to FSM coordination
+- **Enhanced**: Added AUTO_SAVING state to SessionFSM for proper state management
+- **Improved**: TimerFSM now coordinates with SessionFSM for auto-save before timer start
+- **FSM-Centric**: Auto-save is now a proper FSM transition, not just an effect
+- **Coordination**: Bidirectional FSM communication between TimerFSM and SessionFSM
+- **UX**: Better state management with "Auto-saving..." feedback during the process
+- **Technical**: Cleaner separation of concerns - SessionFSM handles saves, TimerFSM handles timers
+
+## Version 2.2.53 - Auto-Save on Start Timer
+Released: 2025-08-27
+- **Enhanced**: Start Timer button now auto-saves WordPress post before starting timer
+- **Fixed**: Prevents timer start failures due to unsaved changes
+- **Improved**: Better user feedback during auto-save process ("Saving & Starting...")
+- **Enhanced**: More reliable timer start process with proper state management
+- **Technical**: Added comprehensive auto-save detection for WordPress and ACF changes
+- **UX**: Clear progress indication during the save and start process
+
+## Version 2.2.52 - Fixed "Updating..." Button Stuck Bug
+Released: 2025-08-27
+- **Fixed**: "Updating..." button no longer gets stuck when validation fails
+- **Fixed**: SessionFSM now properly transitions back to EDITING state on save failures
+- **Enhanced**: Added 30-second timeout to prevent indefinite "Updating..." states
+- **Added**: Emergency recovery function `PTT_SessionForceReset()` for stuck states
+- **Improved**: Pre-save validation prevents FSM from entering SAVING state when validation will fail
+- **Technical**: Added timeout management and proper state cleanup on save operations
+
+## Version 2.2.51 - Enhanced Session Error Messages
+Released: 2025-08-27
+- **User Experience**: Session error messages are now much more descriptive and actionable
+- **Error Messages**: Added specific validation for user permissions and timer states
+- **User Feedback**: Error dialogs now explain exactly what's wrong and how to fix it
+- **Examples**: "You already have a timer running. Stop the current timer before creating new sessions."
+- **Examples**: "You are not the assignee of this task, so you cannot create sessions."
+- **Examples**: "Cannot move session further up - already at the top"
+- **Technical**: Enhanced SessionFSM validation with descriptive error messages
+- **Technical**: Added user assignee validation for session operations
+- **Fixed**: Session FSM error messages now display properly instead of "[object Object]"
+
+## Version 2.2.50 - Phase 2: Bulk Session Operations Complete + Timer Fix
 Released: 2025-08-27
 - Implemented comprehensive bulk session operations with BULK_PROCESSING state
 - Added selection checkboxes to all session rows for multi-select functionality
@@ -12,6 +136,16 @@ Released: 2025-08-27
 - CSV export with proper escaping: Headers, session data, duration calculations, manual overrides
 - Protection against bulk operations while timer is running to prevent conflicts
 - Complete FSM lifecycle: IDLE → BULK_PROCESSING → IDLE with comprehensive validation
+- **Fixed**: Restored missing Start Timer button in task editor when FSM is enabled
+- **Fixed**: Restored missing assignee filter dropdown on All Tasks admin page
+- **Fixed**: Restored assignee column sorting (ascending/descending) on All Tasks admin page
+- **Added**: `src/Admin/ListTable.php` class to handle All Tasks list table functionality
+- **Added**: Plugin setting to control Bulk Actions visibility (default: OFF)
+- **Added**: Bulk Actions can now be toggled via Settings → Enable Bulk Actions checkbox
+- **Technical**: Fixed FSM timer controls initialization to ensure Start Timer button visibility
+- **Technical**: Bulk Actions UI respects PTT_BULK_ACTIONS_ENABLED flag for better UX control
+- **Fixed**: Session FSM error messages now display properly instead of "[object Object]"
+- **Technical**: Improved SessionFSM error handling to extract message from error objects
 
 ## Version 2.2.49 - Phase 2: Session Reordering with Conflict Detection
 Released: 2025-08-27

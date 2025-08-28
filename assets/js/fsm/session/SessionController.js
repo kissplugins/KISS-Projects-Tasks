@@ -43,7 +43,17 @@
       if(!$pre.length) return;
       var args = Array.prototype.slice.call(arguments);
       var ts = new Date().toISOString().split('T')[1].replace('Z','');
-      $pre.append('['+ts+'] [Session] '+args.join(' ')+'\n');
+
+      // Convert objects to readable strings
+      var logArgs = args.map(function(arg){
+        if(typeof arg === 'object' && arg !== null){
+          if(arg.message) return arg.message;
+          try { return JSON.stringify(arg); } catch(e) { return '[object Object]'; }
+        }
+        return String(arg);
+      });
+
+      $pre.append('['+ts+'] [Session] '+logArgs.join(' ')+'\n');
       $pre.scrollTop($pre[0].scrollHeight);
     }
 
@@ -71,13 +81,20 @@
     // Intercept ACF add session button
     jQuery(document).off('click.pttSessionAdd');
     jQuery(document).on('click.pttSessionAdd', '.acf-field[data-key="field_ptt_sessions"] [data-event="add-row"], .acf-field[data-key="field_ptt_sessions"] [data-name="add-row"]', function(e){
-      if(!sessionFSM.canCreateSession()){
+      // If FSM is stuck in EDITING state, try to reset it first
+      if(sessionFSM.state === 'EDITING' && !sessionFSM._hasMeaningfulChanges()){
+        console.warn('[PTT] SessionFSM stuck in EDITING state with no meaningful changes - auto-resetting');
+        sessionFSM.transition('RESET');
+      }
+
+      var validationError = sessionFSM.getValidationError('create sessions');
+      if(validationError){
         e.preventDefault();
         e.stopPropagation();
-        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot create session in current state' });
+        sessionFSM.transition('SESSION_ERROR', { message: validationError });
         return false;
       }
-      
+
       e.preventDefault();
       var postId = jQuery('#post_ID').val();
       
@@ -115,6 +132,25 @@
       }
     });
 
+    // Auto-transition to IDLE when clicking outside session fields
+    jQuery(document).off('click.pttSessionAutoIdle');
+    jQuery(document).on('click.pttSessionAutoIdle', function(e){
+      // Only auto-transition if we're in EDITING state and click is outside session fields
+      if(sessionFSM.state === 'EDITING'){
+        var $target = jQuery(e.target);
+        var isSessionField = $target.closest('.acf-field[data-key="field_ptt_sessions"]').length > 0;
+        var isSessionButton = $target.closest('.acf-field[data-key="field_ptt_sessions"] .acf-button').length > 0;
+
+        if(!isSessionField && !isSessionButton){
+          // Check if we have meaningful changes before auto-transitioning
+          if(!sessionFSM._hasMeaningfulChanges()){
+            console.log('[PTT] Auto-transitioning to IDLE - clicked outside session fields with no meaningful changes');
+            sessionFSM.transition('AUTO_IDLE');
+          }
+        }
+      }
+    });
+
     // Monitor checkbox changes (manual override)
     jQuery(document).off('change.pttSessionCheckbox');
     jQuery(document).on('change.pttSessionCheckbox', '.acf-field[data-key="field_ptt_sessions"] input[type="checkbox"]', function(e){
@@ -137,6 +173,49 @@
       }
     });
 
+    // Intercept ACF Update button - route through FSM
+    jQuery(document).off('click.pttSessionUpdate');
+    jQuery(document).on('click.pttSessionUpdate', '.acf-field[data-key="field_ptt_sessions"] [data-event="update-row"]', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+
+      var $row = jQuery(this).closest('.acf-row');
+      var sessionIndex = $row.index();
+      var postId = jQuery('#post_ID').val();
+
+      // Validate before save
+      var validationError = sessionFSM.getValidationError('save sessions');
+      if(validationError){
+        sessionFSM.transition('SESSION_ERROR', { message: validationError });
+        return false;
+      }
+
+      // Start editing session if not already
+      if(sessionFSM.state === 'IDLE'){
+        sessionFSM.transition('EDIT_SESSION', { sessionIndex: sessionIndex, postId: postId });
+      }
+
+      // Validate and save through FSM
+      if(sessionFSM.state === 'EDITING'){
+        var validationPromise = sessionFSM.transition('VALIDATE_SESSION');
+        if(validationPromise && typeof validationPromise.then === 'function'){
+          validationPromise.then(function(){
+            // If validation passes, proceed with save
+            if(sessionFSM.state === 'EDITING' && sessionFSM.ctx.validationErrors.length === 0){
+              sessionFSM.transition('SAVE_SESSION');
+            }
+          }).catch(function(err){
+            console.error('Validation failed:', err);
+          });
+        }
+      } else {
+        // If not in editing state, try to save directly
+        sessionFSM.transition('SAVE_SESSION');
+      }
+
+      return false;
+    });
+
     // Intercept session deletion
     jQuery(document).off('click.pttSessionDelete');
     jQuery(document).on('click.pttSessionDelete', '.acf-field[data-key="field_ptt_sessions"] [data-event="remove-row"], .acf-field[data-key="field_ptt_sessions"] .acf-icon.-minus', function(e){
@@ -147,8 +226,10 @@
       var sessionIndex = $row.index();
       var postId = jQuery('#post_ID').val();
 
-      if(!sessionFSM.canDeleteSession(sessionIndex)){
-        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot delete session in current state' });
+      var validationError = sessionFSM.getValidationError('delete sessions');
+      if(validationError || !sessionFSM.canDeleteSession(sessionIndex)){
+        var errorMsg = validationError || 'Cannot delete this session while its timer is running';
+        sessionFSM.transition('SESSION_ERROR', { message: errorMsg });
         return false;
       }
 
@@ -166,8 +247,9 @@
       var sessionIndex = $row.index();
       var postId = jQuery('#post_ID').val();
 
-      if(!sessionFSM.canDuplicateSession()){
-        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot duplicate session in current state' });
+      var validationError = sessionFSM.getValidationError('duplicate sessions');
+      if(validationError){
+        sessionFSM.transition('SESSION_ERROR', { message: validationError });
         return false;
       }
 
@@ -186,13 +268,14 @@
       var toIndex = fromIndex - 1;
       var postId = jQuery('#post_ID').val();
 
-      if(!sessionFSM.canReorderSessions()){
-        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot reorder sessions in current state' });
+      var validationError = sessionFSM.getValidationError('reorder sessions');
+      if(validationError){
+        sessionFSM.transition('SESSION_ERROR', { message: validationError });
         return false;
       }
 
       if(toIndex < 0){
-        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot move session further up' });
+        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot move session further up - already at the top' });
         return false;
       }
 
@@ -212,13 +295,14 @@
       var postId = jQuery('#post_ID').val();
       var totalRows = jQuery('.acf-field[data-key="field_ptt_sessions"] .acf-row').length;
 
-      if(!sessionFSM.canReorderSessions()){
-        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot reorder sessions in current state' });
+      var validationError = sessionFSM.getValidationError('reorder sessions');
+      if(validationError){
+        sessionFSM.transition('SESSION_ERROR', { message: validationError });
         return false;
       }
 
       if(toIndex >= totalRows){
-        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot move session further down' });
+        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot move session further down - already at the bottom' });
         return false;
       }
 
@@ -234,13 +318,23 @@
         e.preventDefault();
         e.stopPropagation();
 
-        // Validate before save
-        sessionFSM.transition('VALIDATE_SESSION').then(function(){
-          // If validation passes, proceed with save
-          if(sessionFSM.state === 'EDITING' && sessionFSM.ctx.validationErrors.length === 0){
-            sessionFSM.transition('SAVE_SESSION');
+        // Validate before save - only if in EDITING state
+        if(sessionFSM.state === 'EDITING'){
+          var validationPromise = sessionFSM.transition('VALIDATE_SESSION');
+          if(validationPromise && typeof validationPromise.then === 'function'){
+            validationPromise.then(function(){
+              // If validation passes, proceed with save
+              if(sessionFSM.state === 'EDITING' && sessionFSM.ctx.validationErrors.length === 0){
+                sessionFSM.transition('SAVE_SESSION');
+              }
+            }).catch(function(err){
+              console.error('Validation failed:', err);
+            });
           }
-        });
+        } else {
+          // If not in editing state, try to save directly
+          sessionFSM.transition('SAVE_SESSION');
+        }
 
         return false;
       }
@@ -294,18 +388,19 @@
       var operation = jQuery('.ptt-bulk-action').val();
       var postId = jQuery('#post_ID').val();
 
-      if(!sessionFSM.canPerformBulkOperations()){
-        sessionFSM.transition('SESSION_ERROR', { message: 'Cannot perform bulk operations in current state' });
+      var validationError = sessionFSM.getValidationError('perform bulk operations');
+      if(validationError){
+        sessionFSM.transition('SESSION_ERROR', { message: validationError });
         return false;
       }
 
       if(!operation){
-        sessionFSM.transition('SESSION_ERROR', { message: 'Please select a bulk operation' });
+        sessionFSM.transition('SESSION_ERROR', { message: 'Please select a bulk operation from the dropdown' });
         return false;
       }
 
       if(selectedIndices.length === 0){
-        sessionFSM.transition('SESSION_ERROR', { message: 'Please select at least one session' });
+        sessionFSM.transition('SESSION_ERROR', { message: 'Please select at least one session using the checkboxes' });
         return false;
       }
 
@@ -380,6 +475,15 @@
 
     // Expose SessionFSM globally for debugging
     root.PTT_SessionFSM = sessionFSM;
+
+    // Expose emergency recovery function globally
+    root.PTT_SessionForceReset = function(){
+      console.log('[PTT] Current SessionFSM state before reset:', sessionFSM.state);
+      var result = sessionFSM.forceReset();
+      console.log('[PTT] SessionFSM reset result:', result);
+      console.log('[PTT] New SessionFSM state after reset:', sessionFSM.state);
+      return result;
+    };
 
     sessionFSM.log('SessionController initialized');
   }

@@ -259,6 +259,20 @@ Acceptance Criteria:
 
 **FOCUS**: Advanced Editor features that leverage the solid FSM foundation
 
+### Deferred Fixes (Post-Publish Issue Resolution)
+
+#### **Auto-Save System Conflicts**
+- [ ] **ACF auto-reload after save**: Re-implement the ACF submit_success auto-reload functionality that was disabled to fix publish button conflicts. Need to coordinate with WordPress save states to avoid interference.
+- [ ] **Session update button auto-save**: Re-implement the session update button auto-save trigger that was disabled. Should only trigger when there are actual unsaved changes and coordinate with FSM state.
+
+**Context**: These features were temporarily disabled in v2.2.62 to resolve critical publish button conflicts where posts would appear to publish but revert to draft status. The root cause was multiple competing auto-save triggers interfering with WordPress's normal publish flow.
+
+**Requirements for re-implementation**:
+- Must check WordPress post change state before triggering saves
+- Must coordinate with FSM state to avoid conflicts
+- Must use proper debouncing and state management
+- Must not interfere with normal publish/update button functionality
+
 ### Phase 3 – Consolidation and cleanup
 - [ ] Remove legacy jQuery handlers replaced by FSM when flag ships to 100%
 - [ ] Keep effects layer as the only place with DOM and AJAX code

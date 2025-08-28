@@ -5,12 +5,14 @@ class Settings {
     public const OPTION_FSM_ENABLED = 'ptt_fsm_enabled';
     public const OPTION_FSM_TODAY   = 'ptt_fsm_today_enabled';
     public const OPTION_FSM_EDITOR  = 'ptt_fsm_editor_enabled';
+    public const OPTION_BULK_ACTIONS_ENABLED = 'ptt_bulk_actions_enabled';
 
     public static function getFlags(): array {
         return [
             'enabled' => get_option(self::OPTION_FSM_ENABLED, '1') === '1',
             'today'   => get_option(self::OPTION_FSM_TODAY,   '1') === '1',
             'editor'  => get_option(self::OPTION_FSM_EDITOR,  '1') === '1',
+            'bulk_actions' => get_option(self::OPTION_BULK_ACTIONS_ENABLED, '0') === '1', // Default OFF
         ];
     }
 
@@ -18,6 +20,7 @@ class Settings {
         update_option(self::OPTION_FSM_ENABLED, isset($post['ptt_fsm_enabled']) ? '1' : '0');
         update_option(self::OPTION_FSM_TODAY,   isset($post['ptt_fsm_today_enabled']) ? '1' : '0');
         update_option(self::OPTION_FSM_EDITOR,  isset($post['ptt_fsm_editor_enabled']) ? '1' : '0');
+        update_option(self::OPTION_BULK_ACTIONS_ENABLED, isset($post['ptt_bulk_actions_enabled']) ? '1' : '0');
     }
 }
 

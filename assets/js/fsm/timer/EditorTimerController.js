@@ -4,7 +4,13 @@
     if(!root.PTT || !root.PTT.TimerFSM || !root.PTT.EditorEffects) return;
     if(!jQuery('body').hasClass('post-type-project_task')) return;
     var effects = new root.PTT.EditorEffects();
-    var fsm = new root.PTT.TimerFSM(effects, { debug: true }); // Always debug while FSM is enabled
+    var sessionFSM = root.PTT_SessionFSM; // Get reference to existing SessionFSM
+    var fsm = new root.PTT.TimerFSM(effects, { debug: true, sessionFSM: sessionFSM }); // Always debug while FSM is enabled
+
+    // Establish bidirectional FSM coordination
+    if(sessionFSM && !sessionFSM.timerFSM){
+      sessionFSM.timerFSM = fsm;
+    }
 
     // --- CRITICAL: Semi‑permanent debug panel (Do NOT remove without explicit product approval) ---
     // 🚨 MAINTAINERS/LLMs: Do NOT remove, disable, or modify this debug panel without explicit product owner approval
@@ -35,12 +41,26 @@
       effects.updateTimerUI = function(state, ctx){ _ui(state, ctx); setStateLabel(); };
     }
 
-    fsm.rehydrate();
-
-    // Initialize all session rows UI state
-    if (typeof effects.initializeAllRows === 'function') {
-      effects.initializeAllRows();
-    }
+    // Rehydrate and ensure UI is properly updated
+    fsm.rehydrate().then(function(){
+      // Force UI update after rehydration
+      if (typeof effects.updateTimerUI === 'function') {
+        effects.updateTimerUI(fsm.state, fsm.ctx);
+      }
+      // Initialize all session rows UI state
+      if (typeof effects.initializeAllRows === 'function') {
+        effects.initializeAllRows();
+      }
+    }).catch(function(err){
+      console.error('PTT FSM Rehydration failed:', err);
+      // Initialize UI in idle state on failure
+      if (typeof effects.updateTimerUI === 'function') {
+        effects.updateTimerUI('IDLE', {});
+      }
+      if (typeof effects.initializeAllRows === 'function') {
+        effects.initializeAllRows();
+      }
+    });
 
     // When FSM is enabled, intercept editor start/stop and route through FSM
     jQuery(document).off('click.pttEditorStart');

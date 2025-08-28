@@ -565,6 +565,14 @@ class SelfTests {
             $results = array_merge($results, \KISS\PTT\Diagnostics\SelfTests\ListTableSelfTests::run());
         }
 
+        // TEST – Bulk Actions Setting
+        $bulk_actions_enabled = get_option('ptt_bulk_actions_enabled', '0') === '1';
+        $results[] = [
+            'name' => 'Settings: Bulk Actions Control',
+            'status' => 'Pass',
+            'message' => 'Bulk Actions setting: ' . ($bulk_actions_enabled ? 'ENABLED' : 'DISABLED (default)') . '. Can be toggled via Settings page.'
+        ];
+
         // Sample data validation (session-only approach)
         $sample_tasks = get_posts( [ 'post_type' => 'project_task', 'numberposts' => 1, 'post_status' => 'any' ] );
         if ( ! empty( $sample_tasks ) ) {

@@ -187,13 +187,14 @@ jQuery(document).ready(function ($) {
 	        } catch (e) {}
 
 	        if (window.acf && typeof window.acf.addAction === 'function') {
-	            window.acf.addAction('submit_success', function($form, result) {
-	                try {
-	                    sessionStorage.setItem('ptt_after_save_refresh', '1');
-	                    sessionStorage.setItem('ptt_scroll_after_save', '1');
-	                } catch (e) {}
-	                window.location.reload();
-	            });
+	            // DISABLED: Auto-reload after ACF save (may be causing publish issues)
+	            // window.acf.addAction('submit_success', function($form, result) {
+	            //     try {
+	            //         sessionStorage.setItem('ptt_after_save_refresh', '1');
+	            //         sessionStorage.setItem('ptt_scroll_after_save', '1');
+	            //     } catch (e) {}
+	            //     window.location.reload();
+	            // });
 
 	        // After reload from a save, if flagged, scroll to the bottom near the Sessions repeater
 	        try {
@@ -371,6 +372,13 @@ jQuery(document).ready(function ($) {
                     if ($manualDurationField.length) {
                         if (override) { $manualDurationField.show(); } else { $manualDurationField.hide(); }
                     }
+
+                    // Ensure timer controls are visible for FSM to manage
+                    // FSM will handle the actual show/hide logic via updateTimerUI
+                    $startButton.show();
+                    $activeDisplay.hide();
+                    $message.hide();
+
                     return;
                 }
 
@@ -482,9 +490,17 @@ jQuery(document).ready(function ($) {
                 $controls.find('.ptt-session-active-timer').css('display', 'inline-flex');
                 manageLiveTimer($controls, response.data.start_time);
                 if (window.pttStartUnloadGuard) { window.pttStartUnloadGuard(3000); }
-                // Proactively trigger Update to persist any surrounding ACF state
-                var $saveButton = $('#publish');
-                if ($saveButton.length && $saveButton.is(':enabled')) { setTimeout(function(){ $saveButton.trigger('click'); }, 150); }
+                // Safe auto-save after timer start (only if post has unsaved changes)
+                if (window.wp && window.wp.autosave && window.wp.autosave.server && window.wp.autosave.server.postChanged && window.wp.autosave.server.postChanged()) {
+                    var $saveButton = $('#publish');
+                    if ($saveButton.length && $saveButton.is(':enabled') && !$saveButton.hasClass('ptt-saving')) {
+                        $saveButton.addClass('ptt-saving');
+                        setTimeout(function(){
+                            $saveButton.trigger('click');
+                            setTimeout(function(){ $saveButton.removeClass('ptt-saving'); }, 2000);
+                        }, 150);
+                    }
+                }
             } else {
                 alert(response.data.message || 'An error occurred.');
             }
@@ -524,8 +540,17 @@ jQuery(document).ready(function ($) {
                 const $message = $controls.find('.ptt-session-message');
                 $message.text(`Session stopped. Duration: ${response.data.duration} hrs.`).show();
 
-                // Trigger save post to update total duration
-                $('#publish').trigger('click');
+                // Safe auto-save after timer stop (only if post has unsaved changes)
+                if (window.wp && window.wp.autosave && window.wp.autosave.server && window.wp.autosave.server.postChanged && window.wp.autosave.server.postChanged()) {
+                    var $saveButton = $('#publish');
+                    if ($saveButton.length && $saveButton.is(':enabled') && !$saveButton.hasClass('ptt-saving')) {
+                        $saveButton.addClass('ptt-saving');
+                        setTimeout(function(){
+                            $saveButton.trigger('click');
+                            setTimeout(function(){ $saveButton.removeClass('ptt-saving'); }, 2000);
+                        }, 100);
+                    }
+                }
             } else {
                 alert(response.data.message || 'An error occurred.');
             }
@@ -543,9 +568,16 @@ jQuery(document).ready(function ($) {
             alert('Please complete all fields for open sessions and stop any running timers before adding a new one.');
             return false;
         }
-        const $saveButton = $('#publish');
-        if ($saveButton.length && $saveButton.is(':enabled')) {
-            setTimeout(function(){ $saveButton.trigger('click'); }, 100);
+        // Safe auto-save when adding session rows (only if post has unsaved changes)
+        if (window.wp && window.wp.autosave && window.wp.autosave.server && window.wp.autosave.server.postChanged && window.wp.autosave.server.postChanged()) {
+            const $saveButton = $('#publish');
+            if ($saveButton.length && $saveButton.is(':enabled') && !$saveButton.hasClass('ptt-saving')) {
+                $saveButton.addClass('ptt-saving');
+                setTimeout(function(){
+                    $saveButton.trigger('click');
+                    setTimeout(function(){ $saveButton.removeClass('ptt-saving'); }, 2000);
+                }, 100);
+            }
         }
     });
 
@@ -1986,6 +2018,7 @@ jQuery(document).ready(function ($) {
     e.preventDefault();
     var $btn = $(this);
     $btn.prop('disabled', true).text('Updating...');
-    $('#publish').trigger('click');
+    // DISABLED: Auto-save from session update button
+    // $('#publish').trigger('click');
   });
 })(jQuery);

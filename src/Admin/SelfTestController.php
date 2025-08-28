@@ -89,6 +89,10 @@ class SelfTestController {
             echo '<label><input type="checkbox" name="ptt_fsm_enabled" value="1" '.checked($flags['enabled'],true,false).'> Enable FSM (global)</label><br />';
             echo '<label><input type="checkbox" name="ptt_fsm_today_enabled" value="1" '.checked($flags['today'],true,false).'> Today page</label><br />';
             echo '<label><input type="checkbox" name="ptt_fsm_editor_enabled" value="1" '.checked($flags['editor'],true,false).'> CPT Editor</label><br />';
+            echo '<hr style="margin: 15px 0;" />';
+            echo '<h3>UI Features</h3>';
+            echo '<label><input type="checkbox" name="ptt_bulk_actions_enabled" value="1" '.checked($flags['bulk_actions'],true,false).'> Enable Bulk Actions (Session Operations)</label><br />';
+            echo '<p style="margin-left: 20px; color: #666; font-style: italic;">Bulk Delete, Bulk Export, and session selection controls in task editor</p>';
             echo '<p><button class="button button-primary">Save Flags</button></p>';
             echo '</form>';
 

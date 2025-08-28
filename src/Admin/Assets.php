@@ -61,10 +61,11 @@ class Assets {
             'PTT_FSM_ENABLED' => $flags['enabled'],
             'PTT_FSM_TODAY_ENABLED' => $flags['enabled'] && $flags['today'],
             'PTT_FSM_EDITOR_ENABLED' => $flags['enabled'] && $flags['editor'],
+            'PTT_BULK_ACTIONS_ENABLED' => $flags['bulk_actions'],
         ] );
         // Mirror flags onto window for legacy scripts that check `window.PTT_FSM_ENABLED`
         add_action('admin_print_footer_scripts', function() use ($flags){
-            echo '<script>window.PTT_FSM_ENABLED='.( $flags['enabled']? 'true':'false' ).';window.PTT_FSM_TODAY_ENABLED='.( ($flags['enabled']&&$flags['today'])?'true':'false' ).';window.PTT_FSM_EDITOR_ENABLED='.( ($flags['enabled']&&$flags['editor'])?'true':'false' ).';</script>';
+            echo '<script>window.PTT_FSM_ENABLED='.( $flags['enabled']? 'true':'false' ).';window.PTT_FSM_TODAY_ENABLED='.( ($flags['enabled']&&$flags['today'])?'true':'false' ).';window.PTT_FSM_EDITOR_ENABLED='.( ($flags['enabled']&&$flags['editor'])?'true':'false' ).';window.PTT_BULK_ACTIONS_ENABLED='.( $flags['bulk_actions']? 'true':'false' ).';</script>';
         });
     }
 }
