@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 2.2.67 - Unified Timer and Session FSM
+- **Refactor**: Merged TimerFSM and SessionFSM into a single TaskFSM to simplify coordination and reduce brittleness
+
+
+
 ## Version 2.2.66 - Fix SessionFSM Stuck in EDITING State
 - **CRITICAL FIX**: Fixed SessionFSM getting stuck in EDITING state when clicking "Add Session" button
 - **Enhanced**: Added auto-reset logic to detect when FSM is stuck in EDITING with no meaningful changes

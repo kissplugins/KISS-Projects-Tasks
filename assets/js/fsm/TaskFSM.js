@@ -1,10 +1,10 @@
 (function(root){
   /**
-   * SessionFSM - Manages session lifecycle for CPT Task Editor
+   * TaskFSM - Manages timer and session lifecycle
    * States: IDLE, CREATING, EDITING, VALIDATING, SAVING, AUTO_SAVING, ERROR
-   * Coordinates with TimerFSM to prevent conflicts and handle auto-save before timer start
+   * Handles both timer and session logic with built-in auto-save before timer start
    */
-  function SessionFSM(effects, opts){
+  function TaskFSM(effects, opts){
     this.effects = effects || {};
     this.state = 'IDLE';
     this.ctx = {
@@ -15,17 +15,22 @@
       pendingChanges: {}
     };
     this.debug = (opts && opts.debug) || false;
-    this.timerFSM = opts.timerFSM || null; // Reference to coordinate with TimerFSM
+    this.timerState = 'IDLE';
+    this.timerCtx = { taskId:null, postId:null, sessionIndex:null, startUtc:null };
     this.saveTimeout = null; // Track save operation timeouts
   }
 
-  SessionFSM.prototype.log = function(){ 
+  TaskFSM.prototype.log = function(){ 
     if(this.debug && root.console){ 
-      console.log.apply(console, ['[PTT SessionFSM]'].concat([].slice.call(arguments))); 
+      console.log.apply(console, ['[PTT TaskFSM]'].concat([].slice.call(arguments))); 
     } 
   };
 
-  SessionFSM.prototype.transition = function(event, payload){
+  TaskFSM.prototype.transition = function(event, payload){
+    const ts = this.timerState;
+    if(ts==='IDLE' && event==='START_TIMER') return this._startTimer(payload);
+    if(ts==='RUNNING' && event==='STOP_TIMER') return this._stopTimer(payload);
+    if(event==='TIMER_ERROR'){ this.timerState='ERROR'; this.log('TIMER_ERROR', payload); return; }
     const s = this.state; 
     const e = event;
     
@@ -71,13 +76,13 @@
     this.log('Ignored', e, 'in', s);
   };
 
-  SessionFSM.prototype._createSession = function(payload){
+  TaskFSM.prototype._createSession = function(payload){
     this.state = 'CREATING';
     this.ctx.postId = payload.postId;
     var self = this;
     
     // Check if timer is running - prevent creating new session if timer active
-    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+    if(this.timerState === 'RUNNING'){
       this.state = 'ERROR';
       this.ctx.validationErrors = ['Cannot create new session while timer is running'];
       this.effects.showError && this.effects.showError('Stop the current timer before creating a new session');
@@ -98,7 +103,7 @@
     });
   };
 
-  SessionFSM.prototype._editSession = function(payload){
+  TaskFSM.prototype._editSession = function(payload){
     this.state = 'EDITING';
     this.ctx.sessionIndex = payload.sessionIndex;
     this.ctx.postId = payload.postId;
@@ -110,15 +115,15 @@
     this.log('EDITING_SESSION', this.ctx);
   };
 
-  SessionFSM.prototype._deleteSession = function(payload){
+  TaskFSM.prototype._deleteSession = function(payload){
     this.state = 'DELETING';
     this.ctx.sessionIndex = payload.sessionIndex;
     this.ctx.postId = payload.postId;
     var self = this;
 
     // Check if trying to delete active timer session
-    if(this.timerFSM && this.timerFSM.state === 'RUNNING' &&
-       this.timerFSM.ctx.sessionIndex === payload.sessionIndex){
+    if(this.timerState === 'RUNNING' &&
+       this.timerCtx.sessionIndex === payload.sessionIndex){
       this.state = 'ERROR';
       this.ctx.validationErrors = ['Cannot delete session with active timer'];
       this.effects.showError && this.effects.showError('Stop the timer before deleting this session');
@@ -145,7 +150,7 @@
     });
   };
 
-  SessionFSM.prototype._sessionDeleted = function(payload){
+  TaskFSM.prototype._sessionDeleted = function(payload){
     this.state = 'IDLE';
     this.ctx = {
       sessionIndex: null,
@@ -158,21 +163,21 @@
     this.log('SESSION_DELETED', payload);
   };
 
-  SessionFSM.prototype._deleteFailed = function(payload){
+  TaskFSM.prototype._deleteFailed = function(payload){
     this.state = 'ERROR';
     this.ctx.validationErrors = [payload.message || 'Delete failed'];
     this.effects.showError && this.effects.showError(payload.message || 'Failed to delete session');
     this.log('DELETE_FAILED', payload);
   };
 
-  SessionFSM.prototype._duplicateSession = function(payload){
+  TaskFSM.prototype._duplicateSession = function(payload){
     this.state = 'DUPLICATING';
     this.ctx.sessionIndex = payload.sourceIndex;
     this.ctx.postId = payload.postId;
     var self = this;
 
     // Check if timer is running - prevent duplicating while timer active
-    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+    if(this.timerState === 'RUNNING'){
       this.state = 'ERROR';
       this.ctx.validationErrors = ['Cannot duplicate session while timer is running'];
       this.effects.showError && this.effects.showError('Stop the current timer before duplicating sessions');
@@ -199,7 +204,7 @@
     });
   };
 
-  SessionFSM.prototype._sessionDuplicated = function(payload){
+  TaskFSM.prototype._sessionDuplicated = function(payload){
     this.state = 'IDLE';
     this.ctx = {
       sessionIndex: null,
@@ -212,21 +217,21 @@
     this.log('SESSION_DUPLICATED', payload);
   };
 
-  SessionFSM.prototype._duplicateFailed = function(payload){
+  TaskFSM.prototype._duplicateFailed = function(payload){
     this.state = 'ERROR';
     this.ctx.validationErrors = [payload.message || 'Duplication failed'];
     this.effects.showError && this.effects.showError(payload.message || 'Failed to duplicate session');
     this.log('DUPLICATE_FAILED', payload);
   };
 
-  SessionFSM.prototype._reorderSession = function(payload){
+  TaskFSM.prototype._reorderSession = function(payload){
     this.state = 'REORDERING';
     this.ctx.sessionIndex = payload.fromIndex;
     this.ctx.postId = payload.postId;
     var self = this;
 
     // Check if timer is running - prevent reordering while timer active
-    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+    if(this.timerState === 'RUNNING'){
       this.state = 'ERROR';
       this.ctx.validationErrors = ['Cannot reorder sessions while timer is running'];
       this.effects.showError && this.effects.showError('Stop the current timer before reordering sessions');
@@ -253,7 +258,7 @@
     });
   };
 
-  SessionFSM.prototype._sessionReordered = function(payload){
+  TaskFSM.prototype._sessionReordered = function(payload){
     this.state = 'IDLE';
     this.ctx = {
       sessionIndex: null,
@@ -266,14 +271,14 @@
     this.log('SESSION_REORDERED', payload);
   };
 
-  SessionFSM.prototype._reorderFailed = function(payload){
+  TaskFSM.prototype._reorderFailed = function(payload){
     this.state = 'ERROR';
     this.ctx.validationErrors = [payload.message || 'Reorder failed'];
     this.effects.showError && this.effects.showError(payload.message || 'Failed to reorder session');
     this.log('REORDER_FAILED', payload);
   };
 
-  SessionFSM.prototype._bulkOperation = function(payload){
+  TaskFSM.prototype._bulkOperation = function(payload){
     this.state = 'BULK_PROCESSING';
     this.ctx.bulkOperation = payload.operation;
     this.ctx.selectedIndices = payload.selectedIndices;
@@ -281,7 +286,7 @@
     var self = this;
 
     // Check if timer is running - prevent bulk operations while timer active
-    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+    if(this.timerState === 'RUNNING'){
       this.state = 'ERROR';
       this.ctx.validationErrors = ['Cannot perform bulk operations while timer is running'];
       this.effects.showError && this.effects.showError('Stop the current timer before performing bulk operations');
@@ -317,7 +322,7 @@
     });
   };
 
-  SessionFSM.prototype._bulkCompleted = function(payload){
+  TaskFSM.prototype._bulkCompleted = function(payload){
     this.state = 'IDLE';
     this.ctx = {
       sessionIndex: null,
@@ -330,14 +335,14 @@
     this.log('BULK_COMPLETED', payload);
   };
 
-  SessionFSM.prototype._bulkFailed = function(payload){
+  TaskFSM.prototype._bulkFailed = function(payload){
     this.state = 'ERROR';
     this.ctx.validationErrors = [payload.message || 'Bulk operation failed'];
     this.effects.showError && this.effects.showError(payload.message || 'Failed to perform bulk operation');
     this.log('BULK_FAILED', payload);
   };
 
-  SessionFSM.prototype._fieldChanged = function(payload){
+  TaskFSM.prototype._fieldChanged = function(payload){
     if(this.state !== 'EDITING') return;
 
     this.ctx.isDirty = true;
@@ -359,7 +364,7 @@
     this._checkAutoIdle();
   };
 
-  SessionFSM.prototype._validateSession = function(payload){
+  TaskFSM.prototype._validateSession = function(payload){
     this.state = 'VALIDATING';
     var self = this;
     
@@ -374,14 +379,14 @@
     });
   };
 
-  SessionFSM.prototype._validationPassed = function(payload){
+  TaskFSM.prototype._validationPassed = function(payload){
     this.state = 'EDITING';
     this.ctx.validationErrors = [];
     this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
     this.log('VALIDATION_PASSED');
   };
 
-  SessionFSM.prototype._validationFailed = function(payload){
+  TaskFSM.prototype._validationFailed = function(payload){
     this.state = 'EDITING';
     this.ctx.validationErrors = payload.errors || [];
     this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
@@ -390,7 +395,7 @@
   };
 
   // Auto-save for timer start - FSM-centric approach
-  SessionFSM.prototype._autoSaveForTimer = function(payload){
+  TaskFSM.prototype._autoSaveForTimer = function(payload){
     this.state = 'AUTO_SAVING';
     this.ctx.autoSaveReason = 'timer_start';
     this.ctx.timerPayload = payload; // Store timer payload for after save
@@ -410,10 +415,9 @@
         self.effects.showError && self.effects.showError('Auto-save timed out');
         self.log('AUTO_SAVE_TIMEOUT');
 
-        // Notify TimerFSM that auto-save failed
-        if(self.timerFSM){
-          self.timerFSM.transition('START_FAILED', new Error('Auto-save failed'));
-        }
+        // Notify timer that auto-save failed
+        self.timerState = 'IDLE';
+        self.effects.updateTimerUI && self.effects.updateTimerUI(self.timerState, self.timerCtx);
       }
     }, 10000); // 10 second timeout for auto-save
 
@@ -427,7 +431,7 @@
     });
   };
 
-  SessionFSM.prototype._autoSaveComplete = function(payload){
+  TaskFSM.prototype._autoSaveComplete = function(payload){
     // Clear timeout on successful auto-save
     if(this.saveTimeout){
       clearTimeout(this.saveTimeout);
@@ -440,15 +444,15 @@
     this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
     this.log('AUTO_SAVE_COMPLETE', payload);
 
-    // Now proceed with timer start through TimerFSM
-    if(this.timerFSM && this.ctx.timerPayload){
+    // Now proceed with timer start
+    if(this.ctx.timerPayload){
       var timerPayload = this.ctx.timerPayload;
-      this.ctx.timerPayload = null; // Clear stored payload
-      this.timerFSM.transition('START_TIMER', timerPayload);
+      this.ctx.timerPayload = null;
+      this.transition('START_TIMER', timerPayload);
     }
   };
 
-  SessionFSM.prototype._autoSaveFailed = function(payload){
+  TaskFSM.prototype._autoSaveFailed = function(payload){
     // Clear timeout on auto-save failure
     if(this.saveTimeout){
       clearTimeout(this.saveTimeout);
@@ -457,17 +461,16 @@
 
     this.state = 'EDITING';
     this.ctx.validationErrors = [payload.message || payload];
-    this.effects.updateSessionUI && self.effects.updateSessionUI(this.state, this.ctx);
+    this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
     this.effects.showError && this.effects.showError('Auto-save failed: ' + (payload.message || payload));
     this.log('AUTO_SAVE_FAILED', payload);
 
-    // Notify TimerFSM that auto-save failed
-    if(this.timerFSM){
-      this.timerFSM.transition('START_FAILED', payload);
-    }
+    // Notify timer that auto-save failed
+    this.timerState = 'IDLE';
+    this.effects.updateTimerUI && this.effects.updateTimerUI(this.timerState, this.timerCtx);
   };
 
-  SessionFSM.prototype._saveSession = function(payload){
+  TaskFSM.prototype._saveSession = function(payload){
     // Pre-save validation to prevent getting stuck
     var validationError = this.getValidationError('save sessions');
     if(validationError){
@@ -530,14 +533,14 @@
     });
   };
 
-  SessionFSM.prototype._retry = function(payload){
+  TaskFSM.prototype._retry = function(payload){
     this.state = 'IDLE';
     this.ctx.validationErrors = [];
     this.effects.updateSessionUI && this.effects.updateSessionUI(this.state, this.ctx);
     this.log('RETRY');
   };
 
-  SessionFSM.prototype._reset = function(){
+  TaskFSM.prototype._reset = function(){
     // Clear any pending timeouts
     if(this.saveTimeout){
       clearTimeout(this.saveTimeout);
@@ -561,7 +564,7 @@
   };
 
   // Emergency recovery method for stuck states
-  SessionFSM.prototype.forceReset = function(){
+  TaskFSM.prototype.forceReset = function(){
     // Clear any pending timeouts
     if(this.saveTimeout){
       clearTimeout(this.saveTimeout);
@@ -589,7 +592,7 @@
   };
 
   // Auto-transition to IDLE when no meaningful changes exist
-  SessionFSM.prototype._checkAutoIdle = function(){
+  TaskFSM.prototype._checkAutoIdle = function(){
     var self = this;
 
     // Debounce the check to avoid rapid state changes
@@ -605,7 +608,7 @@
     }, 1000); // 1 second debounce
   };
 
-  SessionFSM.prototype._autoIdle = function(payload){
+  TaskFSM.prototype._autoIdle = function(payload){
     this.state = 'IDLE';
     this.ctx.isDirty = false;
     this.ctx.pendingChanges = {};
@@ -616,7 +619,7 @@
   };
 
   // Check if there are meaningful changes that warrant staying in EDITING state
-  SessionFSM.prototype._hasMeaningfulChanges = function(){
+  TaskFSM.prototype._hasMeaningfulChanges = function(){
     // If explicitly marked as dirty, we have changes
     if(this.ctx.isDirty && Object.keys(this.ctx.pendingChanges).length > 0){
       // Check if any pending changes are non-empty/meaningful
@@ -631,12 +634,12 @@
   };
 
   // Helper methods
-  SessionFSM.prototype.canCreateSession = function(){
-    return this.state === 'IDLE' && (!this.timerFSM || this.timerFSM.state !== 'RUNNING');
+  TaskFSM.prototype.canCreateSession = function(){
+    return this.state === 'IDLE' && this.timerState !== 'RUNNING';
   };
 
   // Enhanced validation with descriptive error messages
-  SessionFSM.prototype.getValidationError = function(action){
+  TaskFSM.prototype.getValidationError = function(action){
     // Check if user is assignee of this task
     var currentUserId = this._getCurrentUserId();
     var taskAssigneeId = this._getTaskAssigneeId();
@@ -646,7 +649,7 @@
     }
 
     // Check timer state with specific messages
-    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+    if(this.timerState === 'RUNNING'){
       switch(action){
         case 'create sessions':
           return 'You already have a timer running. Stop the current timer before creating new sessions.';
@@ -672,7 +675,7 @@
   };
 
   // Helper to get current user ID from page context
-  SessionFSM.prototype._getCurrentUserId = function(){
+  TaskFSM.prototype._getCurrentUserId = function(){
     // Try to get from global WordPress admin context
     if(window.userSettings && window.userSettings.uid){
       return parseInt(window.userSettings.uid, 10);
@@ -685,7 +688,7 @@
   };
 
   // Helper to get task assignee ID from page context
-  SessionFSM.prototype._getTaskAssigneeId = function(){
+  TaskFSM.prototype._getTaskAssigneeId = function(){
     // Try to get from ACF field if available
     var $assigneeField = jQuery('[data-key="field_ptt_assignee"] select, [data-key="field_ptt_assignee"] input[type="hidden"]');
     if($assigneeField.length){
@@ -703,15 +706,15 @@
     return null;
   };
 
-  SessionFSM.prototype.canEditSession = function(){
+  TaskFSM.prototype.canEditSession = function(){
     return this.state === 'IDLE';
   };
 
-  SessionFSM.prototype.canSaveSession = function(){
+  TaskFSM.prototype.canSaveSession = function(){
     return this.state === 'EDITING' && this.ctx.isDirty && this.ctx.validationErrors.length === 0;
   };
 
-  SessionFSM.prototype.hasUnsavedChanges = function(){
+  TaskFSM.prototype.hasUnsavedChanges = function(){
     // Check if SessionFSM has unsaved changes
     if(this.ctx.isDirty) return true;
 
@@ -725,55 +728,116 @@
     return false;
   };
 
-  SessionFSM.prototype.canDeleteSession = function(sessionIndex){
+  TaskFSM.prototype.canDeleteSession = function(sessionIndex){
     // Can't delete if FSM is busy
     if(this.state !== 'IDLE') return false;
 
     // Can't delete if timer is running on this session
-    if(this.timerFSM && this.timerFSM.state === 'RUNNING' &&
-       this.timerFSM.ctx.sessionIndex === sessionIndex){
+    if(this.timerState === 'RUNNING' &&
+       this.timerCtx.sessionIndex === sessionIndex){
       return false;
     }
 
     return true;
   };
 
-  SessionFSM.prototype.canDuplicateSession = function(){
+  TaskFSM.prototype.canDuplicateSession = function(){
     // Can't duplicate if FSM is busy
     if(this.state !== 'IDLE') return false;
 
     // Can't duplicate if timer is running (to avoid confusion)
-    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+    if(this.timerState === 'RUNNING'){
       return false;
     }
 
     return true;
   };
 
-  SessionFSM.prototype.canReorderSessions = function(){
+  TaskFSM.prototype.canReorderSessions = function(){
     // Can't reorder if FSM is busy
     if(this.state !== 'IDLE') return false;
 
     // Can't reorder if timer is running (to avoid confusion and index mismatches)
-    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+    if(this.timerState === 'RUNNING'){
       return false;
     }
 
     return true;
   };
 
-  SessionFSM.prototype.canPerformBulkOperations = function(){
+  TaskFSM.prototype.canPerformBulkOperations = function(){
     // Can't perform bulk operations if FSM is busy
     if(this.state !== 'IDLE') return false;
 
     // Can't perform bulk operations if timer is running (to avoid conflicts)
-    if(this.timerFSM && this.timerFSM.state === 'RUNNING'){
+    if(this.timerState === 'RUNNING'){
       return false;
     }
 
     return true;
   };
 
-  root.PTT = root.PTT || {}; 
-  root.PTT.SessionFSM = SessionFSM;
+  TaskFSM.prototype._startTimer = function(payload){
+    this.timerState='STARTING';
+    this.effects.updateTimerUI && this.effects.updateTimerUI(this.timerState, this.timerCtx);
+    var self=this;
+    if(this.hasUnsavedChanges && this.hasUnsavedChanges()){
+      this.log('AUTO_SAVE_REQUIRED', 'Auto-saving before timer start');
+      this.ctx.timerPayload = payload;
+      this.transition('AUTO_SAVE_FOR_TIMER', payload);
+      return;
+    }
+    return this.effects.startTimer(payload.taskId, payload.title).then(function(res){
+      self.timerCtx = { taskId: payload.taskId, postId: res.postId, sessionIndex: res.sessionIndex, startUtc: res.startUtc };
+      self.timerState='RUNNING';
+      self.effects.updateTimerUI && self.effects.updateTimerUI(self.timerState, self.timerCtx);
+      self.log('TIMER_STARTED', self.timerCtx);
+    }).catch(function(err){
+      self.timerState='IDLE';
+      self.effects.updateTimerUI && self.effects.updateTimerUI(self.timerState, self.timerCtx);
+      self.effects.showError && self.effects.showError(err);
+      self.log('START_FAILED', err);
+    });
+  };
+
+  TaskFSM.prototype._stopTimer = function(){
+    this.timerState='STOPPING';
+    var self=this;
+    return this.effects.stopTimer(this.timerCtx.postId).then(function(){
+      self.timerState='IDLE';
+      self.effects.updateTimerUI && self.effects.updateTimerUI(self.timerState, self.timerCtx);
+      self.log('TIMER_STOPPED');
+      self.timerCtx={ taskId:null, postId:null, sessionIndex:null, startUtc:null };
+    }).catch(function(err){
+      self.timerState='RUNNING';
+      self.effects.showError && self.effects.showError(err);
+      self.log('STOP_FAILED', err);
+    });
+  };
+
+  TaskFSM.prototype.rehydrate = function(){
+    var self=this;
+    return (this.effects.rehydrate? this.effects.rehydrate(): Promise.resolve({running:false}))
+      .then(function(r){
+        if(r.running){
+          self.timerState='RUNNING';
+          self.timerCtx={ taskId:r.taskId||null, postId:r.postId, sessionIndex:r.sessionIndex, startUtc:r.startUtc };
+        } else {
+          self.timerState='IDLE';
+          self.timerCtx={ taskId:null, postId:null, sessionIndex:null, startUtc:null };
+        }
+        if(self.effects.updateTimerUI){
+          self.effects.updateTimerUI(self.timerState, self.timerCtx);
+        }
+        self.log('REHYDRATED', self.timerState, self.timerCtx);
+      }).catch(function(err){
+        self.timerState='IDLE';
+        self.timerCtx={ taskId:null, postId:null, sessionIndex:null, startUtc:null };
+        if(self.effects.updateTimerUI){ self.effects.updateTimerUI(self.timerState, self.timerCtx); }
+        self.log('REHYDRATION_FAILED', err);
+      });
+  };
+
+  root.PTT = root.PTT || {};
+  root.PTT.TaskFSM = TaskFSM;
 })(window);

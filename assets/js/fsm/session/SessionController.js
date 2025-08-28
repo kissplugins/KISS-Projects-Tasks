@@ -1,16 +1,15 @@
 (function(root){
   /**
-   * SessionController - Integrates SessionFSM with CPT Task Editor
-   * Coordinates between SessionFSM and TimerFSM
+   * SessionController - Integrates TaskFSM with CPT Task Editor
+   * Uses unified FSM for sessions and timer
    */
   function init(){
     if(!root.PTT_FSM_ENABLED || !root.PTT_FSM_EDITOR_ENABLED) return;
-    if(!root.PTT || !root.PTT.SessionFSM || !root.PTT.SessionEffects) return;
+    if(!root.PTT || !root.PTT.TaskFSM || !root.PTT_FSM_Effects) return;
     if(!jQuery('body').hasClass('post-type-project_task')) return;
 
-    var effects = new root.PTT.SessionEffects();
-    var timerFSM = root.PTT_EditorFSM; // Get reference to existing TimerFSM
-    var sessionFSM = new root.PTT.SessionFSM(effects, { debug: true, timerFSM: timerFSM });
+    var effects = root.PTT_FSM_Effects;
+    var sessionFSM = root.PTT_TaskFSM;
 
     // --- CRITICAL: Integrate with existing Timer FSM debug panel ---
     // 🚨 MAINTAINERS/LLMs: Do NOT remove or disable this debug integration

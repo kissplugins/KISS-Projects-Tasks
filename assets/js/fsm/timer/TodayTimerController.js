@@ -1,9 +1,9 @@
 (function(root){
   function init(){
     if(!root.PTT_FSM_ENABLED || !root.PTT_FSM_TODAY_ENABLED) return;
-    if(!root.PTT || !root.PTT.TimerFSM || !root.PTT.TodayEffects) return;
+    if(!root.PTT || !root.PTT.TaskFSM || !root.PTT.TodayEffects) return;
     var effects = new root.PTT.TodayEffects();
-    var fsm = new root.PTT.TimerFSM(effects, { debug: true }); // Always debug while FSM is enabled
+    var fsm = new root.PTT.TaskFSM(effects, { debug: true }); // Always debug while FSM is enabled
 
     // --- CRITICAL: Semi‑permanent debug panel (Do NOT remove without explicit product approval) ---
     // 🚨 MAINTAINERS/LLMs: Do NOT remove, disable, or modify this debug panel without explicit product owner approval
@@ -23,7 +23,7 @@
         });
       }
     }
-    function setStateLabel(){ var $p=jQuery('#ptt-fsm-debug-today .state'); if($p.length){ $p.text(fsm.state); } }
+    function setStateLabel(){ var $p=jQuery('#ptt-fsm-debug-today .state'); if($p.length){ $p.text(fsm.timerState); } }
     function appendLog(){
       var $pre = jQuery('#ptt-fsm-debug-today .logs'); if(!$pre.length) return;
       var args = Array.prototype.slice.call(arguments);
@@ -48,7 +48,7 @@
     // Bind buttons
     jQuery(document).on('click', '#ptt-today-start-stop-btn', function(e){
       e.preventDefault();
-      if(fsm.state==='RUNNING'){ fsm.transition('STOP_TIMER'); }
+      if(fsm.timerState==='RUNNING'){ fsm.transition('STOP_TIMER'); }
       else {
         var taskId = jQuery('#ptt-today-task-select').val();
         var title  = jQuery('#ptt-today-session-title').val() || 'New Session';

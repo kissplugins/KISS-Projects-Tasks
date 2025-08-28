@@ -1,16 +1,12 @@
 (function(root){
   function init(){
     if(!root.PTT_FSM_ENABLED || !root.PTT_FSM_EDITOR_ENABLED) return;
-    if(!root.PTT || !root.PTT.TimerFSM || !root.PTT.EditorEffects) return;
+    if(!root.PTT || !root.PTT.TaskFSM || !root.PTT.EditorEffects || !root.PTT.SessionEffects) return;
     if(!jQuery('body').hasClass('post-type-project_task')) return;
-    var effects = new root.PTT.EditorEffects();
-    var sessionFSM = root.PTT_SessionFSM; // Get reference to existing SessionFSM
-    var fsm = new root.PTT.TimerFSM(effects, { debug: true, sessionFSM: sessionFSM }); // Always debug while FSM is enabled
-
-    // Establish bidirectional FSM coordination
-    if(sessionFSM && !sessionFSM.timerFSM){
-      sessionFSM.timerFSM = fsm;
-    }
+    var effects = Object.assign({}, new root.PTT.EditorEffects(), new root.PTT.SessionEffects());
+    var fsm = new root.PTT.TaskFSM(effects, { debug: true }); // Always debug while FSM is enabled
+    root.PTT_TaskFSM = fsm; // Expose globally for other controllers
+    root.PTT_FSM_Effects = effects;
 
     // --- CRITICAL: Semi‑permanent debug panel (Do NOT remove without explicit product approval) ---
     // 🚨 MAINTAINERS/LLMs: Do NOT remove, disable, or modify this debug panel without explicit product owner approval
@@ -30,7 +26,10 @@
         });
       }
     }
-    function setStateLabel(){ var $p=jQuery('#ptt-fsm-debug-editor .state'); if($p.length){ $p.text(fsm.state); } }
+    function setStateLabel(){
+      var $p=jQuery('#ptt-fsm-debug-editor .state');
+      if($p.length){ $p.text('Timer:'+fsm.timerState+' Session:'+fsm.state); }
+    }
     function appendLog(){ var $pre = jQuery('#ptt-fsm-debug-editor .logs'); if(!$pre.length) return; var args = Array.prototype.slice.call(arguments); var ts = new Date().toISOString().split('T')[1].replace('Z',''); $pre.append('['+ts+'] '+args.join(' ')+'\n'); $pre.scrollTop($pre[0].scrollHeight); }
     ensureDebugPanel();
 
@@ -45,7 +44,7 @@
     fsm.rehydrate().then(function(){
       // Force UI update after rehydration
       if (typeof effects.updateTimerUI === 'function') {
-        effects.updateTimerUI(fsm.state, fsm.ctx);
+        effects.updateTimerUI(fsm.timerState, fsm.timerCtx);
       }
       // Initialize all session rows UI state
       if (typeof effects.initializeAllRows === 'function') {
