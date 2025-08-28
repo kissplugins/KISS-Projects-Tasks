@@ -14,7 +14,13 @@ This document defines a single unified FSM (EditorFSM) to manage all CPT Task Ed
 - All UI events flow through EditorFSM; legacy jQuery handlers are thin shims that send events
 - Effects implement DOM/AJAX, keeping FSM pure/testable
 
-## Scope note — Today page FSM (Deferred)
+## Scope note — Today page to be deleted
+
+UPDATED - Delete Today page and Today FSM to reduce surface area bugs and reduce code base.
+
+We will later build a new Today page as a thin client that reuses the same unified endpoints and effects.
+
+DEPRECATED SECTION
 - All Today page FSM work is deferred to a future phase. This document and the immediate implementation plan focus exclusively on the CPT Task Editor (EditorFSM).
 - Do not wire Today page controllers/effects to the FSM in Phases 1–3 below; keep Today behavior as-is until explicitly scheduled.
 
