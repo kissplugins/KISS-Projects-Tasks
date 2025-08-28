@@ -1,5 +1,14 @@
 # Changelog
 
+## Version 2.3.8 - Add Comprehensive End-to-End Testing
+- **MAJOR**: Added EndToEndWorkflowTest class for real-world user behavior testing
+- **TESTING**: Complete chained workflow test: Create Client → Project → Task → Log Multiple Sessions
+- **TESTING**: Validates data integrity across entire user journey (not just isolated components)
+- **TESTING**: Tests timer sessions, manual sessions, and mixed session types
+- **TESTING**: Includes FSM integration testing when EditorFSM is enabled
+- **TESTING**: Proper cleanup of all test data to prevent pollution
+- **RESULT**: Self-tests now include meaningful real-world usage validation alongside unit tests
+
 ## Version 2.3.7 - Complete EditorFSM Phase 1 Implementation
 - **MAJOR**: Implemented real session saving and validation in EditorEffects.js (FSM-first architecture)
 - **MAJOR**: Wired ACF field change events to send EDIT_FIELD events to EditorFSM for complete session editing flow

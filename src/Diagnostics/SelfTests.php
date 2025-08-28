@@ -348,6 +348,24 @@ class SelfTests {
             ];
         }
 
+        // TEST – End-to-End User Workflow (Real-World Usage)
+        if (class_exists('\KISS\PTT\Diagnostics\SelfTests\EndToEndWorkflowTest')) {
+            $e2e_results = \KISS\PTT\Diagnostics\SelfTests\EndToEndWorkflowTest::runCompleteWorkflow();
+            foreach ($e2e_results as $test_result) {
+                $results[] = [
+                    'name' => $test_result['test'],
+                    'status' => $test_result['status'],
+                    'message' => $test_result['message']
+                ];
+            }
+        } else {
+            $results[] = [
+                'name' => 'E2E: Complete User Workflow',
+                'status' => 'Fail',
+                'message' => 'EndToEndWorkflowTest class not found - real-world workflow testing unavailable'
+            ];
+        }
+
         // Today functionality was removed in v2.3.0 - no longer testing Today session visibility
 
         return $results;
