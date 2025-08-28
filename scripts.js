@@ -824,7 +824,7 @@ jQuery(document).ready(function ($) {
                 window.pttShortcodeTimer.start(selectedTaskId)
                     .done(function (response) {
                         if (response.success) {
-                        const currentTaskName = (selectedTaskId === 'new') ? formData.task_name : $taskSelect.find('option:selected').text();
+                            const currentTaskName = (selectedTaskId === 'new') ? formData.task_name : $taskSelect.find('option:selected').text();
                         const taskPostId = response.data.post_id || selectedTaskId;
                         $('#ptt-active-task-name').text(currentTaskName);
                         $('#ptt-active-task-status').text(response.data.task_status || '');
@@ -836,7 +836,7 @@ jQuery(document).ready(function ($) {
                         startActiveTimer(response.data.start_time);
                         // Save to localStorage for recovery
                         saveActiveTaskToStorage(taskPostId, currentTaskName, response.data.start_time);
-                    } else {
+                        } else {
                          if (response.data.active_task_id) {
                             const stopLink = `<a href="#" class="ptt-stop-and-start-new" data-postid="${response.data.active_task_id}">stop</a>`;
                             const viewLink = `<a href="${ptt_ajax_object.edit_post_link}${response.data.active_task_id}" target="_blank">view the task</a>`;
@@ -845,17 +845,18 @@ jQuery(document).ready(function ($) {
                         } else {
                             showMessage($messageContainer, response.data.message, true);
                         }
-                    }
-                })
-                .fail(function () {
-                    showMessage($messageContainer, 'An unexpected error occurred.', true);
-                })
-                .always(function () {
-                    if (!$activeTaskDisplay.is(':visible')) {
-                        $button.prop('disabled', false);
-                    }
-                    hideSpinner($newTaskForm);
-                });
+                        }
+                    })
+                    .fail(function () {
+                        showMessage($messageContainer, 'An unexpected error occurred.', true);
+                    })
+                    .always(function () {
+                        if (!$activeTaskDisplay.is(':visible')) {
+                            $button.prop('disabled', false);
+                        }
+                        hideSpinner($newTaskForm);
+                    });
+            }
         });
 
         // Click handler for the "stop and start new" link
@@ -1892,4 +1893,12 @@ jQuery(document).ready(function ($) {
             }
         });
     });
+
+    // Race condition test button handler
+    $('#ptt-race-condition-test').on('click', function(e) {
+        e.preventDefault();
+        const testUrl = window.location.origin + window.location.pathname + '?post_type=project_task&page=ptt-race-test';
+        window.open(testUrl, '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
+    });
+
 });

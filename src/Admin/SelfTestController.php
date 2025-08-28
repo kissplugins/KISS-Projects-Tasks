@@ -27,6 +27,14 @@ class SelfTestController {
             'ptt-changelog',
             [__CLASS__, 'renderChangelogPage']
         );
+        add_submenu_page(
+            null, // Hidden from menu
+            'Race Condition Test',
+            'Race Test',
+            'manage_options',
+            'ptt-race-test',
+            [__CLASS__, 'renderRaceTestPage']
+        );
     }
 
     public static function handleFlagSave(){
@@ -61,6 +69,112 @@ class SelfTestController {
             echo '<pre>' . esc_html( $content ) . '</pre>';
             echo '<p><em>To view the entire changelog, please open the changelog.md file in a text viewer.</em></p>';
         }
+        echo '</div>';
+    }
+
+    public static function renderRaceTestPage() {
+        // Get a test task for timer operations
+        $test_tasks = get_posts([
+            'post_type' => 'project_task',
+            'posts_per_page' => 5,
+            'post_status' => 'publish'
+        ]);
+
+        echo '<div class="wrap">';
+        echo '<h1>Race Condition Test</h1>';
+        echo '<p>This page tests that multiple timer operations cannot create race conditions or data conflicts.</p>';
+        echo '<p><strong>Instructions:</strong></p>';
+        echo '<ol>';
+        echo '<li>Open this page in multiple browser tabs</li>';
+        echo '<li>Try starting and stopping timers simultaneously in different tabs</li>';
+        echo '<li>Verify that only one timer can be active at a time</li>';
+        echo '<li>Check that session data remains consistent across tabs</li>';
+        echo '</ol>';
+
+        if (empty($test_tasks)) {
+            echo '<div class="notice notice-warning"><p>No tasks found. Please create at least one task to test timer functionality.</p></div>';
+        } else {
+            echo '<div class="card" style="max-width: 600px; padding: 20px;">';
+            echo '<h2>Timer Test Controls</h2>';
+
+            foreach ($test_tasks as $task) {
+                echo '<div style="margin-bottom: 15px; padding: 10px; border: 1px solid #ddd;">';
+                echo '<h3>' . esc_html($task->post_title) . '</h3>';
+                echo '<button class="button button-primary ptt-race-start-timer" data-task-id="' . $task->ID . '">Start Timer</button> ';
+                echo '<button class="button button-secondary ptt-race-stop-timer" data-task-id="' . $task->ID . '">Stop Timer</button>';
+                echo '<div class="ptt-race-status" data-task-id="' . $task->ID . '" style="margin-top: 5px; font-style: italic;">Ready</div>';
+                echo '</div>';
+            }
+
+            echo '</div>';
+        }
+
+        echo '<div class="card" style="max-width: 600px; padding: 20px; margin-top: 20px;">';
+        echo '<h2>Test Log</h2>';
+        echo '<div id="ptt-race-log" style="height: 200px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px; background: #f9f9f9; font-family: monospace; font-size: 12px;"></div>';
+        echo '<button class="button" onclick="document.getElementById(\'ptt-race-log\').innerHTML = \'\'">Clear Log</button>';
+        echo '</div>';
+
+        // Add JavaScript for race condition testing
+        echo '<script>
+        jQuery(document).ready(function($) {
+            function log(message) {
+                const timestamp = new Date().toLocaleTimeString();
+                const logDiv = $("#ptt-race-log");
+                logDiv.append("[" + timestamp + "] " + message + "\\n");
+                logDiv.scrollTop(logDiv[0].scrollHeight);
+            }
+
+            $(".ptt-race-start-timer").on("click", function() {
+                const taskId = $(this).data("task-id");
+                const statusDiv = $(".ptt-race-status[data-task-id=\'" + taskId + "\']");
+
+                log("Starting timer for task " + taskId + "...");
+                statusDiv.text("Starting...");
+
+                window.pttShortcodeTimer.start(taskId)
+                    .done(function(response) {
+                        if (response.success) {
+                            log("✓ Timer started for task " + taskId);
+                            statusDiv.text("Timer running").css("color", "green");
+                        } else {
+                            log("✗ Failed to start timer for task " + taskId + ": " + (response.data.message || "Unknown error"));
+                            statusDiv.text("Start failed").css("color", "red");
+                        }
+                    })
+                    .fail(function() {
+                        log("✗ Network error starting timer for task " + taskId);
+                        statusDiv.text("Network error").css("color", "red");
+                    });
+            });
+
+            $(".ptt-race-stop-timer").on("click", function() {
+                const taskId = $(this).data("task-id");
+                const statusDiv = $(".ptt-race-status[data-task-id=\'" + taskId + "\']");
+
+                log("Stopping timer for task " + taskId + "...");
+                statusDiv.text("Stopping...");
+
+                window.pttShortcodeTimer.stop(taskId)
+                    .done(function(response) {
+                        if (response.success) {
+                            log("✓ Timer stopped for task " + taskId + " (Duration: " + (response.data.duration || "N/A") + ")");
+                            statusDiv.text("Timer stopped").css("color", "blue");
+                        } else {
+                            log("✗ Failed to stop timer for task " + taskId + ": " + (response.data.message || "Unknown error"));
+                            statusDiv.text("Stop failed").css("color", "red");
+                        }
+                    })
+                    .fail(function() {
+                        log("✗ Network error stopping timer for task " + taskId);
+                        statusDiv.text("Network error").css("color", "red");
+                    });
+            });
+
+            log("Race condition test page loaded. Tab ID: " + Math.random().toString(36).substr(2, 9));
+        });
+        </script>';
+
         echo '</div>';
     }
 
@@ -107,6 +221,11 @@ class SelfTestController {
         }
         echo '</p>';
         echo '<div id="ptt-test-results-container" style="margin-top:20px;"><div class="ptt-ajax-spinner" style="display:none;"></div></div>';
+        echo '<hr />';
+        echo '<h2>Race Condition Test</h2>';
+        echo '<p>Test that multiple timer operations cannot create race conditions or data conflicts.</p>';
+        echo '<button id="ptt-race-condition-test" class="button button-secondary">Open Multi-Tab Timer Test</button>';
+        echo '<p><em>This will open a new tab with a test interface. Try starting/stopping timers simultaneously in multiple tabs to verify no race conditions occur.</em></p>';
         echo '<hr />';
         echo '<button id="ptt-sync-authors" class="button">Synchronize Authors &rarr; Assignee</button>';
         echo '<p id="ptt-sync-authors-result"></p>';

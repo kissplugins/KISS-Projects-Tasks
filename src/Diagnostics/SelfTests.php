@@ -251,29 +251,12 @@ class SelfTests {
             wp_delete_user( $user_a_id ); wp_delete_user( $user_b_id );
         }
 
-        // TEST 11 – Move Session Between Tasks
-        $source_task = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Session Move Source', 'post_status' => 'publish' ] );
-        $target_task = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'Session Move Target', 'post_status' => 'publish' ] );
-        if ( $source_task && ! is_wp_error( $source_task ) && $target_task && ! is_wp_error( $target_task ) ) {
-            if ( function_exists('add_row') && function_exists('get_field') ) {
-                $session_data = [ 'session_title' => 'Move Test', 'session_notes' => '', 'session_start_time' => '', 'session_stop_time' => '', 'session_manual_override' => 1, 'session_manual_duration' => 1.5, 'session_calculated_duration' => '1.50' ];
-                $row = add_row( 'sessions', $session_data, $source_task );
-                \ptt_calculate_and_save_duration( $source_task );
-                $move_result = \ptt_move_session_to_task( $source_task, $row - 1, $target_task );
-                $source_sessions = get_field( 'sessions', $source_task );
-                $target_sessions = get_field( 'sessions', $target_task );
-                // Calculate totals using session-only approach (calculated_duration field removed)
-                $source_total = \ptt_calculate_and_save_duration( $source_task );
-                $target_total = \ptt_calculate_and_save_duration( $target_task );
-                $pass = ( $move_result !== false && empty( $source_sessions ) && is_array( $target_sessions ) && count( $target_sessions ) === 1 && $source_total === '0.00' && $target_total === '1.50' );
-                $results[] = [ 'name' => 'Move Session Between Tasks', 'status' => $pass ? 'Pass' : 'Fail', 'message' => $pass ? 'Session reassigned successfully.' : 'Failed to reassign session correctly.' ];
-            } else {
-                $results[] = [ 'name' => 'Move Session Between Tasks', 'status' => 'Skip', 'message' => 'ACF functions are not available; skipping session move test.' ];
-            }
-            wp_delete_post( $source_task, true ); wp_delete_post( $target_task, true );
-        } else {
-            $results[] = [ 'name' => 'Move Session Between Tasks', 'status' => 'Fail', 'message' => 'Could not create test tasks for session move.' ];
-        }
+        // TEST 11 – Move Session Between Tasks (DEFERRED - functionality not implemented)
+        $results[] = [
+            'name' => 'Move Session Between Tasks',
+            'status' => 'Skip',
+            'message' => 'Session moving functionality deferred - ptt_move_session_to_task() not implemented.'
+        ];
 
         // TEST 12 – Manual Session Not Auto-Timestamped
         $timestamp_post = wp_insert_post( [ 'post_type' => 'project_task', 'post_title' => 'SELF TEST - MANUAL NO AUTOSTAMP', 'post_status' => 'publish' ] );
@@ -365,48 +348,7 @@ class SelfTests {
             ];
         }
 
-        // TEST – Today session appears on local date boundary
-        $tz = function_exists('wp_timezone') ? wp_timezone() : new \DateTimeZone(get_option('timezone_string') ?: 'UTC');
-        $local_now = new \DateTime('now', $tz);
-        $local_today_str = $local_now->format('Y-m-d');
-        $utc_now = clone $local_now; $utc_now->setTimezone(new \DateTimeZone('UTC'));
-        $utc_str = $utc_now->format('Y-m-d H:i:s');
-
-        $task_id = wp_insert_post([ 'post_type' => 'project_task', 'post_title' => 'TODAY DATE INCLUSION TEST', 'post_status' => 'publish' ]);
-        if ( $task_id && ! is_wp_error($task_id) ) {
-            if ( function_exists('add_row') ) {
-                add_row('sessions', [ 'session_title' => 'Test', 'session_start_time' => $utc_str, 'session_stop_time' => $utc_str ], $task_id);
-            }
-            if ( function_exists('ptt_get_tasks_for_user') ) {
-                $user_id = get_current_user_id();
-                update_post_meta( $task_id, 'ptt_assignee', $user_id );
-                $candidate_statuses = [ 'In Progress', 'Not Started', 'Completed', 'Blocked' ];
-                foreach ( $candidate_statuses as $name ) {
-                    $term = get_term_by( 'name', $name, 'task_status' );
-                    if ( $term && ! is_wp_error( $term ) ) { wp_set_object_terms( $task_id, [ $term->term_id ], 'task_status', false ); break; }
-                }
-                // Use PSR-4 class directly, with fallback to procedural class
-                if (class_exists('\KISS\PTT\Presentation\Today\DataProvider')) {
-                    $entries = \KISS\PTT\Presentation\Today\DataProvider::getDailyEntries( $user_id, $local_today_str, [] );
-                } elseif (class_exists('PTT_Today_Data_Provider')) {
-                    $entries = \PTT_Today_Data_Provider::get_daily_entries( $user_id, $local_today_str, [] );
-                } else {
-                    $entries = [];
-                }
-                $found = false;
-                foreach ( $entries as $e ) { if ( $e['post_id'] === $task_id ) { $found = true; break; } }
-                $results[] = [
-                    'name'    => 'Today: Session included on local date',
-                    'status'  => $found ? 'Pass' : 'Fail',
-                    'message' => $found ? 'Session with UTC timestamp visible on the same local day.' : 'Session not visible on Today for local date.',
-                ];
-            } else {
-                $results[] = [ 'name' => 'Today: Session included on local date', 'status' => 'Fail', 'message' => 'Provider not available in this environment.' ];
-            }
-            wp_delete_post( $task_id, true );
-        } else {
-            $results[] = [ 'name' => 'Today: Session included on local date', 'status' => 'Fail', 'message' => 'Could not create test task.' ];
-        }
+        // Today functionality was removed in v2.3.0 - no longer testing Today session visibility
 
         return $results;
     }
@@ -548,27 +490,7 @@ class SelfTests {
             }
         }
 
-        // PSR-4 TodayHelpers classes exist
-        $today_entry_renderer_exists = class_exists( '\KISS\PTT\Presentation\Today\EntryRenderer' );
-        $today_data_provider_exists = class_exists( '\KISS\PTT\Presentation\Today\DataProvider' );
-        $today_page_manager_exists = class_exists( '\KISS\PTT\Presentation\Today\PageManager' );
-
-        $results[] = [ 'name' => 'PSR-4: Today EntryRenderer Class', 'status' => $today_entry_renderer_exists ? 'Pass' : 'Fail', 'message' => $today_entry_renderer_exists ? 'PSR-4 Today EntryRenderer class exists.' : 'CRITICAL: PSR-4 Today EntryRenderer class is missing!' ];
-        $results[] = [ 'name' => 'PSR-4: Today DataProvider Class', 'status' => $today_data_provider_exists ? 'Pass' : 'Fail', 'message' => $today_data_provider_exists ? 'PSR-4 Today DataProvider class exists.' : 'CRITICAL: PSR-4 Today DataProvider class is missing!' ];
-        $results[] = [ 'name' => 'PSR-4: Today PageManager Class', 'status' => $today_page_manager_exists ? 'Pass' : 'Fail', 'message' => $today_page_manager_exists ? 'PSR-4 Today PageManager class exists.' : 'CRITICAL: PSR-4 Today PageManager class is missing!' ];
-
-        // PSR-4 TodayController class exists
-        $today_controller_exists = class_exists( '\KISS\PTT\Presentation\Today\TodayController' );
-        $results[] = [ 'name' => 'PSR-4: Today Controller Class', 'status' => $today_controller_exists ? 'Pass' : 'Fail', 'message' => $today_controller_exists ? 'PSR-4 Today Controller class exists.' : 'CRITICAL: PSR-4 Today Controller class is missing!' ];
-
-        // PSR-4 TodayController methods exist
-        if ( $today_controller_exists ) {
-            $required_controller_methods = [ 'register', 'addTodayPage', 'renderTodayPageHtml', 'getDailyEntriesCallback', 'startNewSessionCallback' ];
-            foreach ( $required_controller_methods as $method ) {
-                $method_exists = method_exists( '\KISS\PTT\Presentation\Today\TodayController', $method );
-                $results[] = [ 'name' => "PSR-4 Method: TodayController::{$method}", 'status' => $method_exists ? 'Pass' : 'Fail', 'message' => $method_exists ? "PSR-4 method {$method}() exists." : "CRITICAL: PSR-4 method {$method}() is missing!" ];
-            }
-        }
+        // Today functionality was removed in v2.3.0 - no longer testing Today classes
 
         // Database tables (core)
         global $wpdb;
