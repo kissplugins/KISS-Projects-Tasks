@@ -16,6 +16,30 @@ jQuery(document).ready(function ($) {
         showError: function(msg){ if (window.console) console.warn('[PTT]', msg); },
         rehydrate: function(){ return Promise.resolve({ running: false }); }
     };
+
+    // Unified timer interface for shortcode - routes through EditorFSM session endpoints
+    window.pttShortcodeTimer = {
+        start: function(postId) {
+            return jQuery.post(ptt_ajax_object.ajax_url, {
+                action: 'ptt_start_session_timer',
+                nonce: ptt_ajax_object.nonce,
+                post_id: postId,
+                row_index: 0  // Shortcode always uses first session row
+            });
+        },
+        stop: function(postId) {
+            return jQuery.post(ptt_ajax_object.ajax_url, {
+                action: 'ptt_stop_session_timer',
+                nonce: ptt_ajax_object.nonce,
+                post_id: postId,
+                row_index: 0  // Shortcode always uses first session row
+            });
+        },
+        forceStop: function(postId) {
+            // Force stop by directly stopping session 0, then clearing any parent-level state
+            return this.stop(postId);
+        }
+    };
     window.PTT_FSM = window.PTT_FSM || {
         timerState: 'DISABLED',
         dataState: 'DISABLED',
@@ -473,12 +497,7 @@ jQuery(document).ready(function ($) {
         $btn.prop('disabled', true);
         showSpinner($controls);
 
-        $.post(ptt_ajax_object.ajax_url, {
-            action: 'ptt_start_session_timer',
-            nonce: ptt_ajax_object.nonce,
-            post_id: postId,
-            row_index: index
-        }).done(function(response){
+        window.pttShortcodeTimer.start(postId).done(function(response){
             if (response.success) {
                 $row.find('[data-key="field_ptt_session_start_time"] input').val(response.data.start_time).trigger('change');
                 $btn.hide();
@@ -507,12 +526,7 @@ jQuery(document).ready(function ($) {
         $btn.prop('disabled', true);
         showSpinner($controls);
 
-        $.post(ptt_ajax_object.ajax_url, {
-            action: 'ptt_stop_session_timer',
-            nonce: ptt_ajax_object.nonce,
-            post_id: postId,
-            row_index: index
-        }).done(function(response){
+        window.pttShortcodeTimer.stop(postId).done(function(response){
             if (response.success) {
                 stopLiveTimer($controls);
                 $row.find('[data-key="field_ptt_session_stop_time"] input').val(response.data.stop_time).trigger('change');
@@ -806,17 +820,10 @@ jQuery(document).ready(function ($) {
                     notes: $('#ptt_notes').val(),
                 };
             } else {
-                ajaxAction = 'ptt_start_timer';
-                formData = {
-                    action: ajaxAction,
-                    nonce: ptt_ajax_object.nonce,
-                    post_id: selectedTaskId
-                };
-            }
-
-            $.post(ptt_ajax_object.ajax_url, formData)
-                .done(function (response) {
-                    if (response.success) {
+                // Use unified shortcode timer interface
+                window.pttShortcodeTimer.start(selectedTaskId)
+                    .done(function (response) {
+                        if (response.success) {
                         const currentTaskName = (selectedTaskId === 'new') ? formData.task_name : $taskSelect.find('option:selected').text();
                         const taskPostId = response.data.post_id || selectedTaskId;
                         $('#ptt-active-task-name').text(currentTaskName);
@@ -859,11 +866,7 @@ jQuery(document).ready(function ($) {
 
             $link.text('Stopping...');
 
-            $.post(ptt_ajax_object.ajax_url, {
-                action: 'ptt_stop_timer',
-                nonce: ptt_ajax_object.nonce,
-                post_id: postId,
-            }).done(function(response) {
+            window.pttShortcodeTimer.stop(postId).done(function(response) {
                 if (response.success) {
                     $('#ptt-frontend-message').fadeOut('slow', function() {
                         $(this).html('').show();
@@ -894,11 +897,7 @@ jQuery(document).ready(function ($) {
             showSpinner($activeTaskDisplay);
             $button.prop('disabled', true);
 
-            $.post(ptt_ajax_object.ajax_url, {
-                action: 'ptt_stop_timer',
-                nonce: ptt_ajax_object.nonce,
-                post_id: postId,
-            }).done(function(response) {
+            window.pttShortcodeTimer.stop(postId).done(function(response) {
                 if (response.success) {
                     $activeTaskDisplay.hide();
                     $newTaskForm.trigger('reset');
@@ -956,11 +955,7 @@ jQuery(document).ready(function ($) {
             $button.prop('disabled', true);
             $('#ptt-frontend-stop-btn').prop('disabled', true);
 
-            $.post(ptt_ajax_object.ajax_url, {
-                action: 'ptt_force_stop_timer',
-                nonce: ptt_ajax_object.nonce,
-                post_id: postId,
-            }).done(function(response) {
+            window.pttShortcodeTimer.forceStop(postId).done(function(response) {
                 if (response.success) {
                     $activeTaskDisplay.hide();
                     $newTaskForm.trigger('reset');
@@ -1245,8 +1240,8 @@ jQuery(document).ready(function ($) {
             return new TimerFSM();
         }
 
-        if (window.PTT_FSM_ENABLED) {
-            // Override effects with Today-page aware implementations
+        if (false && window.PTT_FSM_ENABLED) {
+            // Today page FSM removed - this block is disabled
             window.pttEffects = Object.assign({}, window.pttEffects, {
                 startTimer: function(data){
                     var taskId = data.taskId, title = (data.title||'').trim(), clientId = data.clientId||'';

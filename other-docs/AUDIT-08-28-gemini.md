@@ -101,18 +101,21 @@ This section outlines a prioritized checklist of actionable items to improve the
 - ✅ Delete the entire `src/Presentation/Today/` directory.
 - ✅ Remove the inclusion of `src/Presentation/Today/today-compat.php` from `src/Plugin.php`.
 
-### Unify AJAX Endpoints into the EditorFSM
+### Integrate Timer Operations Directly into EditorFSM
 
 **Goal:** Eliminate the risk of race conditions and create a single, authoritative point for all timer-related actions. This is the most critical architectural improvement.
 
 **Status:** 🔄 **IN PROGRESS**
 
+**Revised Approach:** Skip intermediate unified AJAX controller and integrate timer operations directly into the FSM for cleaner architecture.
+
 **Action Items:**
 
-- [ ] Create a new, unified AJAX handler within a relevant PSR-4 class (e.g., `src/Admin/AjaxController.php`).
-- [ ] Modify the EditorFSM's effects (`assets/js/fsm/timer/EditorEffects.js`) to use this new, single AJAX endpoint for all timer actions (start, stop, etc.).
-- [ ] Update the frontend shortcode's JavaScript logic in `scripts.js` to also use this new, unified AJAX endpoint.
-- [ ] Deprecate and remove the old, separate AJAX handlers in `legacy-core.php` and `shortcodes.php`.
+- [x] ~~Create a new, unified AJAX handler within a relevant PSR-4 class~~ **SKIPPED** - Direct FSM integration is cleaner
+- [x] ~~Modify the EditorFSM's effects to use new endpoint~~ **NOT NEEDED** - EditorFSM already uses session endpoints
+- [ ] **Route shortcode timer calls through EditorFSM** instead of legacy AJAX endpoints
+- [ ] **Remove legacy timer AJAX handlers** (`ptt_start_timer_callback`, `ptt_stop_timer_callback`) from `legacy-core.php`
+- [ ] **Keep session-only endpoints** (`ptt_start_session_timer`, `ptt_stop_session_timer`) as they're FSM-compatible
 
 ### Refactor Legacy Code and Complete PSR-4 Migration
 

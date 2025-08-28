@@ -2,6 +2,12 @@
 
 
 
+## Version 2.3.1 - Route shortcode timer calls through EditorFSM session endpoints
+- Added unified shortcode timer interface (pttShortcodeTimer) that routes through session endpoints instead of disabled legacy endpoints.
+- Replaced all shortcode timer AJAX calls (ptt_start_timer, ptt_stop_timer, ptt_force_stop_timer) with session-based equivalents.
+- Disabled Today page FSM code block since Today page was removed in v2.3.0.
+- This eliminates race conditions by ensuring all timer operations go through the same session-only endpoints that EditorFSM uses.
+- Shortcode timers now use row_index: 0 (first session) for consistency with session-based architecture.
 
 ## Version 2.3.0 - Remove Today page and related FSM bundles (deferred feature)
 - Removed Today admin page, controllers, and helper classes under src/Presentation/Today/.
