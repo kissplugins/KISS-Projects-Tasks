@@ -1,5 +1,8 @@
 # Changelog
 
+## Version 2.2.13 - ADDED REMOTE UPDATE FEATURE
+- Plugin can update in one click and show the latest update. 
+
 ## Version 2.2.12 - Function redeclaration fix + timezone documentation
 - Fixed fatal error: Cannot redeclare ptt_get_active_session_index_for_user() by adding function_exists() check in helpers.php.
 - Added PROJECT-TIMEZONE.md documenting timezone handling architecture, potential issues, and recommendations.
